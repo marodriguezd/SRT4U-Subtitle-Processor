@@ -1,5 +1,9 @@
 # SRT4U - Subtitle Processor (PyQt Version)
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue)](https://opensource.org/licenses/Apache-2.0)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-yellow?logo=python&logoColor=white)](https://www.python.org/)
+[![PyQt](https://img.shields.io/badge/PyQt-6.4%2B-3D9D5B)](https://pypi.org/project/PyQt6/)
+
 ---
 
 ## Translate, Clean, and Convert SRT/VTT Subtitles  
