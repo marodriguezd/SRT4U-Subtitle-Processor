@@ -10,7 +10,7 @@
 
 ## Traduce, Limpia y Convierte Subtítulos SRT/VTT con Elegancia
 
-![Captura de pantalla de la aplicación](https://raw.githubusercontent.com/marodriguezd/SRT4U_Subtitle-Processor/main/assets/demo-screenshot.png)
+![Captura de pantalla de la aplicación](https://raw.githubusercontent.com/marodriguezd/SRT4U_Subtitle-Processor/main/assets/demo-screenshot_test.png)
 
 **SRT4U** es una aplicación de escritorio premium desarrollada con Python 3.13 y PyQt6, diseñada para procesar archivos de subtítulos con un enfoque en la velocidad, la fiabilidad y una impresionante interfaz de usuario estilo **Glassmorphism**.
 
