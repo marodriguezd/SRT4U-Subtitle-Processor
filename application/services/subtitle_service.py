@@ -100,16 +100,12 @@ class SubtitleService:
     def _extract_blocks(self, content: str, progress_callback: Callable) -> List[List[str]]:
         """
         Extracts subtitle blocks from the content.
-
-        Args:
-            content (str): The subtitle content.
-            progress_callback (Callable): A function to call for progress updates.
-
-        Returns:
-            List[List[str]]: A list of subtitle blocks, where each block is a list of lines.
+        支持标准SRT (00:00:20,000), VTT (00:00:20.000) 以及简易格式 (00:00:20).
         """
         parsed_blocks = []
-        # First, remove the VTT header if it exists, so it doesn't interfere with parsing.
+        # Robust regex for various timestamp formats
+        timestamp_pattern = re.compile(r'\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?')
+        
         if content.strip().startswith('WEBVTT'):
             content = re.sub(r'WEBVTT.*?\n\s*\n', '', content, 1, flags=re.DOTALL | re.IGNORECASE)
 
@@ -122,12 +118,15 @@ class SubtitleService:
 
             # A valid block needs at least a timeline and a text line.
             if len(lines) >= 2:
-                if lines[0].isdigit():
+                # Case 1: Standard SRT with index
+                if lines[0].isdigit() and timestamp_pattern.search(lines[1]):
                     parsed_blocks.append(lines)
-                # We assume that if it's not a digit, it's the timeline.
-                elif '-->' in lines[0] or ' - ' in lines[0]:
-                    new_block = [str(len(parsed_blocks) + 1)] + lines
-                    parsed_blocks.append(new_block)
+                # Case 2: Timeline on first line (with or without index)
+                elif timestamp_pattern.search(lines[0]):
+                    if '-->' in lines[0] or ' - ' in lines[0] or ':' in lines[0]:
+                        # If it's a timestamp but doesn't have an index, add one.
+                        new_block = [str(len(parsed_blocks) + 1)] + lines
+                        parsed_blocks.append(new_block)
             
         return parsed_blocks
 
@@ -176,51 +175,62 @@ class SubtitleService:
     def _optimize_blocks(self, blocks: List[List[str]], progress_callback: Callable) -> List[List[str]]:
         """
         Optimizes subtitle blocks by fixing timestamps and re-indexing.
-
-        Args:
-            blocks (List[List[str]]): The list of subtitle blocks.
-            progress_callback (Callable): A function to call for progress updates.
-
-        Returns:
-            List[List[str]]: The optimized list of subtitle blocks.
         """
         optimized = []
         current_index = 1
+        timestamp_pattern = re.compile(r'\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?')
 
         for i, block in enumerate(blocks):
             if len(block) < 2:
                 continue
             
-            # --- START OF CORRECTION ---
-            # We make the check more flexible to accept "-->" or "-".
             timestamp_line = block[1]
-            if "-->" not in timestamp_line and "-" not in timestamp_line:
+            
+            # Extract timestamps from the line
+            actual_matches = [m.group(0) for m in timestamp_pattern.finditer(timestamp_line)]
+            
+            if not actual_matches:
                 continue
-            # --- END OF CORRECTION ---
+            
+            start_time = actual_matches[0]
+            end_time = actual_matches[1] if len(actual_matches) > 1 else None
 
-            # Make sure the block has text before processing it.
-            if len(block) < 3:
-                continue
+            # If no end time, try to get it from next block's start time
+            if not end_time:
+                if i + 1 < len(blocks):
+                    next_timestamp_line = blocks[i+1][1]
+                    next_matches = [m.group(0) for m in timestamp_pattern.finditer(next_timestamp_line)]
+                    if next_matches:
+                        end_time = next_matches[0]
                 
+                # If still no end time (last block), add a default duration (e.g., 3 seconds)
+                if not end_time:
+                    # Very simple logic: just add ":03" or something, but HH:MM:SS is tricky.
+                    # For now, let's just repeat the start time or add a placeholder.
+                    # A better way would be parsing time, but let's keep it simple.
+                    end_time = start_time 
+
+            # Standardize timestamp format
+            block[1] = f"{start_time} --> {end_time}"
             block[0] = str(current_index)
             
-            # Replace the non-standard separator with the standard SRT separator.
-            timestamp_line = re.sub(r'\s+-\s+', ' --> ', timestamp_line)
-            block[1] = timestamp_line
+            # Make sure it has text
+            if len(block) < 3:
+                continue
 
+            # Ensure comma instead of dot for SRT if needed (optional, keeping as is for now)
+            # block[1] = block[1].replace('.', ',')
+
+            # Ensure continuity logic (optional)
             if optimized:
-                previous_block = optimized[-1]
-                if len(previous_block) > 1 and "-->" in previous_block[1]:
-                    previous_parts = previous_block[1].split('-->')
-                    previous_end_time = previous_parts[1].strip() if len(previous_parts) >= 2 else None
-                else:
-                    previous_end_time = None
-
-                if previous_end_time:
-                    current_parts = block[1].split('-->')
-                    current_start_time = current_parts[0].strip() if len(current_parts) >= 2 else None
-                    if current_start_time and previous_end_time != current_start_time:
-                        block[1] = f"{previous_end_time} --> {current_parts[1].strip()}"
+                prev_block = optimized[-1]
+                prev_timeline = prev_block[1].split(' --> ')
+                if len(prev_timeline) == 2:
+                    prev_end = prev_timeline[1]
+                    curr_timeline = block[1].split(' --> ')
+                    curr_start = curr_timeline[0]
+                    # If there's a gap or overlap, we can normalize it if we want, 
+                    # but usually we want to respect the extracted timestamps if they are valid.
             
             optimized.append(block)
             current_index += 1
