@@ -169,4 +169,4 @@ resources/example_esp.srt
 resources
 
 # Release Templates
-GITHUB_RELEASE_TEMPLATE.md
+assets/github-release-template.md
