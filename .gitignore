@@ -167,7 +167,5 @@ outputs/output.srt
 resources/example.srt
 resources/example_esp.srt
 resources
-icon.ico
 
 # Release Templates
-GITHUB_RELEASE_TEMPLATE.md
