@@ -1,5 +1,6 @@
 # application/services/subtitle_service.py
 import re
+import concurrent.futures
 from typing import Optional, Callable, List
 from .translation_service import TranslationService
 
@@ -10,13 +11,14 @@ class SubtitleService:
     and optimizing subtitle blocks.
     """
 
-    def __init__(self, batch_size: int = 50):
+    def __init__(self, batch_size: int = 50, max_workers: int = 10):
         """
         Initializes the SubtitleService.
 
         Args:
             batch_size (int): The number of subtitle blocks to process in a batch
                               for operations like translation.
+            max_workers (int): Maximum number of parallel translation workers.
         """
         self.translation_service = TranslationService()
         self.spam_patterns = [
@@ -34,6 +36,7 @@ class SubtitleService:
             r".*?/[a-zA-Z0-9]{12}.*",  # Matches any line containing a Telegram ID
         ]
         self.batch_size = batch_size
+        self.max_workers = max_workers
 
     def process_subtitles(self, file_path: str, translate: bool, target_language: Optional[str],
                           progress_callback: Callable) -> str:
@@ -133,43 +136,47 @@ class SubtitleService:
     def _translate_blocks(self, blocks: List[List[str]], target_language: str,
                           progress_callback: Callable) -> List[List[str]]:
         """
-        Translates the text in each subtitle block.
-
-        Args:
-            blocks (List[List[str]]): The list of subtitle blocks.
-            target_language (str): The target language for translation.
-            progress_callback (Callable): A function to call for progress updates.
-
-        Returns:
-            List[List[str]]: The list of subtitle blocks with translated text.
+        Translates the text in each subtitle block using multi-threading.
         """
-        translated_blocks = []
         total_blocks = len(blocks)
-        progress_callback('status', 'Translating subtitles...')
+        progress_callback('status', f'Translating {total_blocks} subtitles (parallel)...')
 
-        for i, block in enumerate(blocks):
+        results = [None] * total_blocks
+        
+        def translate_single_block(index, block):
             if len(block) < 3:
-                translated_blocks.append(block)
-                continue
+                return index, block
 
             original_text = "\n".join(block[2:])
             if not original_text.strip():
-                translated_blocks.append(block)
-                continue
+                return index, block
 
             try:
                 translated_text = self.translation_service.translate_text(original_text, target_language)
                 translated_lines = translated_text.split("\n")
                 new_block = [block[0], block[1]] + translated_lines
-                translated_blocks.append(new_block)
+                return index, new_block
             except Exception as e:
-                error_message = f"Failed to translate block #{block[0]} (time: {block[1]}): {e}"
-                progress_callback('error', error_message)
-                raise RuntimeError(error_message)
+                raise RuntimeError(f"Block #{block[0]} translation failed: {e}")
 
-            progress = (i + 1) / total_blocks * 0.8
-            progress_callback('progress', progress)
-        return translated_blocks
+        completed_count = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_index = {executor.submit(translate_single_block, i, b): i for i, b in enumerate(blocks)}
+            
+            for future in concurrent.futures.as_completed(future_to_index):
+                try:
+                    index, translated_block = future.result()
+                    results[index] = translated_block
+                    completed_count += 1
+                    
+                    progress = (completed_count / total_blocks) * 0.8
+                    progress_callback('progress', progress)
+                except Exception as e:
+                    progress_callback('error', str(e))
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise
+
+        return results
 
 
     def _optimize_blocks(self, blocks: List[List[str]], progress_callback: Callable) -> List[List[str]]:
