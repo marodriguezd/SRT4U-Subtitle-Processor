@@ -67,10 +67,10 @@ class SubtitleService:
         subtitle_blocks = self._extract_blocks(processed_content, progress_callback)
 
         if not subtitle_blocks:
-            progress_callback(
-                "error", "Could not find any valid subtitle blocks in the file."
+            raise ValueError(
+                "No valid subtitle blocks found. Make sure your file contains "
+                "subtitle timestamps (e.g., 00:00:20,000 --> 00:00:23,500)."
             )
-            return ""
 
         progress_callback("info", f"Total subtitles found: {len(subtitle_blocks)}")
 
