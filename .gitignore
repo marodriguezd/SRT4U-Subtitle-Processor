@@ -170,3 +170,6 @@ resources
 
 # Release Templates
 assets/GITHUB_RELEASE_TEMPLATE.md
+
+# Agent instructions
+AGENTS.md
