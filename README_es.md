@@ -8,7 +8,7 @@
 
 ---
 
-## Traduce, Limpia y Convierte Subtítulos SRT/VTT con Elegancia
+## Traduce, Limpia y Convierte Archivos de Subtítulos con Elegancia
 
 ![Captura de pantalla de la aplicación](https://raw.githubusercontent.com/marodriguezd/SRT4U_Subtitle-Processor/main/assets/demo-screenshot.png)
 
@@ -31,7 +31,7 @@ La última versión presenta una renovación arquitectónica completa:
 - **🌍 Traducción Inteligente**: Impulsado por `deep-translator`. Traduce a más de 100 idiomas manteniendo la integridad del cronometraje original.
 - **🚀 Motor en Paralelo**: Nueva arquitectura multihilo que procesa múltiples bloques de subtítulos simultáneamente, reduciendo el tiempo de traducción hasta en un 80%.
 - **🧹 Limpieza Experta**: Elimina automáticamente spam promocional, IDs de Telegram, URLs y símbolos musicales.
-- **🔄 Soporte de Formato Dual**: Convierte sin problemas entre `.srt` y `.vtt`.
+- **🔄 Soporte Multi-Formato**: Convierte sin problemas entre `.srt` y `.vtt`. También soporta archivos `.txt` que contienen marcas de tiempo de subtítulos.
 - **⚡ Rendimiento Nativo**: Procesamiento totalmente asíncrono; la interfaz nunca se congela, incluso durante tareas de traducción pesadas.
 
 ---
