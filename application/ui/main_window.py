@@ -6,10 +6,24 @@ from typing import Optional
 
 from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt, QSize
 from PyQt6.QtGui import QFont, QIcon, QColor, QPalette
-from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
-                             QLabel, QPushButton, QFileDialog, QCheckBox,
-                             QLineEdit, QComboBox, QProgressBar, QTextEdit,
-                             QMessageBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect)
+from PyQt6.QtWidgets import (
+    QMainWindow,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWidget,
+    QLabel,
+    QPushButton,
+    QFileDialog,
+    QCheckBox,
+    QLineEdit,
+    QComboBox,
+    QProgressBar,
+    QTextEdit,
+    QMessageBox,
+    QFrame,
+    QSizePolicy,
+    QGraphicsDropShadowEffect,
+)
 
 from ..services.file_service import FileService
 from ..services.subtitle_service import SubtitleService
@@ -17,20 +31,22 @@ from ..services.translation_service import TranslationService
 from .styles import Styles
 from .widgets import GlassCard, GlassButton, GlassInput
 
+
 class ProgressSignal(QObject):
     progress_updated = pyqtSignal(str, object)
+
 
 class GlassMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.input_file_path: Optional[str] = None
         self.output_directory: Optional[str] = None
-        self.output_format: str = 'srt'
-        
+        self.output_format: str = "srt"
+
         self.file_service = FileService()
         self.subtitle_service = SubtitleService()
         self.translation_service = TranslationService()
-        
+
         self.progress_queue = Queue()
         self.timer = QTimer()
         self.progress_signal = ProgressSignal()
@@ -41,10 +57,10 @@ class GlassMainWindow(QMainWindow):
         self.setup_ui()
 
     def setup_ui(self):
-        self.setWindowTitle('SRT4U - Subtitle Processor')
+        self.setWindowTitle("SRT4U - Subtitle Processor")
         self.resize(700, 600)
         self.setMinimumSize(600, 500)
-        
+
         # Transparent window setup
         # self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         # self.setWindowFlags(Qt.WindowType.FramelessWindowHint) # Option for even cleaner look
@@ -63,19 +79,21 @@ class GlassMainWindow(QMainWindow):
         self.title_label = QLabel("SRT4U")
         self.title_label.setStyleSheet(Styles.TITLE_LABEL)
         header_layout.addWidget(self.title_label)
-        
+
         self.subtitle_label = QLabel("Professional Subtitle Processing & Translation")
         self.subtitle_label.setStyleSheet(Styles.SUBTITLE_LABEL)
         header_layout.addWidget(self.subtitle_label)
-        
+
         self.main_layout.addLayout(header_layout)
 
         # File Selection Card
         file_card = GlassCard()
         file_card_layout = file_card.layout
-        
+
         file_header = QHBoxLayout()
-        file_header.addWidget(QLabel("1. Input & Output", styleSheet="color: white; font-weight: bold;"))
+        file_header.addWidget(
+            QLabel("1. Input & Output", styleSheet="color: white; font-weight: bold;")
+        )
         file_card_layout.addLayout(file_header)
 
         # Input File Row
@@ -99,13 +117,13 @@ class GlassMainWindow(QMainWindow):
         self.select_dir_btn.clicked.connect(self.select_output_directory)
         out_row.addWidget(self.select_dir_btn)
         file_card_layout.addLayout(out_row)
-        
+
         self.main_layout.addWidget(file_card)
 
         # Configuration Card
         config_card = GlassCard()
         config_layout = config_card.layout
-        
+
         config_header = QLabel("2. Configuration")
         config_header.setStyleSheet("color: white; font-weight: bold;")
         config_layout.addWidget(config_header)
@@ -115,7 +133,7 @@ class GlassMainWindow(QMainWindow):
         self.translation_toggle = QCheckBox("Enable Translation")
         self.translation_toggle.setStyleSheet(Styles.CHECKBOX_GLASS)
         trans_row.addWidget(self.translation_toggle)
-        
+
         trans_row.addSpacing(20)
         trans_row.addWidget(QLabel("To Language:", styleSheet="color: #CCC;"))
         self.target_lang_input = GlassInput("e.g. es, fr, en")
@@ -128,7 +146,7 @@ class GlassMainWindow(QMainWindow):
         format_row = QHBoxLayout()
         format_row.addWidget(QLabel("Output Format:", styleSheet="color: #CCC;"))
         self.format_selector = QComboBox()
-        self.format_selector.addItems(['srt', 'vtt'])
+        self.format_selector.addItems(["srt", "vtt"])
         self.format_selector.setStyleSheet(Styles.COMBO_GLASS)
         self.format_selector.currentTextChanged.connect(self.update_output_format)
         format_row.addWidget(self.format_selector)
@@ -150,7 +168,7 @@ class GlassMainWindow(QMainWindow):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("color: #00E5FF; font-size: 11px;")
         progress_layout.addWidget(self.status_label)
-        
+
         self.main_layout.addWidget(self.progress_area)
 
         # Action Button
@@ -169,7 +187,10 @@ class GlassMainWindow(QMainWindow):
 
     def handle_file_selection(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, 'Select SRT/VTT file', '', 'Subtitle files (*.srt *.vtt);;All files (*.*)'
+            self,
+            "Select subtitle file",
+            "",
+            "Subtitle files (*.srt *.vtt *.txt);;All files (*.*)",
         )
         if file_path:
             self.input_file_path = file_path
@@ -178,7 +199,9 @@ class GlassMainWindow(QMainWindow):
             self.file_status.setText("No file selected")
 
     def select_output_directory(self):
-        directory = QFileDialog.getExistingDirectory(self, 'Select output directory', '')
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select output directory", ""
+        )
         if directory:
             self.output_directory = directory
             self.dir_status.setText(f"Dir: {os.path.basename(directory)}")
@@ -193,7 +216,10 @@ class GlassMainWindow(QMainWindow):
         if not self.output_directory:
             self.show_message("Error", "Please select an output directory", "warning")
             return
-        if self.translation_toggle.isChecked() and not self.target_lang_input.text().strip():
+        if (
+            self.translation_toggle.isChecked()
+            and not self.target_lang_input.text().strip()
+        ):
             self.show_message("Error", "Please enter a target language", "warning")
             return
 
@@ -212,12 +238,14 @@ class GlassMainWindow(QMainWindow):
             processed_text = self.subtitle_service.process_subtitles(
                 self.input_file_path,
                 self.translation_toggle.isChecked(),
-                self.target_lang_input.text().strip() if self.translation_toggle.isChecked() else None,
-                lambda t, d: queue.put((t, d))
+                self.target_lang_input.text().strip()
+                if self.translation_toggle.isChecked()
+                else None,
+                lambda t, d: queue.put((t, d)),
             )
-            queue.put(('success', processed_text))
+            queue.put(("success", processed_text))
         except Exception as e:
-            queue.put(('error', str(e)))
+            queue.put(("error", str(e)))
 
     def check_progress_queue(self):
         try:
@@ -228,14 +256,14 @@ class GlassMainWindow(QMainWindow):
             pass
 
     def handle_progress_update(self, msg_type: str, data):
-        if msg_type == 'progress':
+        if msg_type == "progress":
             self.progress_bar.setValue(int(data * 100))
-        elif msg_type in ['status', 'info']:
+        elif msg_type in ["status", "info"]:
             self.status_label.setText(str(data))
-        elif msg_type == 'success':
+        elif msg_type == "success":
             self.timer.stop()
             self._finalize_success(data)
-        elif msg_type == 'error':
+        elif msg_type == "error":
             self.timer.stop()
             self._finalize_error(data)
 
@@ -249,12 +277,14 @@ class GlassMainWindow(QMainWindow):
             if self.output_format == "vtt":
                 content = f"WEBVTT\n\n{content}"
 
-            with open(output_path, "w", encoding='UTF-8') as f:
+            with open(output_path, "w", encoding="UTF-8") as f:
                 f.write(content)
 
             self.status_label.setText("Success!")
             self.result_label.setText(f"File saved to: {output_path}")
-            self.result_label.setStyleSheet(f"color: {Styles.ACCENT_POSITIVE}; font-size: 11px;")
+            self.result_label.setStyleSheet(
+                f"color: {Styles.ACCENT_POSITIVE}; font-size: 11px;"
+            )
         except Exception as e:
             self._finalize_error(str(e))
         finally:
@@ -264,7 +294,9 @@ class GlassMainWindow(QMainWindow):
     def _finalize_error(self, message: str):
         self.status_label.setText("Failed")
         self.result_label.setText(f"Error: {message}")
-        self.result_label.setStyleSheet(f"color: {Styles.ACCENT_NEGATIVE}; font-size: 11px;")
+        self.result_label.setStyleSheet(
+            f"color: {Styles.ACCENT_NEGATIVE}; font-size: 11px;"
+        )
         self.process_btn.setEnabled(True)
 
     def show_message(self, title, message, mode="info"):
