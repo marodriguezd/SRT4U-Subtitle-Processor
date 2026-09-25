@@ -42,6 +42,7 @@ from .widgets import (
     ProgressModal,
     LogoBadge,
 )
+from .burn_in_dialog import BurnInDialog, BurnInProgressModal, BurnInOptions
 from ..services.config_service import ConfigService
 from ..services.subtitle_service import SubtitleService, ProcessingResult
 from ..services.translation_service import TranslationService
@@ -380,7 +381,7 @@ class MainWindow(QMainWindow):
 
         header_text = QVBoxLayout()
         header_text.setSpacing(2)
-        p_title = QLabel("🎬 Studio de Traducción y Sincronización")
+        p_title = QLabel("🎬 Studio de Traducción")
         p_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
         p_sub = QLabel("Previsualiza vídeo, edita subtítulos frase a frase y sincroniza en directo.")
         p_sub.setStyleSheet("font-size: 12px; color: #94A3B8;")
@@ -395,19 +396,32 @@ class MainWindow(QMainWindow):
         self.btn_open_orig.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_orig.clicked.connect(self._browse_preview_file)
 
-        self.btn_load_video_top = QPushButton("🎬 Cargar vídeo")
-        self.btn_load_video_top.setProperty("class", "secondary-btn")
-        self.btn_load_video_top.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load_video_top.clicked.connect(lambda: self.video_player._browse_video())
-
         self.btn_export = QPushButton("💾 Guardar subtítulo")
         self.btn_export.setObjectName("PrimaryBtn")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.clicked.connect(self._export_result_file)
 
+        self.btn_burn_in = QPushButton("🔥 Incrustar en vídeo")
+        self.btn_burn_in.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_burn_in.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8B5CF6, stop:1 #EC4899);
+                color: #FFFFFF;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 14px;
+                font-weight: 700;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7C3AED, stop:1 #DB2777);
+            }
+        """)
+        self.btn_burn_in.clicked.connect(self._open_burn_in_dialog)
+
         top_bar.addWidget(self.btn_open_orig)
-        top_bar.addWidget(self.btn_load_video_top)
         top_bar.addWidget(self.btn_export)
+        top_bar.addWidget(self.btn_burn_in)
         page_layout.addLayout(top_bar)
 
         # 2. Control & Search Toolbar
@@ -1010,6 +1024,49 @@ class MainWindow(QMainWindow):
                 f.write(content)
             self.saved_output_path = path
             QMessageBox.information(self, "Guardado con éxito", f"Subtítulo guardado en:\n{path}")
+
+    def _open_burn_in_dialog(self):
+        items = self.diff_viewer.get_processed_subtitles()
+        if not items and self.last_result:
+            items = self.last_result.processed_items
+
+        if not items:
+            QMessageBox.information(
+                self,
+                "Sin subtítulos",
+                "No hay subtítulos disponibles para incrustar en el vídeo.\n"
+                "Carga un archivo de subtítulos primero desde 'Abrir subtítulo' o procesa uno."
+            )
+            return
+
+        video_path = ""
+        source = self.video_player.player.source()
+        if source and source.isValid() and not source.isEmpty():
+            video_path = source.toLocalFile()
+        elif self.current_subtitle_path:
+            matching = self.drop_zone._find_matching_video(self.current_subtitle_path)
+            if matching:
+                video_path = matching
+
+        if not video_path:
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Seleccionar vídeo para incrustar subtítulos",
+                "",
+                "Archivos de vídeo (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos los archivos (*.*)"
+            )
+            if not path:
+                return
+            video_path = path
+            self.video_player.load_video(path)
+
+        dialog = BurnInDialog(video_path=video_path, subtitle_items=items, parent=self)
+        dialog.burn_requested.connect(self._start_burn_in_process)
+        dialog.exec()
+
+    def _start_burn_in_process(self, v_path: str, o_path: str, items: list, opts: BurnInOptions):
+        modal = BurnInProgressModal(v_path, o_path, items, opts, parent=self)
+        modal.exec()
 
     def _browse_preview_file(self):
         path, _ = QFileDialog.getOpenFileName(

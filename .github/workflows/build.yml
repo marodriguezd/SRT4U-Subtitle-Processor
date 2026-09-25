@@ -31,9 +31,18 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
+          $ffmpegCmd = Get-Command ffmpeg -ErrorAction SilentlyContinue
+          if (-not $ffmpegCmd) {
+            choco install ffmpeg -y
+            $ffmpegPath = "C:\ProgramData\chocolatey\bin\ffmpeg.exe"
+          } else {
+            $ffmpegPath = $ffmpegCmd.Source
+          }
+          Write-Host "Embedding FFmpeg from: $ffmpegPath"
           pyinstaller --noconsole --onefile --name "SRT4U" `
             --add-data "application;application" `
             --add-data "assets;assets" `
+            --add-binary "$ffmpegPath;." `
             --icon "assets/icon.ico" `
             main.py
 
@@ -54,7 +63,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Qt dependencies
+      - name: Install Qt and multimedia dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -70,6 +79,7 @@ jobs:
             libxcb-shape0 \
             libxcb-xinerama0 \
             libxcb-xfixes0 \
+            ffmpeg \
             file
 
       - name: Setup Python
@@ -86,9 +96,12 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
+          FFMPEG_PATH=$(which ffmpeg)
+          echo "Embedding FFmpeg from $FFMPEG_PATH"
           pyinstaller --noconsole --onefile --name "SRT4U" \
             --add-data "application:application" \
             --add-data "assets:assets" \
+            --add-binary "$FFMPEG_PATH:." \
             --icon "assets/icon.ico" \
             main.py
 
@@ -98,6 +111,7 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp dist/SRT4U AppDir/usr/bin/SRT4U
+          cp "$(which ffmpeg)" AppDir/usr/bin/ffmpeg
           cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/srt4u.png
           cp assets/icon.png AppDir/srt4u.png
 
@@ -160,12 +174,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller pillow
+          brew install ffmpeg || true
 
       - name: Build .app with PyInstaller
         run: |
+          FFMPEG_PATH=$(which ffmpeg)
+          echo "Embedding FFmpeg from $FFMPEG_PATH"
           pyinstaller --windowed --name "SRT4U" \
             --add-data "application:application" \
             --add-data "assets:assets" \
+            --add-binary "$FFMPEG_PATH:." \
             --icon "assets/icon.icns" \
             main.py
 
