@@ -26,6 +26,11 @@ if __name__ == '__main__':
         myappid = 'marodriguezd.srt4u.subtitleprocessor.1.0'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
+    # Ensure GLX compatibility across diverse Linux Mesa/X11 drivers
+    if sys.platform.startswith('linux'):
+        if 'QT_XCB_GL_INTEGRATION' not in os.environ:
+            os.environ['QT_XCB_GL_INTEGRATION'] = 'none'
+
     app = QApplication(sys.argv)
     
     # Set application icon

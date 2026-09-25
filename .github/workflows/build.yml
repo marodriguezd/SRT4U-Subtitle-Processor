@@ -119,6 +119,7 @@ jobs:
           SELF=$(readlink -f "$0")
           HERE=${SELF%/*}
           export PATH="${HERE}/usr/bin:${PATH}"
+          export QT_XCB_GL_INTEGRATION="${QT_XCB_GL_INTEGRATION:-none}"
           exec "${HERE}/usr/bin/SRT4U" "$@"
           EOF
           chmod +x AppDir/AppRun
