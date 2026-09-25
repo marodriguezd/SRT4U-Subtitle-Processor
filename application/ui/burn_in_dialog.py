@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 
 from ..services.subtitle_service import SubtitleItem
 from ..services.video_burner_service import BurnInOptions, BurnInWorker, VideoBurnerService
+from ..services.i18n_service import t
 
 
 class BurnInDialog(QDialog):
@@ -43,7 +44,7 @@ class BurnInDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Incrustar subtítulos en vídeo (Burn-In)")
+        self.setWindowTitle(t("burn.dialog_title"))
         self.setFixedSize(620, 570)
         self.setStyleSheet("""
             QDialog {
@@ -70,9 +71,9 @@ class BurnInDialog(QDialog):
         # 1. Header
         header = QVBoxLayout()
         header.setSpacing(4)
-        title = QLabel("🔥 Incrustar subtítulos en vídeo")
+        title = QLabel("🔥 " + t("burn.dialog_title"))
         title.setStyleSheet("font-size: 19px; font-weight: 800; color: #F8FAFC;")
-        sub = QLabel("Genera un nuevo archivo MP4 con los subtítulos integrados permanentemente.")
+        sub = QLabel(t("preview.subtitle"))
         sub.setStyleSheet("font-size: 12px; color: #94A3B8;")
         header.addWidget(title)
         header.addWidget(sub)
@@ -95,13 +96,13 @@ class BurnInDialog(QDialog):
         # Video origen
         v_box = QVBoxLayout()
         v_box.setSpacing(4)
-        lbl_v = QLabel("Vídeo fuente original:")
+        lbl_v = QLabel(t("burn.lbl_video_source"))
         lbl_v.setStyleSheet("font-size: 11px; font-weight: 700; color: #94A3B8;")
         v_row = QHBoxLayout()
         self.txt_video = QLineEdit(self.video_path)
-        self.txt_video.setPlaceholderText("Selecciona el archivo de vídeo...")
+        self.txt_video.setPlaceholderText("...")
         self.txt_video.setStyleSheet(self._input_style())
-        btn_browse_vid = QPushButton("📁 Cambiar vídeo...")
+        btn_browse_vid = QPushButton("📁 " + t("burn.btn_browse"))
         btn_browse_vid.setStyleSheet(self._btn_secondary_style())
         btn_browse_vid.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_browse_vid.clicked.connect(self._browse_video)
@@ -114,7 +115,7 @@ class BurnInDialog(QDialog):
         # Vídeo destino
         o_box = QVBoxLayout()
         o_box.setSpacing(4)
-        lbl_o = QLabel("Archivo de salida resultante (.mp4):")
+        lbl_o = QLabel(t("burn.lbl_output_file"))
         lbl_o.setStyleSheet("font-size: 11px; font-weight: 700; color: #94A3B8;")
         o_row = QHBoxLayout()
 
@@ -124,9 +125,9 @@ class BurnInDialog(QDialog):
             default_out = f"{base}_subtitulado.mp4"
 
         self.txt_output = QLineEdit(default_out)
-        self.txt_output.setPlaceholderText("Ruta del vídeo de salida...")
+        self.txt_output.setPlaceholderText("...")
         self.txt_output.setStyleSheet(self._input_style())
-        btn_browse_out = QPushButton("📁 Examinar...")
+        btn_browse_out = QPushButton("📁 " + t("burn.btn_browse"))
         btn_browse_out.setStyleSheet(self._btn_secondary_style())
         btn_browse_out.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_browse_out.clicked.connect(self._browse_output)
@@ -252,12 +253,12 @@ class BurnInDialog(QDialog):
         btn_bar.setSpacing(10)
         btn_bar.addStretch()
 
-        btn_cancel = QPushButton("Cancelar")
+        btn_cancel = QPushButton(t("burn.btn_cancel"))
         btn_cancel.setStyleSheet(self._btn_secondary_style())
         btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_cancel.clicked.connect(self.reject)
 
-        self.btn_start = QPushButton("🔥 Iniciar incrustación")
+        self.btn_start = QPushButton(t("burn.btn_burn"))
         self.btn_start.setStyleSheet("""
             QPushButton {
                 background-color: #8B5CF6;

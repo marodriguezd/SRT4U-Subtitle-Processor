@@ -26,6 +26,7 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from .styles import Styles
 from ..services.subtitle_service import SubtitleItem
+from ..services.i18n_service import t, get_i18n
 
 
 class ModernToggle(QAbstractButton):
@@ -262,15 +263,15 @@ class DropZone(QFrame):
         self.icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_badge.setStyleSheet("font-size: 34px; color: #818CF8; background: transparent;")
 
-        self.title_label = QLabel("Arrastra tu archivo de subtítulos aquí")
+        self.title_label = QLabel()
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC; background: transparent;")
 
-        self.sub_label = QLabel("o haz clic para seleccionar")
+        self.sub_label = QLabel()
         self.sub_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.sub_label.setStyleSheet("font-size: 13px; color: #94A3B8; background: transparent;")
 
-        self.formats_label = QLabel("Formatos soportados: .srt, .ass, .vtt, .txt")
+        self.formats_label = QLabel()
         self.formats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.formats_label.setStyleSheet("font-size: 11px; color: #64748B; margin-top: 4px; background: transparent;")
 
@@ -278,23 +279,31 @@ class DropZone(QFrame):
         layout.addWidget(self.title_label)
         layout.addWidget(self.sub_label)
         layout.addWidget(self.formats_label)
+        self.retranslate()
+
+    def retranslate(self):
+        if not self.current_subtitle_path:
+            self.icon_badge.setText("📁")
+            self.title_label.setText(t("dropzone.title"))
+            self.sub_label.setText(t("dropzone.subtitle"))
+            self.sub_label.setStyleSheet("font-size: 13px; color: #94A3B8; background: transparent;")
+            self.formats_label.setText(t("dropzone.formats"))
+        else:
+            filename = os.path.basename(self.current_subtitle_path)
+            size_kb = os.path.getsize(self.current_subtitle_path) / 1024 if os.path.exists(self.current_subtitle_path) else 0
+            self.icon_badge.setText("📄")
+            self.title_label.setText(filename)
+            status_text = t("dropzone.size", size=size_kb)
+            if self.current_video_path:
+                status_text += " | " + t("dropzone.video_detected", name=os.path.basename(self.current_video_path))
+            self.sub_label.setText(status_text)
+            self.sub_label.setStyleSheet("font-size: 12px; color: #38BDF8; font-weight: 500;")
+            self.formats_label.setText(t("dropzone.replace_hint"))
 
     def set_file(self, file_path: str, video_path: Optional[str] = None):
         self.current_subtitle_path = file_path
         self.current_video_path = video_path or self._find_matching_video(file_path)
-
-        filename = os.path.basename(file_path)
-        size_kb = os.path.getsize(file_path) / 1024 if os.path.exists(file_path) else 0
-
-        self.icon_badge.setText("📄")
-        self.title_label.setText(filename)
-        status_text = f"Tamaño: {size_kb:.1f} KB"
-        if self.current_video_path:
-            status_text += f" | Video detectado: {os.path.basename(self.current_video_path)}"
-
-        self.sub_label.setText(status_text)
-        self.sub_label.setStyleSheet("font-size: 12px; color: #38BDF8; font-weight: 500;")
-        self.formats_label.setText("Haz clic o arrastra otro archivo para reemplazar")
+        self.retranslate()
         self.file_dropped.emit(self.current_subtitle_path, self.current_video_path or "")
 
     def _find_matching_video(self, sub_path: str) -> Optional[str]:
@@ -309,9 +318,9 @@ class DropZone(QFrame):
         if event.button() == Qt.MouseButton.LeftButton:
             file_path, _ = QFileDialog.getOpenFileName(
                 self,
-                "Seleccionar subtítulo",
+                t("dropzone.dialog_title"),
                 "",
-                "Subtítulos (*.srt *.ass *.vtt *.txt);;Todos los archivos (*.*)"
+                t("dropzone.filter")
             )
             if file_path:
                 self.set_file(file_path)
@@ -351,17 +360,21 @@ class OptionCard(QFrame):
         text_layout = QVBoxLayout()
         text_layout.setSpacing(3)
 
-        t_lbl = QLabel(title)
-        t_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #F8FAFC;")
-        d_lbl = QLabel(description)
-        d_lbl.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        self.t_lbl = QLabel(title)
+        self.t_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #F8FAFC;")
+        self.d_lbl = QLabel(description)
+        self.d_lbl.setStyleSheet("font-size: 12px; color: #94A3B8;")
 
-        text_layout.addWidget(t_lbl)
-        text_layout.addWidget(d_lbl)
+        text_layout.addWidget(self.t_lbl)
+        text_layout.addWidget(self.d_lbl)
 
         layout.addLayout(text_layout)
         layout.addStretch()
         layout.addWidget(toggle)
+
+    def set_texts(self, title: str, description: str):
+        self.t_lbl.setText(title)
+        self.d_lbl.setText(description)
 
 
 class MetricCard(QFrame):
@@ -390,6 +403,9 @@ class MetricCard(QFrame):
 
     def set_value(self, val: str):
         self.value_lbl.setText(val)
+
+    def set_label(self, lbl: str):
+        self.desc_lbl.setText(lbl)
 
 
 class SubtitleCard(QFrame):
@@ -474,9 +490,9 @@ class SubtitleCard(QFrame):
         meta_layout.addStretch()
 
         # Jump button
-        btn_jump = QPushButton("▶ Saltar a vídeo")
-        btn_jump.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_jump.setStyleSheet("""
+        self.btn_jump = QPushButton(t("preview.btn_jump"))
+        self.btn_jump.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_jump.setStyleSheet("""
             QPushButton {
                 background: rgba(99, 102, 241, 0.15);
                 color: #A5B4FC;
@@ -492,8 +508,8 @@ class SubtitleCard(QFrame):
                 border-color: #6366F1;
             }
         """)
-        btn_jump.clicked.connect(lambda: self.jump_clicked.emit(self.edited_item.start_ms))
-        meta_layout.addWidget(btn_jump)
+        self.btn_jump.clicked.connect(lambda: self.jump_clicked.emit(self.edited_item.start_ms))
+        meta_layout.addWidget(self.btn_jump)
 
         layout.addLayout(meta_layout)
 
@@ -505,9 +521,9 @@ class SubtitleCard(QFrame):
         # Left column (Original)
         left_col = QVBoxLayout()
         left_col.setSpacing(3)
-        lbl_orig_tag = QLabel("ORIGINAL")
-        lbl_orig_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;")
-        left_col.addWidget(lbl_orig_tag)
+        self.lbl_orig_tag = QLabel(t("preview.tag_orig"))
+        self.lbl_orig_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;")
+        left_col.addWidget(self.lbl_orig_tag)
 
         orig_txt = self.original_item.text if self.original_item else ""
         self.lbl_orig = QLabel(orig_txt)
@@ -530,9 +546,9 @@ class SubtitleCard(QFrame):
         # Right column (Editable translation)
         right_col = QVBoxLayout()
         right_col.setSpacing(3)
-        lbl_edit_tag = QLabel("TRADUCCIÓN / EDICIÓN ✏️")
-        lbl_edit_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;")
-        right_col.addWidget(lbl_edit_tag)
+        self.lbl_edit_tag = QLabel(t("preview.tag_edit"))
+        self.lbl_edit_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;")
+        right_col.addWidget(self.lbl_edit_tag)
 
         self.edit_text = QPlainTextEdit()
         self.edit_text.setPlainText(self.edited_item.text)
@@ -565,6 +581,11 @@ class SubtitleCard(QFrame):
         line_count = max(1, new_text.count('\n') + 1)
         self.edit_text.setFixedHeight(max(40, min(140, line_count * 22 + 18)))
         self.text_changed.emit()
+
+    def retranslate(self):
+        self.btn_jump.setText(t("preview.btn_jump"))
+        self.lbl_orig_tag.setText(t("preview.tag_orig"))
+        self.lbl_edit_tag.setText(t("preview.tag_edit"))
 
     def matches_query(self, query: str) -> bool:
         if not query:
@@ -654,6 +675,10 @@ class SubtitleDiffViewer(QWidget):
 
     def get_processed_subtitles(self) -> List[SubtitleItem]:
         return self.processed_items
+
+    def retranslate(self):
+        for card in self.cards:
+            card.retranslate()
 
     def highlight_cue_at_ms(self, pos_ms: int, auto_scroll: bool = True):
         matching_card = None
@@ -799,7 +824,7 @@ class VideoPreviewPlayer(QFrame):
         """)
         self.vol_slider.valueChanged.connect(self._on_volume_changed)
 
-        self.btn_load_video = QPushButton("🎬 Cargar vídeo")
+        self.btn_load_video = QPushButton(t("preview.btn_load_video"))
         self.btn_load_video.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load_video.setStyleSheet("""
             QPushButton {
@@ -826,6 +851,9 @@ class VideoPreviewPlayer(QFrame):
         ctrl_layout.addWidget(self.vol_slider)
         ctrl_layout.addWidget(self.btn_load_video)
         layout.addLayout(ctrl_layout)
+
+    def retranslate(self):
+        self.btn_load_video.setText(t("preview.btn_load_video"))
 
     def _on_tracks_changed(self):
         if len(self.player.audioTracks()) > 0 and self.player.activeAudioTrack() == -1:

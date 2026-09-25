@@ -19,6 +19,7 @@ class ConfigService:
         "auto_clean": True,
         "preserve_format": True,
         "output_dir": "",
+        "ui_language": "auto",
     }
 
     def __init__(self):

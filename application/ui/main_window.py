@@ -46,6 +46,7 @@ from .burn_in_dialog import BurnInDialog, BurnInProgressModal, BurnInOptions
 from ..services.config_service import ConfigService
 from ..services.subtitle_service import SubtitleService, ProcessingResult
 from ..services.translation_service import TranslationService
+from ..services.i18n_service import t, get_i18n, I18nService
 
 
 class ProcessWorker(QThread):
@@ -106,6 +107,7 @@ class MainWindow(QMainWindow):
 
         self.dark_mode = True
         self.config_service = ConfigService()
+        self.i18n = get_i18n(self.config_service)
         self.translation_service = TranslationService(self.config_service)
         self.subtitle_service = SubtitleService(self.translation_service)
 
@@ -117,6 +119,8 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._load_config_values()
         self._apply_theme()
+        self.i18n.language_changed.connect(self.retranslate_ui)
+        self.retranslate_ui()
 
     def _setup_ui(self):
         self.central_widget = QWidget()
@@ -187,19 +191,21 @@ class MainWindow(QMainWindow):
         # Nav Buttons
         self.nav_buttons: List[QPushButton] = []
         nav_items = [
-            ("🏠  Inicio", 0),
-            ("🌐  Traducir", 1),
-            ("✨  Limpiar", 2),
-            ("🔄  Convertir", 3),
-            ("📁  Procesamiento por lote", 4),
-            ("⚙️  Configuración", 5),
-            ("ℹ️  Acerca de", 7),
+            ("🏠", "nav.home", 0),
+            ("🌐", "nav.translate", 1),
+            ("✨", "nav.clean", 2),
+            ("🔄", "nav.convert", 3),
+            ("📁", "nav.batch", 4),
+            ("⚙️", "nav.settings", 5),
+            ("ℹ️", "nav.about", 7),
         ]
 
-        for text, page_idx in nav_items:
-            btn = QPushButton(text)
+        for icon, key, page_idx in nav_items:
+            btn = QPushButton(f"{icon}  {t(key)}")
             btn.setProperty("class", "nav-btn")
             btn.setProperty("page_index", page_idx)
+            btn.setProperty("icon_emoji", icon)
+            btn.setProperty("i18n_key", key)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked, idx=page_idx: self._switch_page(idx))
             layout.addWidget(btn)
@@ -237,16 +243,53 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(16)
 
-        # Header con Theme Toggle
+        # Header con Theme Toggle y Language Selector
         header_row = QHBoxLayout()
         header_text = QVBoxLayout()
         header_text.setSpacing(4)
-        title = QLabel("Traducir subtítulos")
-        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
-        subtitle = QLabel("Selecciona tu archivo, el idioma de destino y las opciones de procesamiento.")
-        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
-        header_text.addWidget(title)
-        header_text.addWidget(subtitle)
+        self.lbl_home_title = QLabel(t("home.title"))
+        self.lbl_home_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        self.lbl_home_sub = QLabel(t("home.subtitle"))
+        self.lbl_home_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        header_text.addWidget(self.lbl_home_title)
+        header_text.addWidget(self.lbl_home_sub)
+
+        # Selector de idioma global
+        self.cb_top_lang = QComboBox()
+        self.cb_top_lang.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
+        self.cb_top_lang.setStyleSheet("""
+            QComboBox {
+                background: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                color: #F8FAFC;
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 600;
+                min-width: 140px;
+            }
+            QComboBox:hover {
+                border-color: #6366F1;
+            }
+            QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView {
+                background-color: #0F172A;
+                color: #F8FAFC;
+                selection-background-color: #6366F1;
+                border: 1px solid #334155;
+                padding: 4px;
+            }
+        """)
+        self.cb_top_lang.addItem(t("topbar.lang_auto"), "auto")
+        for code, meta in self.i18n.SUPPORTED_LANGUAGES.items():
+            self.cb_top_lang.addItem(f"{meta['flag']} {meta['native']}", code)
+
+        cfg_lang = self.i18n.get_configured_language()
+        top_idx = self.cb_top_lang.findData(cfg_lang)
+        if top_idx >= 0:
+            self.cb_top_lang.setCurrentIndex(top_idx)
+        self.cb_top_lang.currentIndexChanged.connect(self._on_top_lang_changed)
 
         self.btn_theme = QPushButton("☀️")
         self.btn_theme.setFixedSize(38, 38)
@@ -268,6 +311,7 @@ class MainWindow(QMainWindow):
 
         header_row.addLayout(header_text)
         header_row.addStretch()
+        header_row.addWidget(self.cb_top_lang)
         header_row.addWidget(self.btn_theme)
         layout.addLayout(header_row)
 
@@ -286,36 +330,36 @@ class MainWindow(QMainWindow):
         # 1. Idioma Origen
         src_box = QVBoxLayout()
         src_box.setSpacing(6)
-        src_lbl = QLabel("Idioma de origen")
-        src_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        self.lbl_src_lang = QLabel(t("home.source_lang"))
+        self.lbl_src_lang.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
         self.cb_source_lang = QComboBox()
         self.cb_source_lang.addItem("Detectar automáticamente", "auto")
         for lang in self.translation_service.SUPPORTED_LANGUAGES:
             self.cb_source_lang.addItem(f"{lang['flag']} {lang['name']}", lang["code"])
-        src_box.addWidget(src_lbl)
+        src_box.addWidget(self.lbl_src_lang)
         src_box.addWidget(self.cb_source_lang)
 
         # 2. Idioma Destino
         tgt_box = QVBoxLayout()
         tgt_box.setSpacing(6)
-        tgt_lbl = QLabel("Idioma de destino")
-        tgt_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        self.lbl_tgt_lang = QLabel(t("home.target_lang"))
+        self.lbl_tgt_lang.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
         self.cb_target_lang = QComboBox()
         for lang in self.translation_service.SUPPORTED_LANGUAGES:
             self.cb_target_lang.addItem(f"{lang['flag']} {lang['name']}", lang["code"])
-        tgt_box.addWidget(tgt_lbl)
+        tgt_box.addWidget(self.lbl_tgt_lang)
         tgt_box.addWidget(self.cb_target_lang)
 
         # 3. Modelo de Traducción
         engine_box = QVBoxLayout()
         engine_box.setSpacing(6)
-        engine_lbl = QLabel("Modelo de traducción")
-        engine_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        self.lbl_engine = QLabel(t("home.engine"))
+        self.lbl_engine.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
         self.cb_engine = QComboBox()
         self.cb_engine.addItem("DeepL (recomendado)", "deepl")
         self.cb_engine.addItem("Google Translate", "google")
         self.cb_engine.addItem("OpenAI / LLM", "openai")
-        engine_box.addWidget(engine_lbl)
+        engine_box.addWidget(self.lbl_engine)
         engine_box.addWidget(self.cb_engine)
 
         sel_layout.addLayout(src_box)
@@ -332,35 +376,35 @@ class MainWindow(QMainWindow):
         self.toggle_clean = ModernToggle(checked=True)
         self.toggle_parallel = ModernToggle(checked=True)
 
-        card_translate = OptionCard(
-            "Traducir subtítulos",
-            "Usa la API de traducción seleccionada.",
+        self.card_translate = OptionCard(
+            t("home.translate_title"),
+            t("home.translate_desc"),
             self.toggle_translate
         )
-        card_preserve = OptionCard(
-            "Mantener formato original",
-            "Conserva la sincronización y la estructura.",
+        self.card_preserve = OptionCard(
+            t("home.format_title"),
+            t("home.format_desc"),
             self.toggle_preserve
         )
-        card_clean = OptionCard(
-            "Limpiar subtítulos",
-            "Elimina spam, URLs, IDs y contenido no deseado.",
+        self.card_clean = OptionCard(
+            t("home.clean_title"),
+            t("home.clean_desc"),
             self.toggle_clean
         )
-        card_parallel = OptionCard(
-            "Procesamiento paralelo",
-            "Traduce múltiples bloques simultáneamente.",
+        self.card_parallel = OptionCard(
+            t("batch.title"),
+            t("batch.subtitle"),
             self.toggle_parallel
         )
 
-        grid_layout.addWidget(card_translate, 0, 0)
-        grid_layout.addWidget(card_preserve, 0, 1)
-        grid_layout.addWidget(card_clean, 1, 0)
-        grid_layout.addWidget(card_parallel, 1, 1)
+        grid_layout.addWidget(self.card_translate, 0, 0)
+        grid_layout.addWidget(self.card_preserve, 0, 1)
+        grid_layout.addWidget(self.card_clean, 1, 0)
+        grid_layout.addWidget(self.card_parallel, 1, 1)
         layout.addLayout(grid_layout)
 
         # Botón de Acción Principal (🚀 Procesar archivo)
-        self.btn_process = QPushButton("🚀 Procesar archivo")
+        self.btn_process = QPushButton(t("home.btn_process"))
         self.btn_process.setObjectName("PrimaryBtn")
         self.btn_process.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_process.setMinimumHeight(48)
@@ -386,27 +430,27 @@ class MainWindow(QMainWindow):
 
         header_text = QVBoxLayout()
         header_text.setSpacing(2)
-        p_title = QLabel("🎬 Studio de Traducción")
-        p_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
-        p_sub = QLabel("Previsualiza vídeo, edita subtítulos frase a frase y sincroniza en directo.")
-        p_sub.setStyleSheet("font-size: 12px; color: #94A3B8;")
-        header_text.addWidget(p_title)
-        header_text.addWidget(p_sub)
+        self.lbl_preview_title = QLabel("🎬 " + t("preview.title"))
+        self.lbl_preview_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
+        self.lbl_preview_sub = QLabel(t("preview.subtitle"))
+        self.lbl_preview_sub.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        header_text.addWidget(self.lbl_preview_title)
+        header_text.addWidget(self.lbl_preview_sub)
 
         top_bar.addLayout(header_text)
         top_bar.addStretch()
 
-        self.btn_open_orig = QPushButton("📁 Abrir subtítulo")
+        self.btn_open_orig = QPushButton(t("preview.btn_open"))
         self.btn_open_orig.setProperty("class", "secondary-btn")
         self.btn_open_orig.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_orig.clicked.connect(self._browse_preview_file)
 
-        self.btn_export = QPushButton("💾 Guardar subtítulo")
+        self.btn_export = QPushButton(t("preview.btn_save"))
         self.btn_export.setObjectName("PrimaryBtn")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.clicked.connect(self._export_result_file)
 
-        self.btn_burn_in = QPushButton("🔥 Incrustar en vídeo")
+        self.btn_burn_in = QPushButton(t("preview.btn_burn"))
         self.btn_burn_in.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_burn_in.setStyleSheet("""
             QPushButton {
@@ -444,7 +488,7 @@ class MainWindow(QMainWindow):
 
         # Search bar
         self.preview_search_input = QLineEdit()
-        self.preview_search_input.setPlaceholderText("🔍 Buscar por texto en original o traducción...")
+        self.preview_search_input.setPlaceholderText(t("preview.search_placeholder"))
         self.preview_search_input.setClearButtonEnabled(True)
         self.preview_search_input.setStyleSheet("""
             QLineEdit {
@@ -464,7 +508,7 @@ class MainWindow(QMainWindow):
         tb_layout.addWidget(self.preview_search_input, stretch=2)
 
         # Counter badge
-        self.lbl_preview_sub_counter = QLabel("0 subtítulos")
+        self.lbl_preview_sub_counter = QLabel(t("preview.sub_count_zero"))
         self.lbl_preview_sub_counter.setStyleSheet("""
             QLabel {
                 background: #1E293B;
@@ -479,7 +523,7 @@ class MainWindow(QMainWindow):
         tb_layout.addWidget(self.lbl_preview_sub_counter)
 
         # Auto-scroll toggle
-        self.chk_autoscroll = QCheckBox("Auto-scroll con vídeo")
+        self.chk_autoscroll = QCheckBox(t("preview.autoscroll"))
         self.chk_autoscroll.setChecked(True)
         self.chk_autoscroll.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_autoscroll.setStyleSheet("""
@@ -549,23 +593,23 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(16)
 
-        title = QLabel("Limpieza automática de subtítulos")
-        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
-        subtitle = QLabel("Elimina spam, URLs, canales de Telegram y créditos sin alterar sincronización.")
-        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        self.lbl_clean_title = QLabel(t("clean.title"))
+        self.lbl_clean_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        self.lbl_clean_sub = QLabel(t("clean.subtitle"))
+        self.lbl_clean_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        layout.addWidget(self.lbl_clean_title)
+        layout.addWidget(self.lbl_clean_sub)
 
         self.clean_drop_zone = DropZone()
         self.clean_drop_zone.file_dropped.connect(self._on_file_selected)
         layout.addWidget(self.clean_drop_zone)
 
-        btn_fast_clean = QPushButton("✨ Limpiar contenido no deseado")
-        btn_fast_clean.setObjectName("PrimaryBtn")
-        btn_fast_clean.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_fast_clean.setMinimumHeight(46)
-        btn_fast_clean.clicked.connect(self._start_fast_clean)
-        layout.addWidget(btn_fast_clean)
+        self.btn_fast_clean = QPushButton(t("clean.btn_clean"))
+        self.btn_fast_clean.setObjectName("PrimaryBtn")
+        self.btn_fast_clean.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fast_clean.setMinimumHeight(46)
+        self.btn_fast_clean.clicked.connect(self._start_fast_clean)
+        layout.addWidget(self.btn_fast_clean)
 
         layout.addStretch()
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -581,12 +625,12 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(16)
 
-        title = QLabel("Convertir formatos de subtítulos")
-        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
-        subtitle = QLabel("Convierte instantáneamente entre .srt, .ass, .vtt y .txt sin tocar tiempos.")
-        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        self.lbl_convert_title = QLabel(t("convert.title"))
+        self.lbl_convert_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        self.lbl_convert_sub = QLabel(t("convert.subtitle"))
+        self.lbl_convert_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        layout.addWidget(self.lbl_convert_title)
+        layout.addWidget(self.lbl_convert_sub)
 
         self.convert_drop_zone = DropZone()
         self.convert_drop_zone.file_dropped.connect(self._on_file_selected)
@@ -596,9 +640,9 @@ class MainWindow(QMainWindow):
         conv_card.setObjectName("CardContainer")
         c_layout = QHBoxLayout(conv_card)
         c_layout.setContentsMargins(18, 14, 18, 14)
-        c_lbl = QLabel("Formato de salida deseado:")
-        c_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
-        c_layout.addWidget(c_lbl)
+        self.lbl_convert_target = QLabel(t("convert.target_label"))
+        self.lbl_convert_target.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        c_layout.addWidget(self.lbl_convert_target)
 
         self.cb_convert_format = QComboBox()
         self.cb_convert_format.addItems(["SRT (.srt)", "VTT (.vtt)", "ASS (.ass)", "TXT (.txt)"])
@@ -606,11 +650,11 @@ class MainWindow(QMainWindow):
         c_layout.addStretch()
         layout.addWidget(conv_card)
 
-        btn_run_convert = QPushButton("🔄 Convertir y guardar")
-        btn_run_convert.setObjectName("PrimaryBtn")
-        btn_run_convert.setMinimumHeight(46)
-        btn_run_convert.clicked.connect(self._run_format_conversion)
-        layout.addWidget(btn_run_convert)
+        self.btn_run_convert = QPushButton(t("convert.btn_convert"))
+        self.btn_run_convert.setObjectName("PrimaryBtn")
+        self.btn_run_convert.setMinimumHeight(46)
+        self.btn_run_convert.clicked.connect(self._run_format_conversion)
+        layout.addWidget(self.btn_run_convert)
 
         layout.addStretch()
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -626,19 +670,19 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(16)
 
-        title = QLabel("Procesamiento por lote")
-        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
-        subtitle = QLabel("Traduce, limpia o convierte múltiples archivos en paralelo.")
-        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
+        self.lbl_batch_title = QLabel(t("batch.title"))
+        self.lbl_batch_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        self.lbl_batch_sub = QLabel(t("batch.subtitle"))
+        self.lbl_batch_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        layout.addWidget(self.lbl_batch_title)
+        layout.addWidget(self.lbl_batch_sub)
 
         btn_layout = QHBoxLayout()
-        self.btn_add_batch = QPushButton("➕ Añadir subtítulos")
+        self.btn_add_batch = QPushButton(t("batch.btn_add"))
         self.btn_add_batch.setProperty("class", "secondary-btn")
         self.btn_add_batch.clicked.connect(self._add_batch_files)
 
-        self.btn_clear_batch = QPushButton("🗑️ Limpiar cola")
+        self.btn_clear_batch = QPushButton(t("batch.btn_clear"))
         self.btn_clear_batch.setProperty("class", "secondary-btn")
         self.btn_clear_batch.clicked.connect(self._clear_batch_table)
 
@@ -649,12 +693,17 @@ class MainWindow(QMainWindow):
 
         self.batch_table = QTableWidget()
         self.batch_table.setColumnCount(4)
-        self.batch_table.setHorizontalHeaderLabels(["Archivo", "Tamaño", "Formato", "Estado"])
+        self.batch_table.setHorizontalHeaderLabels([
+            t("batch.col_file"),
+            t("batch.col_size"),
+            t("batch.col_format"),
+            t("batch.col_status")
+        ])
         self.batch_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.batch_table.setMinimumHeight(240)
         layout.addWidget(self.batch_table)
 
-        self.btn_start_batch = QPushButton("▶ Procesar todos los archivos")
+        self.btn_start_batch = QPushButton(t("batch.btn_start"))
         self.btn_start_batch.setObjectName("PrimaryBtn")
         self.btn_start_batch.setMinimumHeight(46)
         self.btn_start_batch.clicked.connect(self._run_batch_processing)
@@ -674,31 +723,57 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(18)
 
-        title = QLabel("Configuración de servicios")
-        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
-        layout.addWidget(title)
+        self.lbl_settings_title = QLabel(t("settings.title"))
+        self.lbl_settings_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        layout.addWidget(self.lbl_settings_title)
 
-        # DeepL Card
+        # 1. Interface Language Card
+        lang_card = QFrame()
+        lang_card.setObjectName("CardContainer")
+        l_layout = QVBoxLayout(lang_card)
+        l_layout.setContentsMargins(18, 16, 18, 16)
+        l_layout.setSpacing(10)
+
+        self.lbl_lang_card_title = QLabel(t("settings.lang_card_title"))
+        self.lbl_lang_card_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        self.lbl_lang_card_desc = QLabel(t("settings.lang_card_desc"))
+        self.lbl_lang_card_desc.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        l_layout.addWidget(self.lbl_lang_card_title)
+        l_layout.addWidget(self.lbl_lang_card_desc)
+
+        self.cb_settings_lang = QComboBox()
+        self.cb_settings_lang.addItem(t("settings.lang_auto"), "auto")
+        for code, meta in self.i18n.SUPPORTED_LANGUAGES.items():
+            self.cb_settings_lang.addItem(f"{meta['flag']} {meta['native']}", code)
+        cfg_lang = self.i18n.get_configured_language()
+        s_idx = self.cb_settings_lang.findData(cfg_lang)
+        if s_idx >= 0:
+            self.cb_settings_lang.setCurrentIndex(s_idx)
+        self.cb_settings_lang.currentIndexChanged.connect(self._on_settings_lang_changed)
+        l_layout.addWidget(self.cb_settings_lang)
+        layout.addWidget(lang_card)
+
+        # 2. DeepL Card
         deepl_card = QFrame()
         deepl_card.setObjectName("CardContainer")
         d_layout = QVBoxLayout(deepl_card)
         d_layout.setContentsMargins(18, 16, 18, 16)
         d_layout.setSpacing(10)
 
-        d_title = QLabel("DeepL API")
-        d_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
-        d_desc = QLabel("Clave de API para traducciones de alta fidelidad.")
-        d_desc.setStyleSheet("font-size: 12px; color: #94A3B8;")
-        d_layout.addWidget(d_title)
-        d_layout.addWidget(d_desc)
+        self.lbl_deepl_title = QLabel(t("settings.deepl_title"))
+        self.lbl_deepl_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        self.lbl_deepl_desc = QLabel(t("settings.deepl_desc"))
+        self.lbl_deepl_desc.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        d_layout.addWidget(self.lbl_deepl_title)
+        d_layout.addWidget(self.lbl_deepl_desc)
 
         self.txt_deepl_key = QLineEdit()
-        self.txt_deepl_key.setPlaceholderText("Clave API de DeepL (ej. 12345678-abcd...)")
+        self.txt_deepl_key.setPlaceholderText(t("settings.deepl_placeholder"))
         d_layout.addWidget(self.txt_deepl_key)
 
         type_layout = QHBoxLayout()
-        self.rb_deepl_free = QRadioButton("DeepL Free API")
-        self.rb_deepl_pro = QRadioButton("DeepL Pro API")
+        self.rb_deepl_free = QRadioButton(t("settings.deepl_free"))
+        self.rb_deepl_pro = QRadioButton(t("settings.deepl_pro"))
         self.rb_deepl_free.setStyleSheet("color: #F8FAFC;")
         self.rb_deepl_pro.setStyleSheet("color: #F8FAFC;")
         self.rb_deepl_free.setChecked(True)
@@ -712,36 +787,36 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(deepl_card)
 
-        # OpenAI / LLM Card
+        # 3. OpenAI / LLM Card
         openai_card = QFrame()
         openai_card.setObjectName("CardContainer")
         o_layout = QVBoxLayout(openai_card)
         o_layout.setContentsMargins(18, 16, 18, 16)
         o_layout.setSpacing(10)
 
-        o_title = QLabel("OpenAI / Endpoint Compatible (Ollama, OpenRouter)")
-        o_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
-        o_layout.addWidget(o_title)
+        self.lbl_openai_title = QLabel(t("settings.openai_title"))
+        self.lbl_openai_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        o_layout.addWidget(self.lbl_openai_title)
 
         self.txt_openai_key = QLineEdit()
-        self.txt_openai_key.setPlaceholderText("API Key (opcional para endpoints locales)")
+        self.txt_openai_key.setPlaceholderText(t("settings.openai_key_placeholder"))
         o_layout.addWidget(self.txt_openai_key)
 
         self.txt_openai_url = QLineEdit()
-        self.txt_openai_url.setPlaceholderText("Base URL (ej. https://api.openai.com/v1 o http://localhost:11434/v1)")
+        self.txt_openai_url.setPlaceholderText(t("settings.openai_url_placeholder"))
         o_layout.addWidget(self.txt_openai_url)
 
         self.txt_openai_model = QLineEdit()
-        self.txt_openai_model.setPlaceholderText("Modelo (ej. gpt-4o-mini)")
+        self.txt_openai_model.setPlaceholderText(t("settings.openai_model_placeholder"))
         o_layout.addWidget(self.txt_openai_model)
 
         layout.addWidget(openai_card)
 
-        btn_save = QPushButton("💾 Guardar configuración")
-        btn_save.setObjectName("PrimaryBtn")
-        btn_save.setMinimumHeight(46)
-        btn_save.clicked.connect(self._save_settings)
-        layout.addWidget(btn_save)
+        self.btn_save_settings = QPushButton(t("settings.btn_save"))
+        self.btn_save_settings.setObjectName("PrimaryBtn")
+        self.btn_save_settings.setMinimumHeight(46)
+        self.btn_save_settings.clicked.connect(self._save_settings)
+        layout.addWidget(self.btn_save_settings)
 
         layout.addStretch()
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -763,12 +838,12 @@ class MainWindow(QMainWindow):
         check_icon.setStyleSheet("font-size: 34px;")
         
         text_layout = QVBoxLayout()
-        c_title = QLabel("Procesamiento completado")
-        c_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
-        c_sub = QLabel("El archivo se ha procesado y guardado correctamente.")
-        c_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
-        text_layout.addWidget(c_title)
-        text_layout.addWidget(c_sub)
+        self.lbl_completed_title = QLabel(t("completed.title"))
+        self.lbl_completed_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        self.lbl_completed_sub = QLabel(t("completed.subtitle"))
+        self.lbl_completed_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        text_layout.addWidget(self.lbl_completed_title)
+        text_layout.addWidget(self.lbl_completed_sub)
 
         header_layout.addWidget(check_icon)
         header_layout.addLayout(text_layout)
@@ -778,9 +853,9 @@ class MainWindow(QMainWindow):
         # 3 Tarjetas de métricas
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(14)
-        self.card_lines = MetricCard("📄", "0", "líneas procesadas")
-        self.card_deleted = MetricCard("✨", "0", "líneas eliminadas")
-        self.card_time = MetricCard("⏱️", "00:00", "tiempo total")
+        self.card_lines = MetricCard("📄", "0", t("completed.card_lines"))
+        self.card_deleted = MetricCard("✨", "0", t("completed.card_deleted"))
+        self.card_time = MetricCard("⏱️", "00:00", t("completed.card_time"))
         cards_layout.addWidget(self.card_lines)
         cards_layout.addWidget(self.card_deleted)
         cards_layout.addWidget(self.card_time)
@@ -789,15 +864,15 @@ class MainWindow(QMainWindow):
         # Botones de Acción
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
-        self.btn_open_file = QPushButton("📄 Abrir archivo")
+        self.btn_open_file = QPushButton(t("completed.btn_open_file"))
         self.btn_open_file.setObjectName("PrimaryBtn")
         self.btn_open_file.clicked.connect(self._open_saved_file)
 
-        self.btn_open_folder = QPushButton("📂 Ver en el explorador")
+        self.btn_open_folder = QPushButton(t("completed.btn_open_folder"))
         self.btn_open_folder.setProperty("class", "secondary-btn")
         self.btn_open_folder.clicked.connect(self._open_output_folder)
 
-        self.btn_to_preview = QPushButton("👁️ Ver en vista previa")
+        self.btn_to_preview = QPushButton(t("completed.btn_to_preview"))
         self.btn_to_preview.setProperty("class", "secondary-btn")
         self.btn_to_preview.clicked.connect(lambda: self._switch_page(1))
 
@@ -814,13 +889,13 @@ class MainWindow(QMainWindow):
         s_layout.setContentsMargins(20, 16, 20, 16)
         s_layout.setSpacing(8)
 
-        s_head = QLabel("Resumen de cambios")
-        s_head.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
-        s_layout.addWidget(s_head)
+        self.lbl_summary_head = QLabel(t("completed.summary_title"))
+        self.lbl_summary_head.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        s_layout.addWidget(self.lbl_summary_head)
 
-        self.lbl_sum1 = QLabel("✓ Limpieza de spam, URLs e IDs aplicada")
-        self.lbl_sum2 = QLabel("✓ Sincronización y estructura original conservadas")
-        self.lbl_sum3 = QLabel("✓ Archivo guardado correctamente")
+        self.lbl_sum1 = QLabel(t("completed.sum1"))
+        self.lbl_sum2 = QLabel(t("completed.sum2"))
+        self.lbl_sum3 = QLabel(t("completed.sum3"))
         for lbl in [self.lbl_sum1, self.lbl_sum2, self.lbl_sum3]:
             lbl.setStyleSheet("font-size: 13px; color: #10B981; font-weight: 500;")
             s_layout.addWidget(lbl)
@@ -1267,18 +1342,17 @@ class MainWindow(QMainWindow):
             border-radius: 4px;
             border: 1px solid #3730A3;
         """)
-        v_status = QLabel("Versión Estable Multiplataforma • FFmpeg Estático Autónomo")
+        v_status = QLabel(t("about.status"))
         v_status.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        self.lbl_about_status = v_status
         tag_row.addWidget(v_badge)
         tag_row.addWidget(v_status)
         tag_row.addStretch()
 
-        app_desc = QLabel(
-            "Aplicación de escritorio para traducir, editar, limpiar y quemar subtítulos en vídeo "
-            "con sincronización en tiempo real y compatibilidad universal con .srt, .vtt, .ass y .txt."
-        )
+        app_desc = QLabel(t("about.desc"))
         app_desc.setStyleSheet("font-size: 12px; color: #CBD5E1; line-height: 1.4;")
         app_desc.setWordWrap(True)
+        self.lbl_about_desc = app_desc
 
         h_info.addWidget(app_title)
         h_info.addLayout(tag_row)
@@ -1294,8 +1368,9 @@ class MainWindow(QMainWindow):
         d_layout.setContentsMargins(24, 20, 24, 20)
         d_layout.setSpacing(12)
 
-        dev_title = QLabel("👨‍💻 Desarrollador")
+        dev_title = QLabel("👨‍💻 " + t("about.author_title"))
         dev_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
+        self.lbl_dev_title = dev_title
         d_layout.addWidget(dev_title)
 
         dev_name = QLabel("Miguel Ángel Rodríguez Dalí")
@@ -1313,16 +1388,18 @@ class MainWindow(QMainWindow):
         links_row = QHBoxLayout()
         links_row.setSpacing(12)
 
-        btn_github = QPushButton("🌐 Perfil de GitHub (@marodriguezd)")
+        btn_github = QPushButton(t("about.btn_profile") + " (@marodriguezd)")
         btn_github.setStyleSheet(self._btn_link_style())
         btn_github.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_github.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd")))
+        self.btn_github = btn_github
         links_row.addWidget(btn_github)
 
-        btn_repo = QPushButton("📦 Repositorio SRT4U en GitHub")
+        btn_repo = QPushButton(t("about.btn_repo") + " (SRT4U)")
         btn_repo.setStyleSheet(self._btn_link_style())
         btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd/SRT4U-Subtitle-Processor")))
+        self.btn_repo = btn_repo
         links_row.addWidget(btn_repo)
 
         links_row.addStretch()
@@ -1337,8 +1414,9 @@ class MainWindow(QMainWindow):
         l_layout.setContentsMargins(24, 20, 24, 20)
         l_layout.setSpacing(12)
 
-        lic_title = QLabel("⚖️ Licencia y Términos de Uso")
+        lic_title = QLabel("⚖️ " + t("about.license_title"))
         lic_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
+        self.lbl_lic_title = lic_title
         l_layout.addWidget(lic_title)
 
         lic_badge_row = QHBoxLayout()
@@ -1353,36 +1431,40 @@ class MainWindow(QMainWindow):
             border-radius: 4px;
             border: 1px solid #059669;
         """)
-        lic_name = QLabel("Creative Commons Atribución-NoComercial-CompartirIgual 4.0 Internacional")
+        lic_name = QLabel(t("about.license_name"))
         lic_name.setStyleSheet("font-size: 13px; font-weight: 600; color: #F8FAFC;")
+        self.lbl_lic_name = lic_name
         lic_badge_row.addWidget(lic_badge)
         lic_badge_row.addWidget(lic_name)
         lic_badge_row.addStretch()
         l_layout.addLayout(lic_badge_row)
 
         lic_terms = QLabel(
-            "• <b>Libertad de uso y modificación:</b> Puedes usar, estudiar y adaptar el software libremente.<br>"
-            "• <b>Atribución requerida:</b> Debes dar crédito expreso al autor original (Miguel Ángel Rodríguez Dalí).<br>"
-            "• <b>Uso no comercial:</b> Queda prohibida la venta, monetización o explotación comercial de este software o sus derivados sin autorización.<br>"
-            "• <b>Compartir igual:</b> Cualquier modificación o derivado debe distribuirse bajo esta misma licencia."
+            f"• <b>{t('about.perm_title')}:</b> {t('about.perm_1')}<br>"
+            f"• <b>{t('about.restr_1')}</b><br>"
+            f"• <b>{t('about.restr_2')}</b><br>"
+            f"• <b>{t('about.restr_3')}</b>"
         )
         lic_terms.setStyleSheet("font-size: 12px; color: #CBD5E1; line-height: 1.6;")
         lic_terms.setTextFormat(Qt.TextFormat.RichText)
         lic_terms.setWordWrap(True)
+        self.lbl_lic_desc = lic_terms
         l_layout.addWidget(lic_terms)
 
         lic_btn_row = QHBoxLayout()
         lic_btn_row.setSpacing(12)
-        btn_view_lic = QPushButton("📄 Ver texto completo de la licencia")
+        btn_view_lic = QPushButton(t("about.btn_open_license"))
         btn_view_lic.setStyleSheet(self._btn_link_style())
         btn_view_lic.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_view_lic.clicked.connect(self._open_license_file)
+        self.btn_open_license = btn_view_lic
         lic_btn_row.addWidget(btn_view_lic)
 
-        btn_cc_web = QPushButton("🔗 Web oficial Creative Commons")
+        btn_cc_web = QPushButton(t("about.btn_web_deed"))
         btn_cc_web.setStyleSheet(self._btn_link_style())
         btn_cc_web.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_cc_web.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/deed.es")))
+        self.btn_web_deed = btn_cc_web
         lic_btn_row.addWidget(btn_cc_web)
 
         lic_btn_row.addStretch()
@@ -1394,3 +1476,137 @@ class MainWindow(QMainWindow):
         scroll.setWidget(container)
         page_layout.addWidget(scroll)
         return page
+
+    def _on_top_lang_changed(self, index: int):
+        code = self.cb_top_lang.currentData()
+        if code:
+            self.i18n.set_language(code, save_to_config=True)
+            if hasattr(self, "cb_settings_lang"):
+                self.cb_settings_lang.blockSignals(True)
+                s_idx = self.cb_settings_lang.findData(code)
+                if s_idx >= 0:
+                    self.cb_settings_lang.setCurrentIndex(s_idx)
+                self.cb_settings_lang.blockSignals(False)
+
+    def _on_settings_lang_changed(self, index: int):
+        code = self.cb_settings_lang.currentData()
+        if code:
+            self.i18n.set_language(code, save_to_config=True)
+            if hasattr(self, "cb_top_lang"):
+                self.cb_top_lang.blockSignals(True)
+                t_idx = self.cb_top_lang.findData(code)
+                if t_idx >= 0:
+                    self.cb_top_lang.setCurrentIndex(t_idx)
+                self.cb_top_lang.blockSignals(False)
+
+    def retranslate_ui(self):
+        # 1. Sidebar Nav
+        for btn in self.nav_buttons:
+            icon = btn.property("icon_emoji")
+            key = btn.property("i18n_key")
+            if key and icon:
+                btn.setText(f"{icon}  {t(key)}")
+
+        # 2. Home Page
+        if hasattr(self, "lbl_home_title"):
+            self.lbl_home_title.setText(t("home.title"))
+            self.lbl_home_sub.setText(t("home.subtitle"))
+            self.lbl_src_lang.setText(t("home.source_lang"))
+            self.lbl_tgt_lang.setText(t("home.target_lang"))
+            self.lbl_engine.setText(t("home.engine"))
+            self.card_translate.set_texts(t("home.translate_title"), t("home.translate_desc"))
+            self.card_preserve.set_texts(t("home.format_title"), t("home.format_desc"))
+            self.card_clean.set_texts(t("home.clean_title"), t("home.clean_desc"))
+            self.card_parallel.set_texts(t("batch.title"), t("batch.subtitle"))
+            self.btn_process.setText(t("home.btn_process"))
+            self.drop_zone.retranslate()
+
+        # 3. Preview / Studio Page
+        if hasattr(self, "lbl_preview_title"):
+            self.lbl_preview_title.setText("🎬 " + t("preview.title"))
+            self.lbl_preview_sub.setText(t("preview.subtitle"))
+            self.btn_open_orig.setText(t("preview.btn_open"))
+            self.btn_export.setText(t("preview.btn_save"))
+            self.btn_burn_in.setText(t("preview.btn_burn"))
+            self.preview_search_input.setPlaceholderText(t("preview.search_placeholder"))
+            self.chk_autoscroll.setText(t("preview.autoscroll"))
+            self.diff_viewer.retranslate()
+            self.video_player.retranslate()
+
+        # 4. Clean Page
+        if hasattr(self, "lbl_clean_title"):
+            self.lbl_clean_title.setText(t("clean.title"))
+            self.lbl_clean_sub.setText(t("clean.subtitle"))
+            self.btn_fast_clean.setText(t("clean.btn_clean"))
+            self.clean_drop_zone.retranslate()
+
+        # 5. Convert Page
+        if hasattr(self, "lbl_convert_title"):
+            self.lbl_convert_title.setText(t("convert.title"))
+            self.lbl_convert_sub.setText(t("convert.subtitle"))
+            self.lbl_convert_target.setText(t("convert.target_label"))
+            self.btn_run_convert.setText(t("convert.btn_convert"))
+            self.convert_drop_zone.retranslate()
+
+        # 6. Batch Page
+        if hasattr(self, "lbl_batch_title"):
+            self.lbl_batch_title.setText(t("batch.title"))
+            self.lbl_batch_sub.setText(t("batch.subtitle"))
+            self.btn_add_batch.setText(t("batch.btn_add"))
+            self.btn_clear_batch.setText(t("batch.btn_clear"))
+            self.batch_table.setHorizontalHeaderLabels([
+                t("batch.col_file"),
+                t("batch.col_size"),
+                t("batch.col_format"),
+                t("batch.col_status")
+            ])
+            self.btn_start_batch.setText(t("batch.btn_start"))
+
+        # 7. Settings Page
+        if hasattr(self, "lbl_settings_title"):
+            self.lbl_settings_title.setText(t("settings.title"))
+            self.lbl_lang_card_title.setText(t("settings.lang_card_title"))
+            self.lbl_lang_card_desc.setText(t("settings.lang_card_desc"))
+            self.lbl_deepl_title.setText(t("settings.deepl_title"))
+            self.lbl_deepl_desc.setText(t("settings.deepl_desc"))
+            self.txt_deepl_key.setPlaceholderText(t("settings.deepl_placeholder"))
+            self.rb_deepl_free.setText(t("settings.deepl_free"))
+            self.rb_deepl_pro.setText(t("settings.deepl_pro"))
+            self.lbl_openai_title.setText(t("settings.openai_title"))
+            self.txt_openai_key.setPlaceholderText(t("settings.openai_key_placeholder"))
+            self.txt_openai_url.setPlaceholderText(t("settings.openai_url_placeholder"))
+            self.txt_openai_model.setPlaceholderText(t("settings.openai_model_placeholder"))
+            self.btn_save_settings.setText(t("settings.btn_save"))
+
+        # 8. Completed Page
+        if hasattr(self, "lbl_completed_title"):
+            self.lbl_completed_title.setText(t("completed.title"))
+            self.lbl_completed_sub.setText(t("completed.subtitle"))
+            self.card_lines.set_label(t("completed.card_lines"))
+            self.card_deleted.set_label(t("completed.card_deleted"))
+            self.card_time.set_label(t("completed.card_time"))
+            self.btn_open_file.setText(t("completed.btn_open_file"))
+            self.btn_open_folder.setText(t("completed.btn_open_folder"))
+            self.btn_to_preview.setText(t("completed.btn_to_preview"))
+            self.lbl_summary_head.setText(t("completed.summary_title"))
+            self.lbl_sum1.setText(t("completed.sum1"))
+            self.lbl_sum2.setText(t("completed.sum2"))
+            self.lbl_sum3.setText(t("completed.sum3"))
+
+        # 9. About Page
+        if hasattr(self, "lbl_about_status"):
+            self.lbl_about_status.setText(t("about.status"))
+            self.lbl_about_desc.setText(t("about.desc"))
+            self.lbl_dev_title.setText("👨‍💻 " + t("about.author_title"))
+            self.btn_github.setText(t("about.btn_profile") + " (@marodriguezd)")
+            self.btn_repo.setText(t("about.btn_repo") + " (SRT4U)")
+            self.lbl_lic_title.setText("⚖️ " + t("about.license_title"))
+            self.lbl_lic_name.setText(t("about.license_name"))
+            self.lbl_lic_desc.setText(
+                f"• <b>{t('about.perm_title')}:</b> {t('about.perm_1')}<br>"
+                f"• <b>{t('about.restr_1')}</b><br>"
+                f"• <b>{t('about.restr_2')}</b><br>"
+                f"• <b>{t('about.restr_3')}</b>"
+            )
+            self.btn_open_license.setText(t("about.btn_open_license"))
+            self.btn_web_deed.setText(t("about.btn_web_deed"))
