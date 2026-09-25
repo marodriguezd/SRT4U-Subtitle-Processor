@@ -10,7 +10,7 @@
 
 Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de subtítulos (`.srt`, `.vtt`, `.ass`, `.txt`) con reproductor de vídeo sincronizado en tiempo real e incrustación directa en vídeo (Burn-In / Hardsub).
 
-![Vista previa de SRT4U](assets/preview.png)
+![Vista previa de SRT4U](assets/preview_es.png)
 
 ---
 

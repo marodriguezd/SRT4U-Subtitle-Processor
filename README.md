@@ -10,7 +10,7 @@
 
 Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`, `.txt`) with a real-time synchronized video player and direct video burn-in export.
 
-![SRT4U Preview](assets/preview.png)
+![SRT4U Preview](assets/preview_en.png)
 
 ---
 
