@@ -181,16 +181,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller pillow
-          brew install ffmpeg || true
+
+      - name: Download Static Universal FFmpeg (macOS)
+        run: |
+          curl -sL https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64.gz | gzip -d > ffmpeg-arm64
+          curl -sL https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64.gz | gzip -d > ffmpeg-x64
+          chmod +x ffmpeg-arm64 ffmpeg-x64
+          lipo -create -output ffmpeg ffmpeg-arm64 ffmpeg-x64
+          chmod +x ./ffmpeg
+          ./ffmpeg -version
 
       - name: Build .app with PyInstaller
         run: |
-          FFMPEG_PATH=$(which ffmpeg)
-          echo "Embedding FFmpeg from $FFMPEG_PATH"
           pyinstaller --windowed --name "SRT4U" \
             --add-data "application:application" \
             --add-data "assets:assets" \
-            --add-binary "$FFMPEG_PATH:." \
+            --add-binary "ffmpeg:." \
             --icon "assets/icon.icns" \
             main.py
 

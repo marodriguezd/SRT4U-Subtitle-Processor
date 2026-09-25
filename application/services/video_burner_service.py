@@ -51,6 +51,12 @@ class VideoBurnerService:
             candidates.append(os.path.join(sys._MEIPASS, exe_name))
             candidates.append(os.path.join(sys._MEIPASS, "bin", exe_name))
 
+        if getattr(sys, "frozen", False):
+            exe_dir = os.path.dirname(sys.executable)
+            candidates.append(os.path.join(exe_dir, "ffmpeg"))
+            candidates.append(os.path.join(exe_dir, "ffmpeg.exe"))
+            candidates.append(os.path.join(exe_dir, "..", "Resources", "ffmpeg"))
+
         # 2. Local app directory bin/
         app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         local_exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
