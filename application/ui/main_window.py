@@ -374,9 +374,9 @@ class MainWindow(QMainWindow):
         top_bar = QHBoxLayout()
         header_text = QVBoxLayout()
         header_text.setSpacing(3)
-        p_title = QLabel("← Previsualización")
+        p_title = QLabel("🌐 Traducción y Previsualización")
         p_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #F8FAFC;")
-        p_sub = QLabel("Compara el resultado original contra la versión limpia y traducida.")
+        p_sub = QLabel("Compara y afina traducciones editando directamente el texto. Carga un vídeo para sincronizar.")
         p_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
         header_text.addWidget(p_title)
         header_text.addWidget(p_sub)
@@ -384,21 +384,28 @@ class MainWindow(QMainWindow):
         top_bar.addLayout(header_text)
         top_bar.addStretch()
 
-        self.btn_open_orig = QPushButton("📁 Abrir archivo")
+        self.btn_open_orig = QPushButton("📁 Abrir subtítulo")
         self.btn_open_orig.setProperty("class", "secondary-btn")
         self.btn_open_orig.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_orig.clicked.connect(self._browse_preview_file)
 
-        self.btn_export = QPushButton("💾 Guardar subtítulo")
+        self.btn_load_video_top = QPushButton("🎬 Cargar vídeo")
+        self.btn_load_video_top.setProperty("class", "secondary-btn")
+        self.btn_load_video_top.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_load_video_top.clicked.connect(lambda: self.video_player._browse_video())
+
+        self.btn_export = QPushButton("💾 Guardar subtítulo editado")
         self.btn_export.setObjectName("PrimaryBtn")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.clicked.connect(self._export_result_file)
 
         top_bar.addWidget(self.btn_open_orig)
+        top_bar.addWidget(self.btn_load_video_top)
         top_bar.addWidget(self.btn_export)
         layout.addLayout(top_bar)
 
         self.diff_viewer = SubtitleDiffViewer()
+        self.diff_viewer.subtitles_edited.connect(self._on_subtitles_edited)
         layout.addWidget(self.diff_viewer, stretch=3)
 
         self.video_player = VideoPreviewPlayer()
@@ -849,36 +856,64 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error en conversión", str(e))
 
+    def _on_subtitles_edited(self, edited_items):
+        if self.last_result:
+            self.last_result.processed_items = edited_items
+        self.video_player.set_subtitles(edited_items)
+
     def _export_result_file(self):
-        if not self.last_result:
-            QMessageBox.information(self, "Información", "No hay subtítulo procesado aún.")
+        items = self.diff_viewer.get_processed_subtitles()
+        if not items and self.last_result:
+            items = self.last_result.processed_items
+
+        if not items:
+            QMessageBox.information(self, "Información", "No hay subtítulo cargado para guardar.")
             return
+
+        suggested_name = "subtitulo_editado.srt"
+        if self.saved_output_path:
+            suggested_name = self.saved_output_path
+        elif self.current_subtitle_path:
+            base, ext = os.path.splitext(self.current_subtitle_path)
+            suggested_name = f"{base}_editado{ext}"
 
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Guardar subtítulo",
-            self.saved_output_path or "subtitulo_procesado.srt",
+            "Guardar subtítulo editado",
+            suggested_name,
             "Subtítulo SRT (*.srt);;Subtítulo VTT (*.vtt);;Subtítulo ASS (*.ass);;Texto Plano (*.txt)"
         )
         if path:
             ext = os.path.splitext(path)[1].lstrip(".")
-            content = self.subtitle_service.format_output(self.last_result.processed_items, ext)
+            content = self.subtitle_service.format_output(items, ext)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             self.saved_output_path = path
-            QMessageBox.information(self, "Guardado", f"Guardado en:\n{path}")
+            QMessageBox.information(self, "Guardado con éxito", f"Subtítulo guardado en:\n{path}")
 
     def _browse_preview_file(self):
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Seleccionar subtítulo",
+            "Seleccionar subtítulo para previsualizar",
             "",
             "Subtítulos (*.srt *.ass *.vtt *.txt)"
         )
         if path:
-            self._on_file_selected(path, "")
-            self.drop_zone.set_file(path)
-            self._switch_page(0)
+            self.current_subtitle_path = path
+            fmt = self.subtitle_service.detect_format("", path)
+            try:
+                import copy
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                items = self.subtitle_service.parse_subtitles(content, fmt)
+                edited_items = copy.deepcopy(items)
+                self.diff_viewer.load_subtitles(items, edited_items)
+                self.video_player.set_subtitles(edited_items)
+                matching_vid = self.drop_zone._find_matching_video(path)
+                if matching_vid:
+                    self.video_player.load_video(matching_vid)
+            except Exception as e:
+                QMessageBox.critical(self, "Error al cargar subtítulo", str(e))
 
     def _open_saved_file(self):
         if self.saved_output_path and os.path.exists(self.saved_output_path):

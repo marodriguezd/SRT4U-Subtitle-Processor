@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSlider,
     QDialog,
+    QPlainTextEdit,
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -393,6 +394,7 @@ class MetricCard(QFrame):
 
 class SubtitleDiffViewer(QWidget):
     cue_selected = pyqtSignal(int)
+    subtitles_edited = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -400,13 +402,16 @@ class SubtitleDiffViewer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        self.left_col = self._create_column("Original", highlight=False)
-        self.right_col = self._create_column("Traducido y limpio", highlight=True)
+        self.original_items: List[SubtitleItem] = []
+        self.processed_items: List[SubtitleItem] = []
+
+        self.left_col = self._create_column("Original (Solo lectura)", highlight=False, editable=False)
+        self.right_col = self._create_column("Traducido y limpio (Editable ✏️)", highlight=True, editable=True)
 
         layout.addWidget(self.left_col)
         layout.addWidget(self.right_col)
 
-    def _create_column(self, title: str, highlight: bool = False) -> QWidget:
+    def _create_column(self, title: str, highlight: bool = False, editable: bool = False) -> QWidget:
         container = QFrame()
         container.setObjectName("CardContainer")
         col_layout = QVBoxLayout(container)
@@ -433,13 +438,19 @@ class SubtitleDiffViewer(QWidget):
 
         container.content_layout = content_layout
         container.content_widget = content_widget
+        container.editable = editable
         return container
 
     def load_subtitles(self, original_items: List[SubtitleItem], processed_items: List[SubtitleItem]):
-        self._populate_column(self.left_col, original_items)
-        self._populate_column(self.right_col, processed_items)
+        self.original_items = original_items or []
+        self.processed_items = processed_items or []
+        self._populate_column(self.left_col, self.original_items, editable=False)
+        self._populate_column(self.right_col, self.processed_items, editable=True)
 
-    def _populate_column(self, col_container: QWidget, items: List[SubtitleItem]):
+    def get_processed_subtitles(self) -> List[SubtitleItem]:
+        return self.processed_items
+
+    def _populate_column(self, col_container: QWidget, items: List[SubtitleItem], editable: bool = False):
         layout = col_container.content_layout
         while layout.count() > 1:
             child = layout.takeAt(0)
@@ -462,7 +473,7 @@ class SubtitleDiffViewer(QWidget):
             """)
             c_layout = QVBoxLayout(card)
             c_layout.setContentsMargins(8, 8, 8, 8)
-            c_layout.setSpacing(4)
+            c_layout.setSpacing(6)
 
             meta_layout = QHBoxLayout()
             idx_lbl = QLabel(f"#{item.index}")
@@ -472,15 +483,43 @@ class SubtitleDiffViewer(QWidget):
             meta_layout.addWidget(idx_lbl)
             meta_layout.addWidget(time_lbl)
             meta_layout.addStretch()
-
-            text_lbl = QLabel(item.text)
-            text_lbl.setWordWrap(True)
-            text_lbl.setStyleSheet("font-size: 13px; color: #F8FAFC;")
-
             c_layout.addLayout(meta_layout)
-            c_layout.addWidget(text_lbl)
 
             start_time = item.start_ms
+            if editable:
+                text_edit = QPlainTextEdit()
+                text_edit.setPlainText(item.text)
+                text_edit.setTabChangesFocus(True)
+                line_count = max(1, item.text.count('\n') + 1)
+                text_edit.setFixedHeight(max(38, min(140, line_count * 24 + 16)))
+                text_edit.setStyleSheet("""
+                    QPlainTextEdit {
+                        background: #0B1120;
+                        border: 1px solid #334155;
+                        border-radius: 6px;
+                        color: #F8FAFC;
+                        font-size: 13px;
+                        padding: 4px 6px;
+                    }
+                    QPlainTextEdit:focus {
+                        border-color: #A855F7;
+                        background: #111827;
+                    }
+                """)
+                def make_change_handler(target_item=item, widget=text_edit):
+                    def handler():
+                        target_item.text = widget.toPlainText()
+                        self.subtitles_edited.emit(self.processed_items)
+                    return handler
+
+                text_edit.textChanged.connect(make_change_handler())
+                c_layout.addWidget(text_edit)
+            else:
+                text_lbl = QLabel(item.text)
+                text_lbl.setWordWrap(True)
+                text_lbl.setStyleSheet("font-size: 13px; color: #F8FAFC;")
+                c_layout.addWidget(text_lbl)
+
             card.mousePressEvent = lambda e, t=start_time: self.cue_selected.emit(t)
             layout.insertWidget(layout.count() - 1, card)
 
@@ -490,6 +529,7 @@ class VideoPreviewPlayer(QFrame):
         super().__init__(parent)
         self.setStyleSheet("background-color: #070B14; border-radius: 12px; border: 1px solid #25304B;")
         self.setFixedHeight(220)
+        self.setAcceptDrops(True)
 
         self.player = QMediaPlayer()
         self.audio_output = QAudioOutput()
@@ -512,8 +552,9 @@ class VideoPreviewPlayer(QFrame):
         self.player.setVideoOutput(self.video_widget)
         v_layout.addWidget(self.video_widget)
 
-        self.sub_overlay = QLabel("Carga un video para previsualizar sincronización", self.video_widget)
+        self.sub_overlay = QLabel("Haz clic aquí o arrastra un video (.mp4, .mkv, .webm) para previsualizar", self.video_widget)
         self.sub_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.sub_overlay.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sub_overlay.setStyleSheet("""
             QLabel {
                 background: rgba(0, 0, 0, 0.85);
@@ -522,9 +563,15 @@ class VideoPreviewPlayer(QFrame):
                 font-weight: 700;
                 padding: 6px 12px;
                 border-radius: 6px;
+                border: 1px dashed rgba(99, 102, 241, 0.5);
+            }
+            QLabel:hover {
+                background: rgba(30, 27, 75, 0.95);
+                border-color: #818CF8;
             }
         """)
         self.sub_overlay.adjustSize()
+        self.sub_overlay.mousePressEvent = lambda e: self._browse_video() if (not self.player.source().isValid() or self.player.source().isEmpty()) else None
         layout.addWidget(self.video_container)
 
         ctrl_layout = QHBoxLayout()
@@ -555,10 +602,61 @@ class VideoPreviewPlayer(QFrame):
         self.time_lbl = QLabel("00:00:00 / 00:00:00")
         self.time_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: monospace;")
 
+        self.btn_load_video = QPushButton("🎬 Cargar vídeo")
+        self.btn_load_video.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_load_video.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                color: #E2E8F0;
+                border-radius: 6px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: rgba(99, 102, 241, 0.25);
+                border-color: #818CF8;
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_load_video.clicked.connect(self._browse_video)
+
         ctrl_layout.addWidget(self.play_btn)
         ctrl_layout.addWidget(self.time_slider)
         ctrl_layout.addWidget(self.time_lbl)
+        ctrl_layout.addWidget(self.btn_load_video)
         layout.addLayout(ctrl_layout)
+
+    def _browse_video(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar vídeo para previsualizar",
+            "",
+            "Archivos de vídeo (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos los archivos (*.*)"
+        )
+        if path:
+            self.load_video(path)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                ext = os.path.splitext(url.toLocalFile())[1].lower()
+                if ext in ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.m4v']:
+                    event.acceptProposedAction()
+                    return
+        super().dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext in ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.m4v']:
+                    self.load_video(file_path)
+                    event.acceptProposedAction()
+                    return
+        super().dropEvent(event)
 
     def _connect_signals(self):
         self.play_btn.clicked.connect(self._toggle_playback)
