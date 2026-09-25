@@ -717,6 +717,8 @@ class MainWindow(QMainWindow):
         do_translate = self.toggle_translate.isChecked()
         do_clean = self.toggle_clean.isChecked()
         parallel = self.toggle_parallel.isChecked()
+        preserve_format = self.toggle_preserve.isChecked()
+        target_format = None if preserve_format else "srt"
 
         self.modal = ProgressModal(self)
         self.modal.cancelled.connect(self._cancel_worker)
@@ -730,6 +732,7 @@ class MainWindow(QMainWindow):
             target_lang=target_lang,
             source_lang=source_lang,
             engine=engine,
+            target_format=target_format,
             parallel=parallel,
         )
         self.worker.step_updated.connect(self._on_worker_step)

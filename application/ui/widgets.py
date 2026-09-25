@@ -572,11 +572,13 @@ class VideoPreviewPlayer(QFrame):
         h = self.video_widget.height()
         lbl_w = min(w - 20, 440)
         self.sub_overlay.setGeometry((w - lbl_w) // 2, h - 38, lbl_w, 30)
+        self.sub_overlay.raise_()
 
     def load_video(self, video_path: str):
         if os.path.exists(video_path):
             self.player.setSource(QUrl.fromLocalFile(video_path))
             self.sub_overlay.setText("Video cargado - Listo para reproducir")
+            self.sub_overlay.raise_()
 
     def set_subtitles(self, subtitles: List[SubtitleItem]):
         self.current_subtitles = subtitles
@@ -610,6 +612,7 @@ class VideoPreviewPlayer(QFrame):
         if active_text:
             self.sub_overlay.setText(active_text)
             self.sub_overlay.show()
+            self.sub_overlay.raise_()
         else:
             self.sub_overlay.setText("")
 
