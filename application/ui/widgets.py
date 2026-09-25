@@ -5,7 +5,7 @@ Componentes visuales Glassmorphism según el mockup de SRT4U con alto contraste 
 import os
 import math
 from typing import Optional, List
-from PyQt6.QtCore import Qt, QRect, QRectF, QSize, pyqtSignal, QUrl, QPoint
+from PyQt6.QtCore import Qt, QRect, QRectF, QSize, pyqtSignal, QUrl, QPoint, QEvent
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPaintEvent
 from PyQt6.QtWidgets import (
     QWidget,
@@ -528,12 +528,14 @@ class VideoPreviewPlayer(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setStyleSheet("background-color: #070B14; border-radius: 12px; border: 1px solid #25304B;")
-        self.setFixedHeight(220)
+        self.setFixedHeight(250)
         self.setAcceptDrops(True)
 
         self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
+        self.audio_output = QAudioOutput(self)
+        self.audio_output.setVolume(1.0)
         self.player.setAudioOutput(self.audio_output)
+        self.player.tracksChanged.connect(self._on_tracks_changed)
         self.current_subtitles: List[SubtitleItem] = []
 
         self._setup_ui()
@@ -552,26 +554,28 @@ class VideoPreviewPlayer(QFrame):
         self.player.setVideoOutput(self.video_widget)
         v_layout.addWidget(self.video_widget)
 
-        self.sub_overlay = QLabel("Haz clic aquí o arrastra un video (.mp4, .mkv, .webm) para previsualizar", self.video_widget)
+        self.sub_overlay = QLabel(
+            "Haz clic aquí o arrastra un video (.mp4, .mkv, .webm) para previsualizar",
+            self.video_container
+        )
         self.sub_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.sub_overlay.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sub_overlay.setWordWrap(True)
         self.sub_overlay.setStyleSheet("""
             QLabel {
-                background: rgba(0, 0, 0, 0.85);
+                background: rgba(0, 0, 0, 0.88);
                 color: #FFFFFF;
-                font-size: 13px;
+                font-size: 14px;
                 font-weight: 700;
-                padding: 6px 12px;
-                border-radius: 6px;
-                border: 1px dashed rgba(99, 102, 241, 0.5);
-            }
-            QLabel:hover {
-                background: rgba(30, 27, 75, 0.95);
-                border-color: #818CF8;
+                padding: 6px 16px;
+                border-radius: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
             }
         """)
-        self.sub_overlay.adjustSize()
         self.sub_overlay.mousePressEvent = lambda e: self._browse_video() if (not self.player.source().isValid() or self.player.source().isEmpty()) else None
+        
+        self.video_container.installEventFilter(self)
+        self.video_widget.installEventFilter(self)
         layout.addWidget(self.video_container)
 
         ctrl_layout = QHBoxLayout()
@@ -602,6 +606,33 @@ class VideoPreviewPlayer(QFrame):
         self.time_lbl = QLabel("00:00:00 / 00:00:00")
         self.time_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: monospace;")
 
+        self.btn_mute = QPushButton("🔊")
+        self.btn_mute.setFixedSize(28, 28)
+        self.btn_mute.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mute.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+        """)
+        self.btn_mute.clicked.connect(self._toggle_mute)
+
+        self.vol_slider = QSlider(Qt.Orientation.Horizontal)
+        self.vol_slider.setRange(0, 100)
+        self.vol_slider.setValue(100)
+        self.vol_slider.setFixedWidth(70)
+        self.vol_slider.setStyleSheet("""
+            QSlider::groove:horizontal { height: 4px; background: #1E293B; border-radius: 2px; }
+            QSlider::sub-page:horizontal { background: #10B981; border-radius: 2px; }
+            QSlider::handle:horizontal { width: 10px; height: 10px; margin: -3px 0; border-radius: 5px; background: #FFFFFF; }
+        """)
+        self.vol_slider.valueChanged.connect(self._on_volume_changed)
+
         self.btn_load_video = QPushButton("🎬 Cargar vídeo")
         self.btn_load_video.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load_video.setStyleSheet("""
@@ -625,8 +656,56 @@ class VideoPreviewPlayer(QFrame):
         ctrl_layout.addWidget(self.play_btn)
         ctrl_layout.addWidget(self.time_slider)
         ctrl_layout.addWidget(self.time_lbl)
+        ctrl_layout.addWidget(self.btn_mute)
+        ctrl_layout.addWidget(self.vol_slider)
         ctrl_layout.addWidget(self.btn_load_video)
         layout.addLayout(ctrl_layout)
+
+    def _on_tracks_changed(self):
+        if len(self.player.audioTracks()) > 0 and self.player.activeAudioTrack() == -1:
+            self.player.setActiveAudioTrack(0)
+
+    def _on_volume_changed(self, val: int):
+        vol = val / 100.0
+        self.audio_output.setVolume(vol)
+        if val == 0:
+            self.btn_mute.setText("🔇")
+        elif val < 50:
+            self.btn_mute.setText("🔉")
+        else:
+            self.btn_mute.setText("🔊")
+
+    def _toggle_mute(self):
+        is_muted = self.audio_output.isMuted()
+        self.audio_output.setMuted(not is_muted)
+        if not is_muted:
+            self.btn_mute.setText("🔇")
+        else:
+            val = self.vol_slider.value()
+            self.btn_mute.setText("🔊" if val >= 50 else "🔉")
+
+    def eventFilter(self, watched, event):
+        if watched in (self.video_container, self.video_widget) and event.type() == QEvent.Type.Resize:
+            self._reposition_overlay()
+        return super().eventFilter(watched, event)
+
+    def _reposition_overlay(self):
+        w = self.video_container.width()
+        h = self.video_container.height()
+        if w <= 0 or h <= 0:
+            return
+        self.sub_overlay.adjustSize()
+        sh = self.sub_overlay.sizeHint()
+        lbl_w = min(max(260, sh.width() + 32), max(100, w - 24))
+        lbl_h = max(34, min(80, sh.height()))
+        lbl_x = (w - lbl_w) // 2
+        lbl_y = max(8, h - lbl_h - 14)
+        self.sub_overlay.setGeometry(lbl_x, lbl_y, lbl_w, lbl_h)
+        self.sub_overlay.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_overlay()
 
     def _browse_video(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -664,25 +743,26 @@ class VideoPreviewPlayer(QFrame):
         self.player.durationChanged.connect(self._on_duration_changed)
         self.time_slider.sliderMoved.connect(self._set_position)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        w = self.video_widget.width()
-        h = self.video_widget.height()
-        lbl_w = min(w - 20, 440)
-        self.sub_overlay.setGeometry((w - lbl_w) // 2, h - 38, lbl_w, 30)
-        self.sub_overlay.raise_()
-
     def load_video(self, video_path: str):
         if os.path.exists(video_path):
             self.player.setSource(QUrl.fromLocalFile(video_path))
             self.sub_overlay.setText("Video cargado - Listo para reproducir")
+            self._reposition_overlay()
+            self.sub_overlay.show()
             self.sub_overlay.raise_()
 
     def set_subtitles(self, subtitles: List[SubtitleItem]):
         self.current_subtitles = subtitles
+        # Update current overlay text based on current position
+        if self.player.position() > 0:
+            self._on_position_changed(self.player.position())
 
     def seek_to_ms(self, ms: int):
+        was_playing = (self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
         self.player.setPosition(ms)
+        self._on_position_changed(ms)
+        if was_playing:
+            self.player.play()
 
     def _toggle_playback(self):
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
@@ -704,15 +784,23 @@ class VideoPreviewPlayer(QFrame):
         active_text = ""
         for item in self.current_subtitles:
             if item.start_ms <= pos <= item.end_ms:
-                active_text = item.text.replace("\n", " ")
+                active_text = item.text.replace("\n", " ").strip()
                 break
 
         if active_text:
             self.sub_overlay.setText(active_text)
+            self._reposition_overlay()
             self.sub_overlay.show()
             self.sub_overlay.raise_()
         else:
-            self.sub_overlay.setText("")
+            if self.player.source().isValid() and not self.player.source().isEmpty():
+                self.sub_overlay.setText("")
+                self.sub_overlay.hide()
+            else:
+                self.sub_overlay.setText("Haz clic aquí o arrastra un video (.mp4, .mkv, .webm) para previsualizar")
+                self._reposition_overlay()
+                self.sub_overlay.show()
+                self.sub_overlay.raise_()
 
     def _set_position(self, pos: int):
         self.player.setPosition(pos)
