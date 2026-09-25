@@ -392,143 +392,309 @@ class MetricCard(QFrame):
         self.value_lbl.setText(val)
 
 
+class SubtitleCard(QFrame):
+    jump_clicked = pyqtSignal(int)
+    text_changed = pyqtSignal()
+
+    def __init__(self, original_item: SubtitleItem, edited_item: SubtitleItem, parent=None):
+        super().__init__(parent)
+        self.original_item = original_item
+        self.edited_item = edited_item
+        self.is_active = False
+
+        self.setObjectName("SubtitleCard")
+        self._apply_style(active=False)
+        self._setup_ui()
+
+    def _apply_style(self, active: bool):
+        if active:
+            self.setStyleSheet("""
+                QFrame#SubtitleCard {
+                    background-color: #1A1C38;
+                    border: 2px solid #8B5CF6;
+                    border-radius: 8px;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QFrame#SubtitleCard {
+                    background-color: #111827;
+                    border: 1px solid #1F2937;
+                    border-radius: 8px;
+                }
+                QFrame#SubtitleCard:hover {
+                    border-color: #38BDF8;
+                    background-color: #141E33;
+                }
+            """)
+
+    def set_active(self, active: bool):
+        if self.is_active == active:
+            return
+        self.is_active = active
+        self._apply_style(active)
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+
+        # Header / Meta row
+        meta_layout = QHBoxLayout()
+        meta_layout.setContentsMargins(0, 0, 0, 0)
+        meta_layout.setSpacing(8)
+
+        # Index badge
+        idx_lbl = QLabel(f"#{self.edited_item.index}")
+        idx_lbl.setStyleSheet("""
+            QLabel {
+                background: #1E1B4B;
+                color: #A78BFA;
+                font-weight: 800;
+                font-size: 11px;
+                padding: 2px 7px;
+                border-radius: 5px;
+                border: 1px solid #3B3878;
+            }
+        """)
+        meta_layout.addWidget(idx_lbl)
+
+        # Time range
+        time_str = self.edited_item.get_srt_time()
+        time_lbl = QLabel(f"⏱ {time_str}")
+        time_lbl.setStyleSheet("font-family: monospace; font-size: 11px; color: #94A3B8; font-weight: 600;")
+        meta_layout.addWidget(time_lbl)
+
+        # Duration
+        dur_s = max(0.0, (self.edited_item.end_ms - self.edited_item.start_ms) / 1000.0)
+        dur_lbl = QLabel(f"({dur_s:.1f}s)")
+        dur_lbl.setStyleSheet("font-size: 11px; color: #64748B;")
+        meta_layout.addWidget(dur_lbl)
+
+        meta_layout.addStretch()
+
+        # Jump button
+        btn_jump = QPushButton("▶ Saltar a vídeo")
+        btn_jump.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_jump.setStyleSheet("""
+            QPushButton {
+                background: rgba(99, 102, 241, 0.15);
+                color: #A5B4FC;
+                border: 1px solid rgba(99, 102, 241, 0.35);
+                border-radius: 5px;
+                padding: 3px 10px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: #6366F1;
+                color: #FFFFFF;
+                border-color: #6366F1;
+            }
+        """)
+        btn_jump.clicked.connect(lambda: self.jump_clicked.emit(self.edited_item.start_ms))
+        meta_layout.addWidget(btn_jump)
+
+        layout.addLayout(meta_layout)
+
+        # Body row (Paired horizontally: Original left, Editable right)
+        body_layout = QHBoxLayout()
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(10)
+
+        # Left column (Original)
+        left_col = QVBoxLayout()
+        left_col.setSpacing(3)
+        lbl_orig_tag = QLabel("ORIGINAL")
+        lbl_orig_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;")
+        left_col.addWidget(lbl_orig_tag)
+
+        orig_txt = self.original_item.text if self.original_item else ""
+        self.lbl_orig = QLabel(orig_txt)
+        self.lbl_orig.setWordWrap(True)
+        self.lbl_orig.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.lbl_orig.setStyleSheet("""
+            QLabel {
+                background: #0B0F19;
+                border: 1px solid #1E293B;
+                border-radius: 6px;
+                padding: 6px 8px;
+                color: #94A3B8;
+                font-size: 13px;
+                line-height: 1.4;
+            }
+        """)
+        left_col.addWidget(self.lbl_orig, stretch=1)
+        body_layout.addLayout(left_col, stretch=1)
+
+        # Right column (Editable translation)
+        right_col = QVBoxLayout()
+        right_col.setSpacing(3)
+        lbl_edit_tag = QLabel("TRADUCCIÓN / EDICIÓN ✏️")
+        lbl_edit_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;")
+        right_col.addWidget(lbl_edit_tag)
+
+        self.edit_text = QPlainTextEdit()
+        self.edit_text.setPlainText(self.edited_item.text)
+        self.edit_text.setTabChangesFocus(True)
+        line_count = max(1, self.edited_item.text.count('\n') + 1)
+        self.edit_text.setFixedHeight(max(40, min(140, line_count * 22 + 18)))
+        self.edit_text.setStyleSheet("""
+            QPlainTextEdit {
+                background: #080D1A;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                color: #F8FAFC;
+                font-size: 13px;
+                padding: 5px 7px;
+            }
+            QPlainTextEdit:focus {
+                border-color: #8B5CF6;
+                background: #0E1528;
+            }
+        """)
+        self.edit_text.textChanged.connect(self._on_text_changed)
+        right_col.addWidget(self.edit_text, stretch=1)
+        body_layout.addLayout(right_col, stretch=1)
+
+        layout.addLayout(body_layout)
+
+    def _on_text_changed(self):
+        new_text = self.edit_text.toPlainText()
+        self.edited_item.text = new_text
+        line_count = max(1, new_text.count('\n') + 1)
+        self.edit_text.setFixedHeight(max(40, min(140, line_count * 22 + 18)))
+        self.text_changed.emit()
+
+    def matches_query(self, query: str) -> bool:
+        if not query:
+            return True
+        q = query.lower()
+        orig = self.original_item.text.lower() if self.original_item else ""
+        edit = self.edited_item.text.lower()
+        return q in orig or q in edit
+
+
 class SubtitleDiffViewer(QWidget):
     cue_selected = pyqtSignal(int)
     subtitles_edited = pyqtSignal(list)
+    count_changed = pyqtSignal(int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-
         self.original_items: List[SubtitleItem] = []
         self.processed_items: List[SubtitleItem] = []
+        self.cards: List[SubtitleCard] = []
+        self.active_card: Optional[SubtitleCard] = None
+        self._current_filter: str = ""
 
-        self.left_col = self._create_column("Original (Solo lectura)", highlight=False, editable=False)
-        self.right_col = self._create_column("Traducido y limpio (Editable ✏️)", highlight=True, editable=True)
+        self._setup_ui()
 
-        layout.addWidget(self.left_col)
-        layout.addWidget(self.right_col)
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-    def _create_column(self, title: str, highlight: bool = False, editable: bool = False) -> QWidget:
-        container = QFrame()
-        container.setObjectName("CardContainer")
-        col_layout = QVBoxLayout(container)
-        col_layout.setContentsMargins(14, 14, 14, 14)
-        col_layout.setSpacing(10)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: 1px solid #1E293B;
+                border-radius: 10px;
+                background-color: #070B14;
+            }
+        """)
 
-        color_str = "#10B981" if highlight else "#F8FAFC"
-        header = QLabel(title)
-        header.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {color_str};")
-        col_layout.addWidget(header)
+        self.cards_container = QWidget()
+        self.cards_container.setStyleSheet("background: transparent;")
+        self.cards_layout = QVBoxLayout(self.cards_container)
+        self.cards_layout.setContentsMargins(8, 8, 8, 8)
+        self.cards_layout.setSpacing(8)
+        self.cards_layout.addStretch()
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(8)
-        content_layout.addStretch()
-
-        scroll.setWidget(content_widget)
-        col_layout.addWidget(scroll)
-
-        container.content_layout = content_layout
-        container.content_widget = content_widget
-        container.editable = editable
-        return container
+        self.scroll_area.setWidget(self.cards_container)
+        layout.addWidget(self.scroll_area)
 
     def load_subtitles(self, original_items: List[SubtitleItem], processed_items: List[SubtitleItem]):
         self.original_items = original_items or []
         self.processed_items = processed_items or []
-        self._populate_column(self.left_col, self.original_items, editable=False)
-        self._populate_column(self.right_col, self.processed_items, editable=True)
+        self.active_card = None
+
+        self.cards_container.setUpdatesEnabled(False)
+        try:
+            while self.cards_layout.count() > 1:
+                child = self.cards_layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+            self.cards.clear()
+
+            orig_map = {item.index: item for item in self.original_items}
+            for idx, proc_item in enumerate(self.processed_items):
+                orig_item = orig_map.get(proc_item.index)
+                if orig_item is None and idx < len(self.original_items):
+                    orig_item = self.original_items[idx]
+                if orig_item is None:
+                    orig_item = proc_item
+
+                card = SubtitleCard(orig_item, proc_item)
+                card.jump_clicked.connect(self.cue_selected.emit)
+                card.text_changed.connect(self._on_card_edited)
+                self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
+                self.cards.append(card)
+        finally:
+            self.cards_container.setUpdatesEnabled(True)
+
+        if self._current_filter:
+            self.filter_subtitles(self._current_filter)
+        else:
+            self.count_changed.emit(len(self.cards), len(self.cards))
+
+    def _on_card_edited(self):
+        self.subtitles_edited.emit(self.processed_items)
 
     def get_processed_subtitles(self) -> List[SubtitleItem]:
         return self.processed_items
 
-    def _populate_column(self, col_container: QWidget, items: List[SubtitleItem], editable: bool = False):
-        layout = col_container.content_layout
-        while layout.count() > 1:
-            child = layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+    def highlight_cue_at_ms(self, pos_ms: int, auto_scroll: bool = True):
+        matching_card = None
+        for card in self.cards:
+            if card.edited_item.start_ms <= pos_ms <= card.edited_item.end_ms:
+                matching_card = card
+                break
 
-        for item in items:
-            card = QFrame()
-            card.setStyleSheet("""
-                QFrame {
-                    background: #1A2238;
-                    border: 1px solid #2B3758;
-                    border-radius: 8px;
-                    padding: 8px;
-                }
-                QFrame:hover {
-                    border-color: #6366F1;
-                    background: #202A46;
-                }
-            """)
-            c_layout = QVBoxLayout(card)
-            c_layout.setContentsMargins(8, 8, 8, 8)
-            c_layout.setSpacing(6)
+        if matching_card != self.active_card:
+            if self.active_card:
+                self.active_card.set_active(False)
+            self.active_card = matching_card
+            if self.active_card:
+                self.active_card.set_active(True)
+                if auto_scroll and self.active_card.isVisible():
+                    self.scroll_area.ensureWidgetVisible(self.active_card, 0, 70)
 
-            meta_layout = QHBoxLayout()
-            idx_lbl = QLabel(f"#{item.index}")
-            idx_lbl.setStyleSheet("font-size: 11px; font-weight: 700; color: #818CF8;")
-            time_lbl = QLabel(item.get_srt_time())
-            time_lbl.setStyleSheet("font-size: 11px; font-family: monospace; color: #94A3B8;")
-            meta_layout.addWidget(idx_lbl)
-            meta_layout.addWidget(time_lbl)
-            meta_layout.addStretch()
-            c_layout.addLayout(meta_layout)
+    def filter_subtitles(self, query: str) -> tuple[int, int]:
+        self._current_filter = query.strip()
+        visible_count = 0
+        total_count = len(self.cards)
 
-            start_time = item.start_ms
-            if editable:
-                text_edit = QPlainTextEdit()
-                text_edit.setPlainText(item.text)
-                text_edit.setTabChangesFocus(True)
-                line_count = max(1, item.text.count('\n') + 1)
-                text_edit.setFixedHeight(max(38, min(140, line_count * 24 + 16)))
-                text_edit.setStyleSheet("""
-                    QPlainTextEdit {
-                        background: #0B1120;
-                        border: 1px solid #334155;
-                        border-radius: 6px;
-                        color: #F8FAFC;
-                        font-size: 13px;
-                        padding: 4px 6px;
-                    }
-                    QPlainTextEdit:focus {
-                        border-color: #A855F7;
-                        background: #111827;
-                    }
-                """)
-                def make_change_handler(target_item=item, widget=text_edit):
-                    def handler():
-                        target_item.text = widget.toPlainText()
-                        self.subtitles_edited.emit(self.processed_items)
-                    return handler
+        self.cards_container.setUpdatesEnabled(False)
+        try:
+            for card in self.cards:
+                matches = card.matches_query(self._current_filter)
+                card.setVisible(matches)
+                if matches:
+                    visible_count += 1
+        finally:
+            self.cards_container.setUpdatesEnabled(True)
 
-                text_edit.textChanged.connect(make_change_handler())
-                c_layout.addWidget(text_edit)
-            else:
-                text_lbl = QLabel(item.text)
-                text_lbl.setWordWrap(True)
-                text_lbl.setStyleSheet("font-size: 13px; color: #F8FAFC;")
-                c_layout.addWidget(text_lbl)
-
-            card.mousePressEvent = lambda e, t=start_time: self.cue_selected.emit(t)
-            layout.insertWidget(layout.count() - 1, card)
+        self.count_changed.emit(visible_count, total_count)
+        return visible_count, total_count
 
 
 class VideoPreviewPlayer(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setStyleSheet("background-color: #070B14; border-radius: 12px; border: 1px solid #25304B;")
-        self.setFixedHeight(250)
+        self.setMinimumHeight(180)
         self.setAcceptDrops(True)
 
         self.player = QMediaPlayer()

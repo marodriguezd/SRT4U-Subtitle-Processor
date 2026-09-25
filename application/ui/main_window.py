@@ -27,6 +27,8 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QFrame,
     QScrollArea,
+    QSplitter,
+    QCheckBox,
 )
 
 from .styles import Styles
@@ -364,20 +366,24 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: VISTA PREVIA ------------------
+    # ------------------ PÁGINA: VISTA PREVIA (STUDIO DE TRADUCCIÓN) ------------------
     def _build_preview_page(self) -> QWidget:
         page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(28, 22, 28, 22)
-        layout.setSpacing(14)
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(24, 18, 24, 18)
+        page_layout.setSpacing(10)
 
+        # 1. Top Header & Action Buttons
         top_bar = QHBoxLayout()
+        top_bar.setContentsMargins(0, 0, 0, 0)
+        top_bar.setSpacing(12)
+
         header_text = QVBoxLayout()
-        header_text.setSpacing(3)
-        p_title = QLabel("🌐 Traducción y Previsualización")
-        p_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #F8FAFC;")
-        p_sub = QLabel("Compara y afina traducciones editando directamente el texto. Carga un vídeo para sincronizar.")
-        p_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        header_text.setSpacing(2)
+        p_title = QLabel("🎬 Studio de Traducción y Sincronización")
+        p_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
+        p_sub = QLabel("Previsualiza vídeo, edita subtítulos frase a frase y sincroniza en directo.")
+        p_sub.setStyleSheet("font-size: 12px; color: #94A3B8;")
         header_text.addWidget(p_title)
         header_text.addWidget(p_sub)
 
@@ -394,7 +400,7 @@ class MainWindow(QMainWindow):
         self.btn_load_video_top.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load_video_top.clicked.connect(lambda: self.video_player._browse_video())
 
-        self.btn_export = QPushButton("💾 Guardar subtítulo editado")
+        self.btn_export = QPushButton("💾 Guardar subtítulo")
         self.btn_export.setObjectName("PrimaryBtn")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.clicked.connect(self._export_result_file)
@@ -402,16 +408,116 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.btn_open_orig)
         top_bar.addWidget(self.btn_load_video_top)
         top_bar.addWidget(self.btn_export)
-        layout.addLayout(top_bar)
+        page_layout.addLayout(top_bar)
 
-        self.diff_viewer = SubtitleDiffViewer()
-        self.diff_viewer.subtitles_edited.connect(self._on_subtitles_edited)
-        layout.addWidget(self.diff_viewer, stretch=3)
+        # 2. Control & Search Toolbar
+        toolbar = QFrame()
+        toolbar.setStyleSheet("""
+            QFrame {
+                background: #0F172A;
+                border: 1px solid #1E293B;
+                border-radius: 8px;
+            }
+        """)
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(10, 6, 10, 6)
+        tb_layout.setSpacing(14)
+
+        # Search bar
+        self.preview_search_input = QLineEdit()
+        self.preview_search_input.setPlaceholderText("🔍 Buscar por texto en original o traducción...")
+        self.preview_search_input.setClearButtonEnabled(True)
+        self.preview_search_input.setStyleSheet("""
+            QLineEdit {
+                background: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                color: #F8FAFC;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border-color: #8B5CF6;
+                background: #1A2234;
+            }
+        """)
+        self.preview_search_input.textChanged.connect(self._on_preview_search_changed)
+        tb_layout.addWidget(self.preview_search_input, stretch=2)
+
+        # Counter badge
+        self.lbl_preview_sub_counter = QLabel("0 subtítulos")
+        self.lbl_preview_sub_counter.setStyleSheet("""
+            QLabel {
+                background: #1E293B;
+                color: #94A3B8;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 4px 10px;
+                border-radius: 6px;
+                border: 1px solid #334155;
+            }
+        """)
+        tb_layout.addWidget(self.lbl_preview_sub_counter)
+
+        # Auto-scroll toggle
+        self.chk_autoscroll = QCheckBox("Auto-scroll con vídeo")
+        self.chk_autoscroll.setChecked(True)
+        self.chk_autoscroll.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_autoscroll.setStyleSheet("""
+            QCheckBox {
+                color: #CBD5E1;
+                font-size: 12px;
+                font-weight: 600;
+                spacing: 6px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border-radius: 4px;
+                border: 1px solid #475569;
+                background: #1E293B;
+            }
+            QCheckBox::indicator:checked {
+                background: #8B5CF6;
+                border-color: #8B5CF6;
+            }
+        """)
+        tb_layout.addWidget(self.chk_autoscroll)
+
+        page_layout.addWidget(toolbar)
+
+        # 3. Cinema Splitter (Video Player on TOP, Subtitle Diff Viewer on BOTTOM)
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        splitter.setHandleWidth(8)
+        splitter.setStyleSheet("""
+            QSplitter::handle:vertical {
+                background-color: #1E293B;
+                height: 6px;
+                margin: 2px 20px;
+                border-radius: 3px;
+            }
+            QSplitter::handle:vertical:hover {
+                background-color: #8B5CF6;
+            }
+        """)
 
         self.video_player = VideoPreviewPlayer()
-        self.diff_viewer.cue_selected.connect(self.video_player.seek_to_ms)
-        layout.addWidget(self.video_player, stretch=2)
+        self.diff_viewer = SubtitleDiffViewer()
 
+        # Connect signals
+        self.diff_viewer.subtitles_edited.connect(self._on_subtitles_edited)
+        self.diff_viewer.cue_selected.connect(self.video_player.seek_to_ms)
+        self.diff_viewer.count_changed.connect(self._on_preview_count_changed)
+        self.video_player.player.positionChanged.connect(self._on_video_position_sync)
+
+        splitter.addWidget(self.video_player)
+        splitter.addWidget(self.diff_viewer)
+        splitter.setSizes([260, 420])
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 3)
+        splitter.setChildrenCollapsible(False)
+
+        page_layout.addWidget(splitter, stretch=1)
         return page
 
     # ------------------ PÁGINA: LIMPIAR ------------------
@@ -860,6 +966,20 @@ class MainWindow(QMainWindow):
         if self.last_result:
             self.last_result.processed_items = edited_items
         self.video_player.set_subtitles(edited_items)
+
+    def _on_preview_search_changed(self, text: str):
+        self.diff_viewer.filter_subtitles(text)
+
+    def _on_preview_count_changed(self, visible: int, total: int):
+        if total == 0:
+            self.lbl_preview_sub_counter.setText("0 subtítulos")
+        elif visible == total:
+            self.lbl_preview_sub_counter.setText(f"Total: {total} subtítulos")
+        else:
+            self.lbl_preview_sub_counter.setText(f"Mostrando {visible} de {total}")
+
+    def _on_video_position_sync(self, pos_ms: int):
+        self.diff_viewer.highlight_cue_at_ms(pos_ms, auto_scroll=self.chk_autoscroll.isChecked())
 
     def _export_result_file(self):
         items = self.diff_viewer.get_processed_subtitles()

@@ -8,8 +8,8 @@ QMessageBox.warning = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
 QMessageBox.critical = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
 
 from application.ui.main_window import MainWindow
-from application.ui.widgets import ModernToggle, CircularProgress, DropZone
-from application.services.subtitle_service import SubtitleService
+from application.ui.widgets import ModernToggle, CircularProgress, DropZone, SubtitleDiffViewer, SubtitleCard
+from application.services.subtitle_service import SubtitleService, SubtitleItem
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -78,3 +78,72 @@ def test_batch_processing_logic(tmp_path):
         )
         assert res.stats.total_lines > 0
         assert len(res.output_content) > 0
+
+
+def test_subtitle_card_and_diff_viewer(qapp):
+    orig = [
+        SubtitleItem(index=1, start_ms=1000, end_ms=3000, text="Hello world"),
+        SubtitleItem(index=2, start_ms=4000, end_ms=7000, text="How are you?"),
+    ]
+    proc = [
+        SubtitleItem(index=1, start_ms=1000, end_ms=3000, text="Hola mundo"),
+        SubtitleItem(index=2, start_ms=4000, end_ms=7000, text="¿Cómo estás?"),
+    ]
+
+    viewer = SubtitleDiffViewer()
+    viewer.show()
+    viewer.load_subtitles(orig, proc)
+    assert len(viewer.cards) == 2
+    assert viewer.cards[0].original_item.text == "Hello world"
+    assert viewer.cards[0].edited_item.text == "Hola mundo"
+
+    # Search filter
+    vis, total = viewer.filter_subtitles("mundo")
+    assert vis == 1
+    assert total == 2
+    assert not viewer.cards[0].isHidden()
+    assert viewer.cards[1].isHidden()
+
+    viewer.filter_subtitles("")
+    assert not viewer.cards[0].isHidden()
+    assert not viewer.cards[1].isHidden()
+
+    # Active cue highlight
+    viewer.highlight_cue_at_ms(2000, auto_scroll=False)
+    assert viewer.cards[0].is_active is True
+    assert viewer.cards[1].is_active is False
+
+    viewer.highlight_cue_at_ms(5000, auto_scroll=False)
+    assert viewer.cards[0].is_active is False
+    assert viewer.cards[1].is_active is True
+
+    # Edit text
+    edited_events = []
+    viewer.subtitles_edited.connect(lambda items: edited_events.append(items))
+    viewer.cards[0].edit_text.setPlainText("Hola universo")
+    assert len(edited_events) > 0
+    assert viewer.get_processed_subtitles()[0].text == "Hola universo"
+
+
+def test_preview_page_studio_integration(qapp):
+    win = MainWindow()
+    win._switch_page(1)  # Preview / Studio page
+    assert win.stack.currentIndex() == 1
+    assert win.video_player is not None
+    assert win.diff_viewer is not None
+    assert win.preview_search_input is not None
+    assert win.chk_autoscroll.isChecked()
+
+    sample_srt = os.path.join(FIXTURES_DIR, "sample.srt")
+    with open(sample_srt, "r", encoding="utf-8") as f:
+        items = win.subtitle_service.parse_subtitles(f.read(), "srt")
+    import copy
+    win.diff_viewer.load_subtitles(items, copy.deepcopy(items))
+    assert len(win.diff_viewer.cards) > 0
+
+    # Test search input
+    win.preview_search_input.setText("xyz_not_found_token_999")
+    assert win.lbl_preview_sub_counter.text().startswith("Mostrando 0")
+    win.preview_search_input.setText("")
+    assert "Total:" in win.lbl_preview_sub_counter.text()
+
