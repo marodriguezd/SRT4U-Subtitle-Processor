@@ -4,11 +4,11 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-19%20passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-26%20passed-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
-Desktop app to translate, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`, `.txt`) with a real-time synchronized video player.
+Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`, `.txt`) with a real-time synchronized video player and direct video burn-in export.
 
 ![SRT4U Preview](assets/preview.png)
 
@@ -16,16 +16,25 @@ Desktop app to translate, clean, and convert subtitle files (`.srt`, `.vtt`, `.a
 
 ## Features
 
+- **Video Burn-In (Hardsub Export)**:
+  - Permanently embeds subtitles into video files (`.mp4`, `.mkv`, `.webm`, etc.).
+  - Visual customization: Font size, color (White, Yellow, Cyan), and reading boxes (Semitransparent, Solid, or Border outline).
+  - Adaptive resolution rendering: Subtitles scale proportionally to video height (from 480p to 4K and vertical Reels/TikTok).
+  - Automatic overlap sanitizer: Prevents overlapping subtitle timecodes from colliding on screen.
+  - Real-time progress modal with encoding speed (x), elapsed time, and ETA.
+- **Interactive Translation Studio**:
+  - Live side-by-side card editor to review and refine translations line-by-line.
+  - Synchronized with the built-in video player (click any subtitle to seek to that video frame).
+  - Search and filter cues instantly.
 - **Translation Engines**:
   - Google Translate: Built-in free tier with zero setup or API keys required.
   - DeepL: Free and Pro API key support.
   - OpenAI / Local LLMs: Compatible with OpenAI, Ollama, and OpenRouter endpoints.
 - **Automated Cleaner**: Strips out Telegram channels (`t.me`), URLs, fansub credits, ads, and musical markers (`♪`) while preserving valid dialogue and formatting tags (`<i>`, `<b>`, ASS styles).
 - **Format Converter**: Bi-directional conversion between `.srt`, `.vtt`, `.ass`, and plain text `.txt`.
-- **Live Video Preview**: Integrated player to inspect subtitles overlaid onto the video before saving.
 - **Batch Processing**: Queue entire folders or multiple files with per-file progress tracking.
 - **Parallel Execution**: Multi-threaded block translation to speed up large subtitle files.
-- **Dark / Light Glass Theme**: Toggle instantly between dark and light modes.
+- **Dark / Light Glass Theme**: Modern Glassmorphism UI with instant theme switching.
 
 ---
 
@@ -53,11 +62,11 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Pre-built Binaries
-Standalone portable binaries are automatically built via GitHub Actions for every release tag:
-- **Windows**: `SRT4U-Windows-x64.exe`
-- **Linux**: `SRT4U-Linux-x86_64.AppImage` (portable)
-- **macOS**: `SRT4U-macOS.dmg`
+### Pre-built Standalone Binaries
+Standalone portable binaries are built via GitHub Actions for every release tag. **They come bundled with a static standalone FFmpeg build, requiring zero external dependencies or setup**:
+- **Windows**: `SRT4U-Windows-x64.exe` (Single self-contained `.exe`)
+- **Linux**: `SRT4U-Linux-x86_64.AppImage` (Portable on any Linux distro)
+- **macOS**: `SRT4U-macOS.dmg` (Universal binary for Apple Silicon M1-M4 and Intel)
 
 ---
 
