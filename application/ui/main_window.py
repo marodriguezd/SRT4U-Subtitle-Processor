@@ -5,8 +5,8 @@ import sys
 import time
 from typing import Optional, List
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
+from PyQt6.QtGui import QIcon, QFont, QDesktopServices
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -140,6 +140,7 @@ class MainWindow(QMainWindow):
         self.page_batch = self._build_batch_page()
         self.page_settings = self._build_settings_page()
         self.page_completed = self._build_completed_page()
+        self.page_about = self._build_about_page()
 
         self.stack.addWidget(self.page_home)       # 0
         self.stack.addWidget(self.page_preview)    # 1
@@ -148,6 +149,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.page_batch)      # 4
         self.stack.addWidget(self.page_settings)   # 5
         self.stack.addWidget(self.page_completed)  # 6
+        self.stack.addWidget(self.page_about)      # 7
 
         root_layout.addWidget(self.stack)
         self._switch_page(0)
@@ -191,11 +193,13 @@ class MainWindow(QMainWindow):
             ("🔄  Convertir", 3),
             ("📁  Procesamiento por lote", 4),
             ("⚙️  Configuración", 5),
+            ("ℹ️  Acerca de", 7),
         ]
 
         for text, page_idx in nav_items:
             btn = QPushButton(text)
             btn.setProperty("class", "nav-btn")
+            btn.setProperty("page_index", page_idx)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked, idx=page_idx: self._switch_page(idx))
             layout.addWidget(btn)
@@ -206,8 +210,9 @@ class MainWindow(QMainWindow):
 
     def _switch_page(self, page_index: int):
         self.stack.setCurrentIndex(page_index)
-        for i, btn in enumerate(self.nav_buttons):
-            btn.setProperty("active", "true" if i == page_index else "false")
+        for btn in self.nav_buttons:
+            is_active = (btn.property("page_index") == page_index)
+            btn.setProperty("active", "true" if is_active else "false")
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
@@ -1186,3 +1191,206 @@ class MainWindow(QMainWindow):
         self.config_service.set("openai_base_url", self.txt_openai_url.text().strip())
         self.config_service.set("openai_model", self.txt_openai_model.text().strip())
         QMessageBox.information(self, "Ajustes guardados", "Configuración guardada correctamente.")
+
+    # ------------------ PÁGINA: ACERCA DE ------------------
+    def _btn_link_style(self) -> str:
+        return """
+            QPushButton {
+                background: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                color: #F8FAFC;
+                padding: 7px 14px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: #334155;
+                border-color: #8B5CF6;
+                color: #FFFFFF;
+            }
+        """
+
+    def _open_license_file(self):
+        lic_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "LICENSE")
+        if os.path.exists(lic_path):
+            if sys.platform == "win32":
+                os.startfile(lic_path)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", lic_path])
+            else:
+                subprocess.Popen(["xdg-open", lic_path])
+        else:
+            QDesktopServices.openUrl(QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/"))
+
+    def _build_about_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("background: transparent; border: none;")
+
+        container = QWidget()
+        container.setMaximumWidth(960)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(20)
+
+        # 1. Header con Identidad
+        header_card = QFrame()
+        header_card.setObjectName("CardContainer")
+        h_layout = QHBoxLayout(header_card)
+        h_layout.setContentsMargins(24, 20, 24, 20)
+        h_layout.setSpacing(20)
+
+        logo = LogoBadge()
+        logo.setFixedSize(56, 56)
+        h_layout.addWidget(logo)
+
+        h_info = QVBoxLayout()
+        h_info.setSpacing(6)
+        app_title = QLabel("SRT4U - Subtitle Processor")
+        app_title.setStyleSheet("font-size: 22px; font-weight: 800; color: #F8FAFC;")
+
+        tag_row = QHBoxLayout()
+        tag_row.setSpacing(8)
+        v_badge = QLabel("v1.0.0")
+        v_badge.setStyleSheet("""
+            background: #1E1B4B;
+            color: #A78BFA;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #3730A3;
+        """)
+        v_status = QLabel("Versión Estable Multiplataforma • FFmpeg Estático Autónomo")
+        v_status.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        tag_row.addWidget(v_badge)
+        tag_row.addWidget(v_status)
+        tag_row.addStretch()
+
+        app_desc = QLabel(
+            "Aplicación de escritorio para traducir, editar, limpiar y quemar subtítulos en vídeo "
+            "con sincronización en tiempo real y compatibilidad universal con .srt, .vtt, .ass y .txt."
+        )
+        app_desc.setStyleSheet("font-size: 12px; color: #CBD5E1; line-height: 1.4;")
+        app_desc.setWordWrap(True)
+
+        h_info.addWidget(app_title)
+        h_info.addLayout(tag_row)
+        h_info.addWidget(app_desc)
+        h_layout.addLayout(h_info, stretch=1)
+
+        layout.addWidget(header_card)
+
+        # 2. Card: Desarrollador / About Me
+        dev_card = QFrame()
+        dev_card.setObjectName("CardContainer")
+        d_layout = QVBoxLayout(dev_card)
+        d_layout.setContentsMargins(24, 20, 24, 20)
+        d_layout.setSpacing(12)
+
+        dev_title = QLabel("👨‍💻 Desarrollador")
+        dev_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
+        d_layout.addWidget(dev_title)
+
+        dev_name = QLabel("Miguel Ángel Rodríguez Dalí")
+        dev_name.setStyleSheet("font-size: 18px; font-weight: 800; color: #818CF8;")
+        d_layout.addWidget(dev_name)
+
+        dev_desc = QLabel(
+            "Diseñado y desarrollado para ofrecer una experiencia rápida, privada y sin fricciones "
+            "en el procesamiento y traducción de subtítulos en Fedora Linux, Windows y macOS."
+        )
+        dev_desc.setStyleSheet("font-size: 13px; color: #94A3B8; line-height: 1.4;")
+        dev_desc.setWordWrap(True)
+        d_layout.addWidget(dev_desc)
+
+        links_row = QHBoxLayout()
+        links_row.setSpacing(12)
+
+        btn_github = QPushButton("🌐 Perfil de GitHub (@marodriguezd)")
+        btn_github.setStyleSheet(self._btn_link_style())
+        btn_github.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_github.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd")))
+        links_row.addWidget(btn_github)
+
+        btn_repo = QPushButton("📦 Repositorio SRT4U en GitHub")
+        btn_repo.setStyleSheet(self._btn_link_style())
+        btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd/SRT4U-Subtitle-Processor")))
+        links_row.addWidget(btn_repo)
+
+        links_row.addStretch()
+        d_layout.addLayout(links_row)
+
+        layout.addWidget(dev_card)
+
+        # 3. Card: Licencia y Términos Legales
+        lic_card = QFrame()
+        lic_card.setObjectName("CardContainer")
+        l_layout = QVBoxLayout(lic_card)
+        l_layout.setContentsMargins(24, 20, 24, 20)
+        l_layout.setSpacing(12)
+
+        lic_title = QLabel("⚖️ Licencia y Términos de Uso")
+        lic_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
+        l_layout.addWidget(lic_title)
+
+        lic_badge_row = QHBoxLayout()
+        lic_badge_row.setSpacing(10)
+        lic_badge = QLabel("CC BY-NC-SA 4.0")
+        lic_badge.setStyleSheet("""
+            background: #064E3B;
+            color: #34D399;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid #059669;
+        """)
+        lic_name = QLabel("Creative Commons Atribución-NoComercial-CompartirIgual 4.0 Internacional")
+        lic_name.setStyleSheet("font-size: 13px; font-weight: 600; color: #F8FAFC;")
+        lic_badge_row.addWidget(lic_badge)
+        lic_badge_row.addWidget(lic_name)
+        lic_badge_row.addStretch()
+        l_layout.addLayout(lic_badge_row)
+
+        lic_terms = QLabel(
+            "• <b>Libertad de uso y modificación:</b> Puedes usar, estudiar y adaptar el software libremente.<br>"
+            "• <b>Atribución requerida:</b> Debes dar crédito expreso al autor original (Miguel Ángel Rodríguez Dalí).<br>"
+            "• <b>Uso no comercial:</b> Queda prohibida la venta, monetización o explotación comercial de este software o sus derivados sin autorización.<br>"
+            "• <b>Compartir igual:</b> Cualquier modificación o derivado debe distribuirse bajo esta misma licencia."
+        )
+        lic_terms.setStyleSheet("font-size: 12px; color: #CBD5E1; line-height: 1.6;")
+        lic_terms.setTextFormat(Qt.TextFormat.RichText)
+        lic_terms.setWordWrap(True)
+        l_layout.addWidget(lic_terms)
+
+        lic_btn_row = QHBoxLayout()
+        lic_btn_row.setSpacing(12)
+        btn_view_lic = QPushButton("📄 Ver texto completo de la licencia")
+        btn_view_lic.setStyleSheet(self._btn_link_style())
+        btn_view_lic.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_view_lic.clicked.connect(self._open_license_file)
+        lic_btn_row.addWidget(btn_view_lic)
+
+        btn_cc_web = QPushButton("🔗 Web oficial Creative Commons")
+        btn_cc_web.setStyleSheet(self._btn_link_style())
+        btn_cc_web.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cc_web.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/deed.es")))
+        lic_btn_row.addWidget(btn_cc_web)
+
+        lic_btn_row.addStretch()
+        l_layout.addLayout(lic_btn_row)
+
+        layout.addWidget(lic_card)
+        layout.addStretch()
+
+        scroll.setWidget(container)
+        page_layout.addWidget(scroll)
+        return page

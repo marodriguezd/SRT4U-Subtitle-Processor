@@ -40,13 +40,15 @@ def test_ui_components(qapp):
 
 def test_main_window_flow(qapp, tmp_path):
     win = MainWindow()
-    assert win.stack.count() == 7
+    assert win.stack.count() == 8
 
     # Prueba de cambio de páginas
     win._switch_page(0)
     assert win.stack.currentIndex() == 0
     win._switch_page(3)  # Convertir
     assert win.stack.currentIndex() == 3
+    win._switch_page(7)  # Acerca de
+    assert win.stack.currentIndex() == 7
 
     # Carga de archivo
     sample_srt = os.path.join(FIXTURES_DIR, "sample.srt")
