@@ -1,153 +1,182 @@
 # application/ui/styles.py
+"""
+Estilos Glassmorphism Dark con alto contraste, legibilidad y fidelidad al mockup.
+"""
 
 class Styles:
-    # Color Palette
-    PRIMARY = "#007AFF"
-    SECONDARY = "#5856D6"
-    BACKGROUND = "rgba(10, 10, 10, 0.7)"
-    GLASS_BORDER = "rgba(255, 255, 255, 0.15)"
-    GLASS_BACKGROUND = "rgba(255, 255, 255, 0.05)"
-    TEXT_PRIMARY = "#FFFFFF"
-    TEXT_SECONDARY = "#AAAAAA"
-    ACCENT_POSITIVE = "#34C759"
-    ACCENT_NEGATIVE = "#FF3B30"
-    ACCENT_WARNING = "#FF9500"
+    # Paleta Dark
+    BG_DARK = "#0A0E17"
+    SIDEBAR_DARK = "#0D1322"
+    CARD_DARK = "#141B2D"
+    CARD_BORDER_DARK = "#25304B"
+    TEXT_MAIN_DARK = "#F8FAFC"
+    TEXT_MUTED_DARK = "#94A3B8"
+    PRIMARY = "#6366F1"
+    PRIMARY_HOVER = "#4F46E5"
+    PRIMARY_LIGHT = "rgba(99, 102, 241, 0.2)"
+    ACCENT = "#8B5CF6"
+    SUCCESS = "#10B981"
 
-    MAIN_WINDOW = f"""
-    QMainWindow {{
-        background: transparent;
-    }}
-    QWidget#CentralWidget {{
-        background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, 
-                                    stop:0 rgba(15, 15, 25, 255), 
-                                    stop:1 rgba(40, 40, 60, 255));
-    }}
-    """
+    # Paleta Light
+    BG_LIGHT = "#F8FAFC"
+    SIDEBAR_LIGHT = "#FFFFFF"
+    CARD_LIGHT = "#FFFFFF"
+    CARD_BORDER_LIGHT = "#E2E8F0"
+    TEXT_MAIN_LIGHT = "#0F172A"
+    TEXT_MUTED_LIGHT = "#64748B"
 
-    GLASS_CARD = f"""
-    QFrame#GlassCard {{
-        background-color: {GLASS_BACKGROUND};
-        border: 1px solid {GLASS_BORDER};
-        border-radius: 12px;
-    }}
-    """
+    @classmethod
+    def get_main_style(cls, dark: bool = True) -> str:
+        bg = cls.BG_DARK if dark else cls.BG_LIGHT
+        sidebar_bg = cls.SIDEBAR_DARK if dark else cls.SIDEBAR_LIGHT
+        card_bg = cls.CARD_DARK if dark else cls.CARD_LIGHT
+        border = cls.CARD_BORDER_DARK if dark else cls.CARD_BORDER_LIGHT
+        text = cls.TEXT_MAIN_DARK if dark else cls.TEXT_MAIN_LIGHT
+        muted = cls.TEXT_MUTED_DARK if dark else cls.TEXT_MUTED_LIGHT
+        drop_bg = "#0F1626" if dark else "#F8FAFC"
+        drop_border = "#4F46E5" if dark else "#818CF8"
 
-    TITLE_LABEL = f"""
-    QLabel {{
-        color: {TEXT_PRIMARY};
-        font-weight: bold;
-        font-size: 22px;
-    }}
-    """
+        return f"""
+        QMainWindow, QWidget#CentralWidget {{
+            background-color: {bg};
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            color: {text};
+        }}
 
-    SUBTITLE_LABEL = f"""
-    QLabel {{
-        color: {TEXT_SECONDARY};
-        font-size: 13px;
-    }}
-    """
+        QLabel {{
+            color: {text};
+        }}
 
-    BUTTON_GLASS = f"""
-    QPushButton {{
-        background-color: {GLASS_BACKGROUND};
-        border: 1px solid {GLASS_BORDER};
-        border-radius: 8px;
-        color: {TEXT_PRIMARY};
-        padding: 8px 16px;
-        font-weight: 500;
-    }}
-    QPushButton:hover {{
-        background-color: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }}
-    QPushButton:pressed {{
-        background-color: rgba(255, 255, 255, 0.05);
-    }}
-    QPushButton:disabled {{
-        color: rgba(255, 255, 255, 0.2);
-        background-color: rgba(255, 255, 255, 0.01);
-    }}
-    """
+        QLabel.muted {{
+            color: {muted};
+        }}
 
-    BUTTON_PRIMARY = f"""
-    QPushButton {{
-        background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0 #007AFF, stop:1 #5856D6);
-        border: none;
-        border-radius: 8px;
-        color: white;
-        padding: 10px 20px;
-        font-weight: bold;
-    }}
-    QPushButton:hover {{
-        background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0 #1a87ff, stop:1 #6d6bed);
-    }}
-    QPushButton:pressed {{
-        background: #007AFF;
-    }}
-    """
+        QWidget#Sidebar {{
+            background-color: {sidebar_bg};
+            border-right: 1px solid {border};
+        }}
 
-    INPUT_GLASS = f"""
-    QLineEdit {{
-        background-color: rgba(0, 0, 0, 0.2);
-        border: 1px solid {GLASS_BORDER};
-        border-radius: 6px;
-        color: {TEXT_PRIMARY};
-        padding: 6px 12px;
-    }}
-    QLineEdit:focus {{
-        border: 1px solid {PRIMARY};
-    }}
-    """
+        QPushButton.nav-btn {{
+            background-color: transparent;
+            color: {muted};
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: left;
+        }}
+        QPushButton.nav-btn:hover {{
+            background-color: {"rgba(255, 255, 255, 0.05)" if dark else "#F1F5F9"};
+            color: {text};
+        }}
+        QPushButton.nav-btn[active="true"] {{
+            background-color: {cls.PRIMARY_LIGHT};
+            color: #C7D2FE;
+            font-weight: 600;
+            border: 1px solid #4F46E5;
+        }}
 
-    COMBO_GLASS = f"""
-    QComboBox {{
-        background-color: rgba(0, 0, 0, 0.2);
-        border: 1px solid {GLASS_BORDER};
-        border-radius: 6px;
-        color: {TEXT_PRIMARY};
-        padding: 4px 12px;
-    }}
-    QComboBox::drop-down {{
-        border: none;
-    }}
-    QComboBox QAbstractItemView {{
-        background-color: #1A1A1A;
-        border: 1px solid {GLASS_BORDER};
-        selection-background-color: {PRIMARY};
-        color: {TEXT_PRIMARY};
-    }}
-    """
+        QFrame#CardContainer, QFrame.ModernCard {{
+            background-color: {card_bg};
+            border: 1px solid {border};
+            border-radius: 14px;
+        }}
 
-    CHECKBOX_GLASS = f"""
-    QCheckBox {{
-        color: {TEXT_PRIMARY};
-        spacing: 8px;
-    }}
-    QCheckBox::indicator {{
-        width: 18px;
-        height: 18px;
-        border-radius: 4px;
-        border: 1px solid {GLASS_BORDER};
-        background-color: rgba(0, 0, 0, 0.2);
-    }}
-    QCheckBox::indicator:checked {{
-        background-color: #007AFF;
-    }}
-    """
+        QFrame#DropZone {{
+            background-color: {drop_bg};
+            border: 2px dashed {drop_border};
+            border-radius: 16px;
+        }}
+        QFrame#DropZone:hover {{
+            background-color: {"rgba(99, 102, 241, 0.15)" if dark else "#EEF2FF"};
+            border-color: {cls.PRIMARY};
+        }}
 
-    PROGRESS_GLASS = f"""
-    QProgressBar {{
-        background-color: rgba(0, 0, 0, 0.3);
-        border: 1px solid {GLASS_BORDER};
-        border-radius: 10px;
-        text-align: center;
-        color: transparent;
-    }}
-    QProgressBar::chunk {{
-        background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
-                                    stop:0 #007AFF, stop:1 #00E5FF);
-        border-radius: 9px;
-    }}
-    """
+        QComboBox {{
+            background-color: {card_bg};
+            border: 1px solid {border};
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: {text};
+            min-height: 24px;
+        }}
+        QComboBox:hover {{
+            border-color: {cls.PRIMARY};
+        }}
+        QComboBox::drop-down {{
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 25px;
+            border-left: none;
+        }}
+        QComboBox QAbstractItemView {{
+            background-color: {card_bg};
+            border: 1px solid {border};
+            border-radius: 8px;
+            selection-background-color: {cls.PRIMARY_LIGHT};
+            selection-color: {text};
+            color: {text};
+            outline: none;
+            padding: 4px;
+        }}
+
+        QPushButton#PrimaryBtn {{
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {cls.PRIMARY}, stop:1 {cls.ACCENT});
+            color: #FFFFFF;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 700;
+            min-height: 22px;
+        }}
+        QPushButton#PrimaryBtn:hover {{
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {cls.PRIMARY_HOVER}, stop:1 #7C3AED);
+        }}
+        QPushButton#PrimaryBtn:pressed {{
+            background-color: #3730A3;
+        }}
+
+        QPushButton.secondary-btn {{
+            background-color: {"rgba(255, 255, 255, 0.05)" if dark else "#FFFFFF"};
+            border: 1px solid {border};
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            color: {text};
+        }}
+        QPushButton.secondary-btn:hover {{
+            background-color: {"rgba(255, 255, 255, 0.1)" if dark else "#F8FAFC"};
+            border-color: {cls.PRIMARY};
+        }}
+
+        QLineEdit {{
+            background-color: {card_bg};
+            border: 1px solid {border};
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: {text};
+        }}
+        QLineEdit:focus {{
+            border-color: {cls.PRIMARY};
+        }}
+
+        QTableWidget {{
+            background-color: {card_bg};
+            border: 1px solid {border};
+            border-radius: 8px;
+            color: {text};
+            gridline-color: {border};
+        }}
+        QHeaderView::section {{
+            background-color: {"#0D1322" if dark else "#F1F5F9"};
+            color: {muted};
+            padding: 8px;
+            border: none;
+            font-weight: 600;
+        }}
+        """

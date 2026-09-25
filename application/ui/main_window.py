@@ -1,312 +1,973 @@
 # application/ui/main_window.py
 import os
-from queue import Queue
-from threading import Thread
-from typing import Optional
+import subprocess
+import sys
+import time
+from typing import Optional, List
 
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject, Qt, QSize
-from PyQt6.QtGui import QFont, QIcon, QColor, QPalette
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtWidgets import (
     QMainWindow,
+    QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QWidget,
+    QGridLayout,
+    QStackedWidget,
     QLabel,
     QPushButton,
-    QFileDialog,
-    QCheckBox,
-    QLineEdit,
     QComboBox,
-    QProgressBar,
-    QTextEdit,
+    QFileDialog,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
     QMessageBox,
+    QLineEdit,
+    QRadioButton,
+    QButtonGroup,
     QFrame,
-    QSizePolicy,
-    QGraphicsDropShadowEffect,
+    QScrollArea,
 )
 
-from ..services.file_service import FileService
-from ..services.subtitle_service import SubtitleService
-from ..services.translation_service import TranslationService
 from .styles import Styles
-from .widgets import GlassCard, GlassButton, GlassInput
+from .widgets import (
+    ModernToggle,
+    DropZone,
+    OptionCard,
+    MetricCard,
+    SubtitleDiffViewer,
+    VideoPreviewPlayer,
+    ProgressModal,
+    LogoBadge,
+)
+from ..services.config_service import ConfigService
+from ..services.subtitle_service import SubtitleService, ProcessingResult
+from ..services.translation_service import TranslationService
 
 
-class ProgressSignal(QObject):
-    progress_updated = pyqtSignal(str, object)
+class ProcessWorker(QThread):
+    step_updated = pyqtSignal(str, object)
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        service: SubtitleService,
+        file_path: str,
+        do_clean: bool,
+        do_translate: bool,
+        target_lang: str,
+        source_lang: str,
+        engine: str,
+        target_format: Optional[str] = None,
+        parallel: bool = True,
+    ):
+        super().__init__()
+        self.service = service
+        self.file_path = file_path
+        self.do_clean = do_clean
+        self.do_translate = do_translate
+        self.target_lang = target_lang
+        self.source_lang = source_lang
+        self.engine = engine
+        self.target_format = target_format
+        self.parallel = parallel
+
+    def run(self):
+        def callback(event_name: str, payload: object):
+            self.step_updated.emit(event_name, payload)
+
+        try:
+            result = self.service.process_subtitles(
+                file_path=self.file_path,
+                do_clean=self.do_clean,
+                do_translate=self.do_translate,
+                target_language=self.target_lang,
+                source_language=self.source_lang,
+                engine=self.engine,
+                target_format=self.target_format,
+                parallel=self.parallel,
+                progress_callback=callback,
+            )
+            self.completed.emit(result)
+        except Exception as e:
+            self.failed.emit(str(e))
 
 
-class GlassMainWindow(QMainWindow):
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.input_file_path: Optional[str] = None
-        self.output_directory: Optional[str] = None
-        self.output_format: str = "srt"
-
-        self.file_service = FileService()
-        self.subtitle_service = SubtitleService()
-        self.translation_service = TranslationService()
-
-        self.progress_queue = Queue()
-        self.timer = QTimer()
-        self.progress_signal = ProgressSignal()
-
-        self.progress_signal.progress_updated.connect(self.handle_progress_update)
-        self.timer.timeout.connect(self.check_progress_queue)
-
-        self.setup_ui()
-
-    def setup_ui(self):
         self.setWindowTitle("SRT4U - Subtitle Processor")
-        self.resize(700, 600)
-        self.setMinimumSize(600, 500)
+        self.resize(1120, 780)
+        self.setMinimumSize(920, 640)
 
-        # Transparent window setup
-        # self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        # self.setWindowFlags(Qt.WindowType.FramelessWindowHint) # Option for even cleaner look
+        self.dark_mode = True
+        self.config_service = ConfigService()
+        self.translation_service = TranslationService(self.config_service)
+        self.subtitle_service = SubtitleService(self.translation_service)
 
+        self.current_subtitle_path: Optional[str] = None
+        self.current_video_path: Optional[str] = None
+        self.last_result: Optional[ProcessingResult] = None
+        self.saved_output_path: Optional[str] = None
+
+        self._setup_ui()
+        self._load_config_values()
+        self._apply_theme()
+
+    def _setup_ui(self):
         self.central_widget = QWidget()
         self.central_widget.setObjectName("CentralWidget")
-        self.central_widget.setStyleSheet(Styles.MAIN_WINDOW)
         self.setCentralWidget(self.central_widget)
 
-        self.main_layout = QVBoxLayout(self.central_widget)
-        self.main_layout.setContentsMargins(30, 30, 30, 30)
-        self.main_layout.setSpacing(20)
+        root_layout = QHBoxLayout(self.central_widget)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
-        # Header
-        header_layout = QVBoxLayout()
-        self.title_label = QLabel("SRT4U")
-        self.title_label.setStyleSheet(Styles.TITLE_LABEL)
-        header_layout.addWidget(self.title_label)
+        # 1. Sidebar lateral
+        self.sidebar = self._build_sidebar()
+        root_layout.addWidget(self.sidebar)
 
-        self.subtitle_label = QLabel("Professional Subtitle Processing & Translation")
-        self.subtitle_label.setStyleSheet(Styles.SUBTITLE_LABEL)
-        header_layout.addWidget(self.subtitle_label)
+        # 2. Main Content Stack
+        self.stack = QStackedWidget()
+        self.page_home = self._build_home_page()
+        self.page_preview = self._build_preview_page()
+        self.page_clean = self._build_clean_page()
+        self.page_convert = self._build_convert_page()
+        self.page_batch = self._build_batch_page()
+        self.page_settings = self._build_settings_page()
+        self.page_completed = self._build_completed_page()
 
-        self.main_layout.addLayout(header_layout)
+        self.stack.addWidget(self.page_home)       # 0
+        self.stack.addWidget(self.page_preview)    # 1
+        self.stack.addWidget(self.page_clean)      # 2
+        self.stack.addWidget(self.page_convert)    # 3
+        self.stack.addWidget(self.page_batch)      # 4
+        self.stack.addWidget(self.page_settings)   # 5
+        self.stack.addWidget(self.page_completed)  # 6
 
-        # File Selection Card
-        file_card = GlassCard()
-        file_card_layout = file_card.layout
+        root_layout.addWidget(self.stack)
+        self._switch_page(0)
 
-        file_header = QHBoxLayout()
-        file_header.addWidget(
-            QLabel("1. Input & Output", styleSheet="color: white; font-weight: bold;")
+    def _build_sidebar(self) -> QWidget:
+        sidebar = QWidget()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(240)
+
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(16, 24, 16, 24)
+        layout.setSpacing(8)
+
+        # Brand Header
+        logo_layout = QHBoxLayout()
+        logo_layout.setSpacing(12)
+        logo_badge = LogoBadge()
+        
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        app_title = QLabel("SRT4U")
+        app_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
+        app_sub = QLabel("Subtitle Processor")
+        app_sub.setStyleSheet("font-size: 11px; color: #818CF8; font-weight: 500;")
+        title_box.addWidget(app_title)
+        title_box.addWidget(app_sub)
+
+        logo_layout.addWidget(logo_badge)
+        logo_layout.addLayout(title_box)
+        logo_layout.addStretch()
+
+        layout.addLayout(logo_layout)
+        layout.addSpacing(20)
+
+        # Nav Buttons
+        self.nav_buttons: List[QPushButton] = []
+        nav_items = [
+            ("🏠  Inicio", 0),
+            ("🌐  Traducir", 1),
+            ("✨  Limpiar", 2),
+            ("🔄  Convertir", 3),
+            ("📁  Procesamiento por lote", 4),
+            ("⚙️  Configuración", 5),
+        ]
+
+        for text, page_idx in nav_items:
+            btn = QPushButton(text)
+            btn.setProperty("class", "nav-btn")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, idx=page_idx: self._switch_page(idx))
+            layout.addWidget(btn)
+            self.nav_buttons.append(btn)
+
+        layout.addStretch()
+        return sidebar
+
+    def _switch_page(self, page_index: int):
+        self.stack.setCurrentIndex(page_index)
+        for i, btn in enumerate(self.nav_buttons):
+            btn.setProperty("active", "true" if i == page_index else "false")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+
+    def _toggle_theme(self):
+        self.dark_mode = not self.dark_mode
+        self._apply_theme()
+
+    def _apply_theme(self):
+        self.central_widget.setStyleSheet(Styles.get_main_style(self.dark_mode))
+        self.btn_theme.setText("☀️" if self.dark_mode else "🌙")
+
+    # ------------------ PÁGINA: INICIO ------------------
+    def _build_home_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Contenedor centrado para evitar estiramiento excesivo en tiling WMs (dwm)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
+
+        # Header con Theme Toggle
+        header_row = QHBoxLayout()
+        header_text = QVBoxLayout()
+        header_text.setSpacing(4)
+        title = QLabel("Traducir subtítulos")
+        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        subtitle = QLabel("Selecciona tu archivo, el idioma de destino y las opciones de procesamiento.")
+        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        header_text.addWidget(title)
+        header_text.addWidget(subtitle)
+
+        self.btn_theme = QPushButton("☀️")
+        self.btn_theme.setFixedSize(38, 38)
+        self.btn_theme.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_theme.setStyleSheet("""
+            QPushButton {
+                background: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 19px;
+                font-size: 16px;
+                color: #F8FAFC;
+            }
+            QPushButton:hover {
+                background: #334155;
+                border-color: #6366F1;
+            }
+        """)
+        self.btn_theme.clicked.connect(self._toggle_theme)
+
+        header_row.addLayout(header_text)
+        header_row.addStretch()
+        header_row.addWidget(self.btn_theme)
+        layout.addLayout(header_row)
+
+        # Drop Zone
+        self.drop_zone = DropZone()
+        self.drop_zone.file_dropped.connect(self._on_file_selected)
+        layout.addWidget(self.drop_zone)
+
+        # Selector Row (3 columnas: Origen, Destino, Modelo)
+        selector_card = QFrame()
+        selector_card.setObjectName("CardContainer")
+        sel_layout = QHBoxLayout(selector_card)
+        sel_layout.setContentsMargins(18, 14, 18, 14)
+        sel_layout.setSpacing(18)
+
+        # 1. Idioma Origen
+        src_box = QVBoxLayout()
+        src_box.setSpacing(6)
+        src_lbl = QLabel("Idioma de origen")
+        src_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        self.cb_source_lang = QComboBox()
+        self.cb_source_lang.addItem("Detectar automáticamente", "auto")
+        for lang in self.translation_service.SUPPORTED_LANGUAGES:
+            self.cb_source_lang.addItem(f"{lang['flag']} {lang['name']}", lang["code"])
+        src_box.addWidget(src_lbl)
+        src_box.addWidget(self.cb_source_lang)
+
+        # 2. Idioma Destino
+        tgt_box = QVBoxLayout()
+        tgt_box.setSpacing(6)
+        tgt_lbl = QLabel("Idioma de destino")
+        tgt_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        self.cb_target_lang = QComboBox()
+        for lang in self.translation_service.SUPPORTED_LANGUAGES:
+            self.cb_target_lang.addItem(f"{lang['flag']} {lang['name']}", lang["code"])
+        tgt_box.addWidget(tgt_lbl)
+        tgt_box.addWidget(self.cb_target_lang)
+
+        # 3. Modelo de Traducción
+        engine_box = QVBoxLayout()
+        engine_box.setSpacing(6)
+        engine_lbl = QLabel("Modelo de traducción")
+        engine_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        self.cb_engine = QComboBox()
+        self.cb_engine.addItem("DeepL (recomendado)", "deepl")
+        self.cb_engine.addItem("Google Translate", "google")
+        self.cb_engine.addItem("OpenAI / LLM", "openai")
+        engine_box.addWidget(engine_lbl)
+        engine_box.addWidget(self.cb_engine)
+
+        sel_layout.addLayout(src_box)
+        sel_layout.addLayout(tgt_box)
+        sel_layout.addLayout(engine_box)
+        layout.addWidget(selector_card)
+
+        # Cuadrícula 2x2 de Opciones (según mockup)
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(14)
+
+        self.toggle_translate = ModernToggle(checked=True)
+        self.toggle_preserve = ModernToggle(checked=True)
+        self.toggle_clean = ModernToggle(checked=True)
+        self.toggle_parallel = ModernToggle(checked=True)
+
+        card_translate = OptionCard(
+            "Traducir subtítulos",
+            "Usa la API de traducción seleccionada.",
+            self.toggle_translate
         )
-        file_card_layout.addLayout(file_header)
+        card_preserve = OptionCard(
+            "Mantener formato original",
+            "Conserva la sincronización y la estructura.",
+            self.toggle_preserve
+        )
+        card_clean = OptionCard(
+            "Limpiar subtítulos",
+            "Elimina spam, URLs, IDs y contenido no deseado.",
+            self.toggle_clean
+        )
+        card_parallel = OptionCard(
+            "Procesamiento paralelo",
+            "Traduce múltiples bloques simultáneamente.",
+            self.toggle_parallel
+        )
 
-        # Input File Row
-        input_row = QHBoxLayout()
-        self.file_status = QLabel("No file selected")
-        self.file_status.setStyleSheet("color: #CCC; font-size: 11px;")
-        input_row.addWidget(self.file_status)
-        input_row.addStretch()
-        self.select_file_btn = GlassButton("Select File")
-        self.select_file_btn.clicked.connect(self.handle_file_selection)
-        input_row.addWidget(self.select_file_btn)
-        file_card_layout.addLayout(input_row)
+        grid_layout.addWidget(card_translate, 0, 0)
+        grid_layout.addWidget(card_preserve, 0, 1)
+        grid_layout.addWidget(card_clean, 1, 0)
+        grid_layout.addWidget(card_parallel, 1, 1)
+        layout.addLayout(grid_layout)
 
-        # Output Dir Row
-        out_row = QHBoxLayout()
-        self.dir_status = QLabel("No directory selected")
-        self.dir_status.setStyleSheet("color: #CCC; font-size: 11px;")
-        out_row.addWidget(self.dir_status)
-        out_row.addStretch()
-        self.select_dir_btn = GlassButton("Select Output")
-        self.select_dir_btn.clicked.connect(self.select_output_directory)
-        out_row.addWidget(self.select_dir_btn)
-        file_card_layout.addLayout(out_row)
+        # Botón de Acción Principal (🚀 Procesar archivo)
+        self.btn_process = QPushButton("🚀 Procesar archivo")
+        self.btn_process.setObjectName("PrimaryBtn")
+        self.btn_process.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_process.setMinimumHeight(48)
+        self.btn_process.clicked.connect(self._start_processing)
+        layout.addWidget(self.btn_process)
 
-        self.main_layout.addWidget(file_card)
+        layout.addStretch()
 
-        # Configuration Card
-        config_card = GlassCard()
-        config_layout = config_card.layout
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
 
-        config_header = QLabel("2. Configuration")
-        config_header.setStyleSheet("color: white; font-weight: bold;")
-        config_layout.addWidget(config_header)
+    # ------------------ PÁGINA: VISTA PREVIA ------------------
+    def _build_preview_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(28, 22, 28, 22)
+        layout.setSpacing(14)
 
-        # Translation row
-        trans_row = QHBoxLayout()
-        self.translation_toggle = QCheckBox("Enable Translation")
-        self.translation_toggle.setStyleSheet(Styles.CHECKBOX_GLASS)
-        trans_row.addWidget(self.translation_toggle)
+        top_bar = QHBoxLayout()
+        header_text = QVBoxLayout()
+        header_text.setSpacing(3)
+        p_title = QLabel("← Previsualización")
+        p_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #F8FAFC;")
+        p_sub = QLabel("Compara el resultado original contra la versión limpia y traducida.")
+        p_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        header_text.addWidget(p_title)
+        header_text.addWidget(p_sub)
 
-        trans_row.addSpacing(20)
-        trans_row.addWidget(QLabel("To Language:", styleSheet="color: #CCC;"))
-        self.target_lang_input = GlassInput("e.g. es, fr, en")
-        self.target_lang_input.setFixedWidth(100)
-        trans_row.addWidget(self.target_lang_input)
-        trans_row.addStretch()
-        config_layout.addLayout(trans_row)
+        top_bar.addLayout(header_text)
+        top_bar.addStretch()
 
-        # Format row
-        format_row = QHBoxLayout()
-        format_row.addWidget(QLabel("Output Format:", styleSheet="color: #CCC;"))
-        self.format_selector = QComboBox()
-        self.format_selector.addItems(["srt", "vtt"])
-        self.format_selector.setStyleSheet(Styles.COMBO_GLASS)
-        self.format_selector.currentTextChanged.connect(self.update_output_format)
-        format_row.addWidget(self.format_selector)
-        format_row.addStretch()
-        config_layout.addLayout(format_row)
+        self.btn_open_orig = QPushButton("📁 Abrir archivo")
+        self.btn_open_orig.setProperty("class", "secondary-btn")
+        self.btn_open_orig.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_orig.clicked.connect(self._browse_preview_file)
 
-        self.main_layout.addWidget(config_card)
+        self.btn_export = QPushButton("💾 Guardar subtítulo")
+        self.btn_export.setObjectName("PrimaryBtn")
+        self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export.clicked.connect(self._export_result_file)
 
-        # Progress Area
-        self.progress_area = QWidget()
-        progress_layout = QVBoxLayout(self.progress_area)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setStyleSheet(Styles.PROGRESS_GLASS)
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedHeight(12)
-        progress_layout.addWidget(self.progress_bar)
+        top_bar.addWidget(self.btn_open_orig)
+        top_bar.addWidget(self.btn_export)
+        layout.addLayout(top_bar)
 
-        self.status_label = QLabel("")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: #00E5FF; font-size: 11px;")
-        progress_layout.addWidget(self.status_label)
+        self.diff_viewer = SubtitleDiffViewer()
+        layout.addWidget(self.diff_viewer, stretch=3)
 
-        self.main_layout.addWidget(self.progress_area)
+        self.video_player = VideoPreviewPlayer()
+        self.diff_viewer.cue_selected.connect(self.video_player.seek_to_ms)
+        layout.addWidget(self.video_player, stretch=2)
 
-        # Action Button
-        self.process_btn = GlassButton("START PROCESSING", primary=True)
-        self.process_btn.setFixedHeight(50)
-        self.process_btn.clicked.connect(self.process_subtitle_file)
-        self.main_layout.addWidget(self.process_btn)
+        return page
 
-        # Footer Result
-        self.result_label = QLabel("")
-        self.result_label.setWordWrap(True)
-        self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.main_layout.addWidget(self.result_label)
+    # ------------------ PÁGINA: LIMPIAR ------------------
+    def _build_clean_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
 
-        self.main_layout.addStretch()
+        title = QLabel("Limpieza automática de subtítulos")
+        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        subtitle = QLabel("Elimina spam, URLs, canales de Telegram y créditos sin alterar sincronización.")
+        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
 
-    def handle_file_selection(self):
-        file_path, _ = QFileDialog.getOpenFileName(
+        self.clean_drop_zone = DropZone()
+        self.clean_drop_zone.file_dropped.connect(self._on_file_selected)
+        layout.addWidget(self.clean_drop_zone)
+
+        btn_fast_clean = QPushButton("✨ Limpiar contenido no deseado")
+        btn_fast_clean.setObjectName("PrimaryBtn")
+        btn_fast_clean.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_fast_clean.setMinimumHeight(46)
+        btn_fast_clean.clicked.connect(self._start_fast_clean)
+        layout.addWidget(btn_fast_clean)
+
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
+
+    # ------------------ PÁGINA: CONVERTIR ------------------
+    def _build_convert_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
+
+        title = QLabel("Convertir formatos de subtítulos")
+        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        subtitle = QLabel("Convierte instantáneamente entre .srt, .ass, .vtt y .txt sin tocar tiempos.")
+        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+
+        self.convert_drop_zone = DropZone()
+        self.convert_drop_zone.file_dropped.connect(self._on_file_selected)
+        layout.addWidget(self.convert_drop_zone)
+
+        conv_card = QFrame()
+        conv_card.setObjectName("CardContainer")
+        c_layout = QHBoxLayout(conv_card)
+        c_layout.setContentsMargins(18, 14, 18, 14)
+        c_lbl = QLabel("Formato de salida deseado:")
+        c_lbl.setStyleSheet("font-weight: 700; font-size: 13px; color: #F8FAFC;")
+        c_layout.addWidget(c_lbl)
+
+        self.cb_convert_format = QComboBox()
+        self.cb_convert_format.addItems(["SRT (.srt)", "VTT (.vtt)", "ASS (.ass)", "TXT (.txt)"])
+        c_layout.addWidget(self.cb_convert_format)
+        c_layout.addStretch()
+        layout.addWidget(conv_card)
+
+        btn_run_convert = QPushButton("🔄 Convertir y guardar")
+        btn_run_convert.setObjectName("PrimaryBtn")
+        btn_run_convert.setMinimumHeight(46)
+        btn_run_convert.clicked.connect(self._run_format_conversion)
+        layout.addWidget(btn_run_convert)
+
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
+
+    # ------------------ PÁGINA: PROCESAMIENTO POR LOTE ------------------
+    def _build_batch_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
+
+        title = QLabel("Procesamiento por lote")
+        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        subtitle = QLabel("Traduce, limpia o convierte múltiples archivos en paralelo.")
+        subtitle.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+
+        btn_layout = QHBoxLayout()
+        self.btn_add_batch = QPushButton("➕ Añadir subtítulos")
+        self.btn_add_batch.setProperty("class", "secondary-btn")
+        self.btn_add_batch.clicked.connect(self._add_batch_files)
+
+        self.btn_clear_batch = QPushButton("🗑️ Limpiar cola")
+        self.btn_clear_batch.setProperty("class", "secondary-btn")
+        self.btn_clear_batch.clicked.connect(self._clear_batch_table)
+
+        btn_layout.addWidget(self.btn_add_batch)
+        btn_layout.addWidget(self.btn_clear_batch)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        self.batch_table = QTableWidget()
+        self.batch_table.setColumnCount(4)
+        self.batch_table.setHorizontalHeaderLabels(["Archivo", "Tamaño", "Formato", "Estado"])
+        self.batch_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.batch_table.setMinimumHeight(240)
+        layout.addWidget(self.batch_table)
+
+        self.btn_start_batch = QPushButton("▶ Procesar todos los archivos")
+        self.btn_start_batch.setObjectName("PrimaryBtn")
+        self.btn_start_batch.setMinimumHeight(46)
+        self.btn_start_batch.clicked.connect(self._run_batch_processing)
+        layout.addWidget(self.btn_start_batch)
+
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
+
+    # ------------------ PÁGINA: CONFIGURACIÓN ------------------
+    def _build_settings_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(18)
+
+        title = QLabel("Configuración de servicios")
+        title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        layout.addWidget(title)
+
+        # DeepL Card
+        deepl_card = QFrame()
+        deepl_card.setObjectName("CardContainer")
+        d_layout = QVBoxLayout(deepl_card)
+        d_layout.setContentsMargins(18, 16, 18, 16)
+        d_layout.setSpacing(10)
+
+        d_title = QLabel("DeepL API")
+        d_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        d_desc = QLabel("Clave de API para traducciones de alta fidelidad.")
+        d_desc.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        d_layout.addWidget(d_title)
+        d_layout.addWidget(d_desc)
+
+        self.txt_deepl_key = QLineEdit()
+        self.txt_deepl_key.setPlaceholderText("Clave API de DeepL (ej. 12345678-abcd...)")
+        d_layout.addWidget(self.txt_deepl_key)
+
+        type_layout = QHBoxLayout()
+        self.rb_deepl_free = QRadioButton("DeepL Free API")
+        self.rb_deepl_pro = QRadioButton("DeepL Pro API")
+        self.rb_deepl_free.setStyleSheet("color: #F8FAFC;")
+        self.rb_deepl_pro.setStyleSheet("color: #F8FAFC;")
+        self.rb_deepl_free.setChecked(True)
+        self.bg_deepl = QButtonGroup()
+        self.bg_deepl.addButton(self.rb_deepl_free)
+        self.bg_deepl.addButton(self.rb_deepl_pro)
+        type_layout.addWidget(self.rb_deepl_free)
+        type_layout.addWidget(self.rb_deepl_pro)
+        type_layout.addStretch()
+        d_layout.addLayout(type_layout)
+
+        layout.addWidget(deepl_card)
+
+        # OpenAI / LLM Card
+        openai_card = QFrame()
+        openai_card.setObjectName("CardContainer")
+        o_layout = QVBoxLayout(openai_card)
+        o_layout.setContentsMargins(18, 16, 18, 16)
+        o_layout.setSpacing(10)
+
+        o_title = QLabel("OpenAI / Endpoint Compatible (Ollama, OpenRouter)")
+        o_title.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        o_layout.addWidget(o_title)
+
+        self.txt_openai_key = QLineEdit()
+        self.txt_openai_key.setPlaceholderText("API Key (opcional para endpoints locales)")
+        o_layout.addWidget(self.txt_openai_key)
+
+        self.txt_openai_url = QLineEdit()
+        self.txt_openai_url.setPlaceholderText("Base URL (ej. https://api.openai.com/v1 o http://localhost:11434/v1)")
+        o_layout.addWidget(self.txt_openai_url)
+
+        self.txt_openai_model = QLineEdit()
+        self.txt_openai_model.setPlaceholderText("Modelo (ej. gpt-4o-mini)")
+        o_layout.addWidget(self.txt_openai_model)
+
+        layout.addWidget(openai_card)
+
+        btn_save = QPushButton("💾 Guardar configuración")
+        btn_save.setObjectName("PrimaryBtn")
+        btn_save.setMinimumHeight(46)
+        btn_save.clicked.connect(self._save_settings)
+        layout.addWidget(btn_save)
+
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
+
+    # ------------------ PÁGINA: COMPLETADO ------------------
+    def _build_completed_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(40, 32, 40, 32)
+        layout.setSpacing(22)
+
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(14)
+        check_icon = QLabel("✅")
+        check_icon.setStyleSheet("font-size: 34px;")
+        
+        text_layout = QVBoxLayout()
+        c_title = QLabel("Procesamiento completado")
+        c_title.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        c_sub = QLabel("El archivo se ha procesado y guardado correctamente.")
+        c_sub.setStyleSheet("font-size: 13px; color: #94A3B8;")
+        text_layout.addWidget(c_title)
+        text_layout.addWidget(c_sub)
+
+        header_layout.addWidget(check_icon)
+        header_layout.addLayout(text_layout)
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
+
+        # 3 Tarjetas de métricas
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(14)
+        self.card_lines = MetricCard("📄", "0", "líneas procesadas")
+        self.card_deleted = MetricCard("✨", "0", "líneas eliminadas")
+        self.card_time = MetricCard("⏱️", "00:00", "tiempo total")
+        cards_layout.addWidget(self.card_lines)
+        cards_layout.addWidget(self.card_deleted)
+        cards_layout.addWidget(self.card_time)
+        layout.addLayout(cards_layout)
+
+        # Botones de Acción
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+        self.btn_open_file = QPushButton("📄 Abrir archivo")
+        self.btn_open_file.setObjectName("PrimaryBtn")
+        self.btn_open_file.clicked.connect(self._open_saved_file)
+
+        self.btn_open_folder = QPushButton("📂 Ver en el explorador")
+        self.btn_open_folder.setProperty("class", "secondary-btn")
+        self.btn_open_folder.clicked.connect(self._open_output_folder)
+
+        self.btn_to_preview = QPushButton("👁️ Ver en vista previa")
+        self.btn_to_preview.setProperty("class", "secondary-btn")
+        self.btn_to_preview.clicked.connect(lambda: self._switch_page(1))
+
+        btn_row.addWidget(self.btn_open_file)
+        btn_row.addWidget(self.btn_open_folder)
+        btn_row.addWidget(self.btn_to_preview)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        # Resumen de cambios
+        summary_card = QFrame()
+        summary_card.setObjectName("CardContainer")
+        s_layout = QVBoxLayout(summary_card)
+        s_layout.setContentsMargins(20, 16, 20, 16)
+        s_layout.setSpacing(8)
+
+        s_head = QLabel("Resumen de cambios")
+        s_head.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC;")
+        s_layout.addWidget(s_head)
+
+        self.lbl_sum1 = QLabel("✓ Limpieza de spam, URLs e IDs aplicada")
+        self.lbl_sum2 = QLabel("✓ Sincronización y estructura original conservadas")
+        self.lbl_sum3 = QLabel("✓ Archivo guardado correctamente")
+        for lbl in [self.lbl_sum1, self.lbl_sum2, self.lbl_sum3]:
+            lbl.setStyleSheet("font-size: 13px; color: #10B981; font-weight: 500;")
+            s_layout.addWidget(lbl)
+
+        layout.addWidget(summary_card)
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
+
+    # ------------------ ACCIONES Y FLUJO ------------------
+    def _on_file_selected(self, subtitle_path: str, video_path: str):
+        self.current_subtitle_path = subtitle_path
+        self.current_video_path = video_path
+
+        if video_path and os.path.exists(video_path):
+            self.video_player.load_video(video_path)
+
+    def _start_processing(self):
+        if not self.current_subtitle_path or not os.path.exists(self.current_subtitle_path):
+            QMessageBox.warning(self, "Archivo requerido", "Arrastra o selecciona un archivo de subtítulos primero.")
+            return
+
+        target_lang = self.cb_target_lang.currentData()
+        source_lang = self.cb_source_lang.currentData()
+        engine = self.cb_engine.currentData()
+        do_translate = self.toggle_translate.isChecked()
+        do_clean = self.toggle_clean.isChecked()
+        parallel = self.toggle_parallel.isChecked()
+
+        self.modal = ProgressModal(self)
+        self.modal.cancelled.connect(self._cancel_worker)
+        self.modal.show()
+
+        self.worker = ProcessWorker(
+            service=self.subtitle_service,
+            file_path=self.current_subtitle_path,
+            do_clean=do_clean,
+            do_translate=do_translate,
+            target_lang=target_lang,
+            source_lang=source_lang,
+            engine=engine,
+            parallel=parallel,
+        )
+        self.worker.step_updated.connect(self._on_worker_step)
+        self.worker.completed.connect(self._on_processing_completed)
+        self.worker.failed.connect(self._on_processing_failed)
+        self.start_process_time = time.time()
+        self.worker.start()
+
+    def _cancel_worker(self):
+        if hasattr(self, "worker") and self.worker.isRunning():
+            self.worker.terminate()
+
+    def _on_worker_step(self, step_name: str, payload: object):
+        if not hasattr(self, "modal") or not self.modal.isVisible():
+            return
+
+        if step_name == "step_reading":
+            self.modal.update_step(0, done=True)
+            self.modal.set_progress(0.15)
+        elif step_name == "step_analyzing":
+            self.modal.update_step(1, done=True)
+            self.modal.set_progress(0.30)
+        elif step_name == "step_cleaning":
+            self.modal.update_step(2, done=True)
+            self.modal.set_progress(0.45)
+        elif step_name == "step_translating" and isinstance(payload, tuple):
+            completed, total = payload
+            ratio = completed / max(1, total)
+            self.modal.update_step(3, done=(completed == total), text_override=f"Traduciendo ({completed}/{total})...")
+            overall = 0.45 + (ratio * 0.45)
+            elapsed = time.time() - self.start_process_time
+            remaining = int((elapsed / max(0.01, ratio)) - elapsed) if ratio > 0 else 0
+            self.modal.set_progress(overall, remaining_seconds=max(0, remaining))
+        elif step_name == "step_formatting":
+            self.modal.update_step(4, done=True)
+            self.modal.set_progress(0.95)
+        elif step_name == "step_saving":
+            self.modal.update_step(5, done=True)
+            self.modal.set_progress(1.0, 0)
+
+    def _on_processing_completed(self, result: ProcessingResult):
+        if hasattr(self, "modal") and self.modal.isVisible():
+            self.modal.accept()
+
+        self.last_result = result
+        base, ext = os.path.splitext(self.current_subtitle_path)
+        out_path = f"{base}_processed{ext}"
+        try:
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(result.output_content)
+            self.saved_output_path = out_path
+        except Exception as e:
+            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar el archivo:\n{e}")
+            return
+
+        self.diff_viewer.load_subtitles(result.original_items, result.processed_items)
+        self.video_player.set_subtitles(result.processed_items)
+
+        self.card_lines.set_value(str(result.stats.total_lines))
+        self.card_deleted.set_value(str(result.stats.deleted_lines))
+        m = int(result.stats.elapsed_time // 60)
+        s = int(result.stats.elapsed_time % 60)
+        self.card_time.set_value(f"{m:02d}:{s:02d}")
+        self.lbl_sum3.setText(f"✓ Guardado como: {os.path.basename(out_path)}")
+
+        self._switch_page(6)
+
+    def _on_processing_failed(self, error_msg: str):
+        if hasattr(self, "modal") and self.modal.isVisible():
+            self.modal.reject()
+        QMessageBox.critical(self, "Error", f"Fallo al procesar el archivo:\n{error_msg}")
+
+    def _start_fast_clean(self):
+        if not self.current_subtitle_path:
+            QMessageBox.warning(self, "Archivo requerido", "Arrastra o selecciona un archivo de subtítulos.")
+            return
+
+        self.worker = ProcessWorker(
+            service=self.subtitle_service,
+            file_path=self.current_subtitle_path,
+            do_clean=True,
+            do_translate=False,
+            target_lang="es",
+            source_lang="auto",
+            engine="google",
+        )
+        self.worker.completed.connect(self._on_processing_completed)
+        self.worker.failed.connect(self._on_processing_failed)
+        self.worker.start()
+
+    def _run_format_conversion(self):
+        if not self.current_subtitle_path or not os.path.exists(self.current_subtitle_path):
+            QMessageBox.warning(self, "Archivo requerido", "Selecciona un archivo para convertir.")
+            return
+
+        fmt_map = {"SRT (.srt)": "srt", "VTT (.vtt)": "vtt", "ASS (.ass)": "ass", "TXT (.txt)": "txt"}
+        tgt_fmt = fmt_map.get(self.cb_convert_format.currentText(), "srt")
+
+        base, _ = os.path.splitext(self.current_subtitle_path)
+        out_path = f"{base}_converted.{tgt_fmt}"
+
+        try:
+            with open(self.current_subtitle_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            src_fmt = self.subtitle_service.detect_format(content, self.current_subtitle_path)
+            items = self.subtitle_service.parse_subtitles(content, src_fmt)
+            out_content = self.subtitle_service.format_output(items, tgt_fmt)
+
+            with open(out_path, "w", encoding="utf-8") as out_f:
+                out_f.write(out_content)
+
+            self.saved_output_path = out_path
+            QMessageBox.information(self, "Conversión completada", f"Archivo convertido y guardado en:\n{out_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error en conversión", str(e))
+
+    def _export_result_file(self):
+        if not self.last_result:
+            QMessageBox.information(self, "Información", "No hay subtítulo procesado aún.")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
             self,
-            "Select subtitle file",
-            "",
-            "Subtitle files (*.srt *.vtt *.txt);;All files (*.*)",
+            "Guardar subtítulo",
+            self.saved_output_path or "subtitulo_procesado.srt",
+            "Subtítulo SRT (*.srt);;Subtítulo VTT (*.vtt);;Subtítulo ASS (*.ass);;Texto Plano (*.txt)"
         )
-        if file_path:
-            self.input_file_path = file_path
-            self.file_status.setText(f"File: {os.path.basename(file_path)}")
-        else:
-            self.file_status.setText("No file selected")
-
-    def select_output_directory(self):
-        directory = QFileDialog.getExistingDirectory(
-            self, "Select output directory", ""
-        )
-        if directory:
-            self.output_directory = directory
-            self.dir_status.setText(f"Dir: {os.path.basename(directory)}")
-
-    def update_output_format(self, value: str):
-        self.output_format = value
-
-    def process_subtitle_file(self):
-        if not self.input_file_path:
-            self.show_message("Error", "Please select an input file", "warning")
-            return
-        if not self.output_directory:
-            self.show_message("Error", "Please select an output directory", "warning")
-            return
-        if (
-            self.translation_toggle.isChecked()
-            and not self.target_lang_input.text().strip()
-        ):
-            self.show_message("Error", "Please enter a target language", "warning")
-            return
-
-        self.process_btn.setEnabled(False)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
-        self.status_label.setText("Preparing...")
-        self.result_label.setText("")
-
-        worker = Thread(target=self._run_processing, args=(self.progress_queue,))
-        worker.start()
-        self.timer.start(100)
-
-    def _run_processing(self, queue: Queue):
-        try:
-            processed_text = self.subtitle_service.process_subtitles(
-                self.input_file_path,
-                self.translation_toggle.isChecked(),
-                self.target_lang_input.text().strip()
-                if self.translation_toggle.isChecked()
-                else None,
-                lambda t, d: queue.put((t, d)),
-            )
-            queue.put(("success", processed_text))
-        except Exception as e:
-            queue.put(("error", str(e)))
-
-    def check_progress_queue(self):
-        try:
-            while True:
-                msg_type, data = self.progress_queue.get_nowait()
-                self.progress_signal.progress_updated.emit(msg_type, data)
-        except:
-            pass
-
-    def handle_progress_update(self, msg_type: str, data):
-        if msg_type == "progress":
-            self.progress_bar.setValue(int(data * 100))
-        elif msg_type in ["status", "info"]:
-            self.status_label.setText(str(data))
-        elif msg_type == "success":
-            self.timer.stop()
-            self._finalize_success(data)
-        elif msg_type == "error":
-            self.timer.stop()
-            self._finalize_error(data)
-
-    def _finalize_success(self, content: str):
-        try:
-            base_name = os.path.basename(self.input_file_path)
-            name_without_ext = os.path.splitext(base_name)[0]
-            output_filename = f"{name_without_ext}_processed.{self.output_format}"
-            output_path = os.path.join(self.output_directory, output_filename)
-
-            if self.output_format == "vtt":
-                content = f"WEBVTT\n\n{content}"
-
-            with open(output_path, "w", encoding="UTF-8") as f:
+        if path:
+            ext = os.path.splitext(path)[1].lstrip(".")
+            content = self.subtitle_service.format_output(self.last_result.processed_items, ext)
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
+            self.saved_output_path = path
+            QMessageBox.information(self, "Guardado", f"Guardado en:\n{path}")
 
-            self.status_label.setText("Success!")
-            self.result_label.setText(f"File saved to: {output_path}")
-            self.result_label.setStyleSheet(
-                f"color: {Styles.ACCENT_POSITIVE}; font-size: 11px;"
-            )
-        except Exception as e:
-            self._finalize_error(str(e))
-        finally:
-            self.process_btn.setEnabled(True)
-            QTimer.singleShot(5000, lambda: self.progress_bar.setVisible(False))
-
-    def _finalize_error(self, message: str):
-        self.status_label.setText("Failed")
-        self.result_label.setText(f"Error: {message}")
-        self.result_label.setStyleSheet(
-            f"color: {Styles.ACCENT_NEGATIVE}; font-size: 11px;"
+    def _browse_preview_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar subtítulo",
+            "",
+            "Subtítulos (*.srt *.ass *.vtt *.txt)"
         )
-        self.process_btn.setEnabled(True)
+        if path:
+            self._on_file_selected(path, "")
+            self.drop_zone.set_file(path)
+            self._switch_page(0)
 
-    def show_message(self, title, message, mode="info"):
-        msg = QMessageBox(self)
-        msg.setWindowTitle(title)
-        msg.setText(message)
-        if mode == "warning":
-            msg.setIcon(QMessageBox.Icon.Warning)
-        elif mode == "error":
-            msg.setIcon(QMessageBox.Icon.Critical)
-        else:
-            msg.setIcon(QMessageBox.Icon.Information)
-        msg.exec()
+    def _open_saved_file(self):
+        if self.saved_output_path and os.path.exists(self.saved_output_path):
+            if sys.platform == "win32":
+                os.startfile(self.saved_output_path)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", self.saved_output_path])
+            else:
+                subprocess.Popen(["xdg-open", self.saved_output_path])
+
+    def _open_output_folder(self):
+        if self.saved_output_path and os.path.exists(self.saved_output_path):
+            folder = os.path.dirname(self.saved_output_path)
+            if sys.platform == "win32":
+                subprocess.Popen(f'explorer /select,"{os.path.normpath(self.saved_output_path)}"')
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", self.saved_output_path])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+
+    # ------------------ LOTE ------------------
+    def _add_batch_files(self):
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Seleccionar subtítulos para procesar en lote",
+            "",
+            "Subtítulos (*.srt *.ass *.vtt *.txt)"
+        )
+        for f in files:
+            row = self.batch_table.rowCount()
+            self.batch_table.insertRow(row)
+            self.batch_table.setItem(row, 0, QTableWidgetItem(f))
+            size = f"{os.path.getsize(f) / 1024:.1f} KB" if os.path.exists(f) else "0 KB"
+            self.batch_table.setItem(row, 1, QTableWidgetItem(size))
+            ext = os.path.splitext(f)[1].upper().lstrip(".")
+            self.batch_table.setItem(row, 2, QTableWidgetItem(ext))
+            self.batch_table.setItem(row, 3, QTableWidgetItem("Pendiente"))
+
+    def _clear_batch_table(self):
+        self.batch_table.setRowCount(0)
+
+    def _run_batch_processing(self):
+        rows = self.batch_table.rowCount()
+        if rows == 0:
+            QMessageBox.information(self, "Lote vacío", "Añade archivos a la cola primero.")
+            return
+
+        target_lang = self.cb_target_lang.currentData()
+        source_lang = self.cb_source_lang.currentData()
+        engine = self.cb_engine.currentData()
+        do_translate = self.toggle_translate.isChecked()
+        do_clean = self.toggle_clean.isChecked()
+        parallel = self.toggle_parallel.isChecked()
+
+        for row in range(rows):
+            file_path = self.batch_table.item(row, 0).text()
+            self.batch_table.setItem(row, 3, QTableWidgetItem("Procesando..."))
+            try:
+                result = self.subtitle_service.process_subtitles(
+                    file_path=file_path,
+                    do_clean=do_clean,
+                    do_translate=do_translate,
+                    target_language=target_lang,
+                    source_language=source_lang,
+                    engine=engine,
+                    parallel=parallel,
+                )
+                base, ext = os.path.splitext(file_path)
+                out_path = f"{base}_processed{ext}"
+                with open(out_path, "w", encoding="utf-8") as out_f:
+                    out_f.write(result.output_content)
+                self.batch_table.setItem(row, 3, QTableWidgetItem("Completado ✓"))
+            except Exception as e:
+                self.batch_table.setItem(row, 3, QTableWidgetItem(f"Error: {e}"))
+
+        QMessageBox.information(self, "Lote finalizado", "Se procesaron todos los archivos del lote.")
+
+    # ------------------ AJUSTES ------------------
+    def _load_config_values(self):
+        self.txt_deepl_key.setText(self.config_service.get("deepl_api_key", ""))
+        is_pro = self.config_service.get("deepl_type", "free") == "pro"
+        self.rb_deepl_pro.setChecked(is_pro)
+        self.rb_deepl_free.setChecked(not is_pro)
+
+        self.txt_openai_key.setText(self.config_service.get("openai_api_key", ""))
+        self.txt_openai_url.setText(self.config_service.get("openai_base_url", "https://api.openai.com/v1"))
+        self.txt_openai_model.setText(self.config_service.get("openai_model", "gpt-4o-mini"))
+
+    def _save_settings(self):
+        self.config_service.set("deepl_api_key", self.txt_deepl_key.text().strip())
+        self.config_service.set("deepl_type", "pro" if self.rb_deepl_pro.isChecked() else "free")
+        self.config_service.set("openai_api_key", self.txt_openai_key.text().strip())
+        self.config_service.set("openai_base_url", self.txt_openai_url.text().strip())
+        self.config_service.set("openai_model", self.txt_openai_model.text().strip())
+        QMessageBox.information(self, "Ajustes guardados", "Configuración guardada correctamente.")

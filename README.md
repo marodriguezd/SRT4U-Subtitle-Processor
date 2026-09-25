@@ -1,79 +1,87 @@
-# SRT4U - Subtitle Processor 💎
+# SRT4U - Subtitle Processor
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/Python-3.13%2B-yellow?logo=python&logoColor=white)](https://www.python.org/)
-[![PyQt](https://img.shields.io/badge/PyQt-6.4%2B-3D9D5B)](https://pypi.org/project/PyQt6/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
+[![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
+[![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-19%20passed-success.svg)]()
 
-[**Español 🇪🇸**](README_es.md) | [**English 🇺🇸**](README.md)
+[**English**](README.md) | [**Español**](README_es.md)
 
----
+Desktop app to translate, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`, `.txt`) with a real-time synchronized video player.
 
-## Translate, Clean, and Convert Subtitle Files with Elegance
-
-![Application Screenshot](https://raw.githubusercontent.com/marodriguezd/SRT4U_Subtitle-Processor/main/assets/demo-screenshot.png)
-
-**SRT4U** is a premium desktop application built with Python 3.13 and PyQt6, designed to process subtitle files with a focus on speed, reliability, and a stunning **Glassmorphism** user interface.
-
-### ✨ What's New? (Glassmorphism Refactor)
-The latest version features a complete architectural overhaul:
-- **Premium UI**: Ultra-modern dark theme with translucent "Glass" cards and smooth gradients.
-- **Architectural Purity**: Strict separation between core processing logic and the user interface.
-- **Parallel Translation Engine**: New multi-threaded core for significantly faster translations.
-- **Enhanced Performance**: Optimized for Python 3.13 with native PyQt6 threading.
-- **Bundled Executable**: Easy distribution using PyInstaller.
+![SRT4U Preview](assets/preview.png)
 
 ---
 
-## 🚀 Key Features
+## Features
 
-- **💎 Stunning Glassmorphism UI**: A modern, translucent design that feels at home on Windows 11 and modern OSs.
-- **🛠️ Robust Subtitle Parsing**: Automatically detects and fixes common errors like missing indices or non-standard timestamp separators (`-` instead of `-->`).
-- **🌍 Smart Translation**: Powered by `deep-translator`. Translate into 100+ languages while maintaining pixel-perfect timing integrity.
-- **🚀 Parallel Engine**: New multi-threaded architecture that processes multiple subtitle blocks simultaneously, cutting translation time by up to 80%.
-- **🧹 Expert Cleaning**: Strips out promotional spam, Telegram IDs, URLs, and musical symbols automatically.
-- **🔄 Multi-Format Support**: Seamlessly convert between `.srt` and `.vtt`. Also supports `.txt` files containing subtitle timestamps.
-- **⚡ Native Performance**: Fully asynchronous processing; the UI never freezes, even during heavy translation tasks.
+- **Translation Engines**:
+  - Google Translate: Built-in free tier with zero setup or API keys required.
+  - DeepL: Free and Pro API key support.
+  - OpenAI / Local LLMs: Compatible with OpenAI, Ollama, and OpenRouter endpoints.
+- **Automated Cleaner**: Strips out Telegram channels (`t.me`), URLs, fansub credits, ads, and musical markers (`♪`) while preserving valid dialogue and formatting tags (`<i>`, `<b>`, ASS styles).
+- **Format Converter**: Bi-directional conversion between `.srt`, `.vtt`, `.ass`, and plain text `.txt`.
+- **Live Video Preview**: Integrated player to inspect subtitles overlaid onto the video before saving.
+- **Batch Processing**: Queue entire folders or multiple files with per-file progress tracking.
+- **Parallel Execution**: Multi-threaded block translation to speed up large subtitle files.
+- **Dark / Light Glass Theme**: Toggle instantly between dark and light modes.
 
 ---
 
-## 📦 Installation & Setup
+## Installation & Running
 
-### Prerequisites
-- Python 3.13 (recommended)
-- Internet connection (for translations)
+### Requirements
+- Python 3.10 or higher
+- `pip`
 
-### 1. Clone & Install
+### Run from Source
+
 ```bash
-git clone https://github.com/marodriguezd/SRT4U_Subtitle-Processor.git
-cd SRT4U_Subtitle-Processor
+# Clone the repository
+git clone https://github.com/marodriguezd/SRT4U-Subtitle-Processor.git
+cd SRT4U-Subtitle-Processor
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Run
-```bash
+# Run the application
 python main.py
 ```
 
-### 3. Generate Portable Executable (.exe)
-If you want to create a standalone version for Windows:
+### Pre-built Binaries
+Standalone portable binaries are automatically built via GitHub Actions for every release tag:
+- **Windows**: `SRT4U-Windows-x64.exe`
+- **Linux**: `SRT4U-Linux-x86_64.tar.gz`
+- **macOS**: `SRT4U-macOS.dmg`
+
+---
+
+## Running Tests
+
+The test suite covers parsing, cleaning, cross-format conversion, free translation, and UI flows:
+
 ```bash
-.\build_exe.bat
+pytest tests/ -v
 ```
-The resulting file will be in the `/dist` folder.
 
 ---
 
-## 🛠️ Internal Architecture
+## Supported Formats
 
-The project follows a modular service-oriented architecture:
-- `application/ui/`: Contains the Glassmorphism styling and PyQt6 window definitions.
-- `application/services/`: Pure logic services for file handling, subtitle parsing, and translation.
-- `main.py`: The entry point that orchestrates the application launch.
-
----
-
-## 📄 License
-This project is licensed under the Apache License 2.0.
+| Format | Extension | Read | Write | Style Preservation |
+|---|---|:---:|:---:|:---:|
+| SubRip Subtitle | `.srt` | Yes | Yes | Yes (HTML tags) |
+| Web Video Text Tracks | `.vtt` | Yes | Yes | Yes (cue settings & tags) |
+| Advanced SubStation Alpha | `.ass` / `.ssa` | Yes | Yes | Yes (styles & positions) |
+| Plain Text Dialogue | `.txt` | Yes | Yes | Lines only |
 
 ---
-*Created with ❤️ for subtitle enthusiasts.*
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

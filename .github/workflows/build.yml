@@ -1,0 +1,158 @@
+name: Build & Release Multiplatform
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --noconsole --onefile --name "SRT4U" `
+            --add-data "application;application" `
+            --add-data "assets;assets" `
+            --icon "assets/icon.ico" `
+            main.py
+
+      - name: Rename binary
+        run: |
+          Move-Item -Path "dist/SRT4U.exe" -Destination "dist/SRT4U-Windows-x64.exe"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SRT4U-Windows-x64
+          path: dist/SRT4U-Windows-x64.exe
+
+  build-linux:
+    name: Build Linux Binary
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Qt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1-mesa \
+            libgl1-mesa-dev \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-xinerama0 \
+            libxcb-xfixes0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --noconsole --onefile --name "SRT4U" \
+            --add-data "application:application" \
+            --add-data "assets:assets" \
+            --icon "assets/icon.ico" \
+            main.py
+          cd dist
+          tar -czvf SRT4U-Linux-x86_64.tar.gz SRT4U
+          cd ..
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SRT4U-Linux-x86_64
+          path: dist/SRT4U-Linux-x86_64.tar.gz
+
+  build-macos:
+    name: Build macOS (.dmg)
+    runs-on: macos-13
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build .app with PyInstaller
+        run: |
+          pyinstaller --windowed --name "SRT4U" \
+            --add-data "application:application" \
+            --add-data "assets:assets" \
+            --icon "assets/icon.ico" \
+            main.py
+
+      - name: Package into DMG
+        run: |
+          hdiutil create -volname "SRT4U" -srcfolder "dist/SRT4U.app" -ov -format UDZO "dist/SRT4U-macOS.dmg"
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SRT4U-macOS
+          path: dist/SRT4U-macOS.dmg
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe
+            release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.tar.gz
+            release-artifacts/SRT4U-macOS/SRT4U-macOS.dmg
+          generate_release_notes: true
