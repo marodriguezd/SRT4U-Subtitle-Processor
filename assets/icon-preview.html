@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRT4U - Icon Showcase & Redesign</title>
+  <style>
+    :root {
+      --bg: #0B0F19;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent: #8B5CF6;
+      --accent-glow: rgba(139, 92, 246, 0.35);
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.12) 0px, transparent 50%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #C084FC;
+      background: rgba(192, 132, 252, 0.1);
+      border: 1px solid rgba(192, 132, 252, 0.25);
+      border-radius: 9999px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #FFFFFF 0%, #CBD5E1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.sub {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 520px;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 980px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 32px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    }
+
+    .card h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      align-self: flex-start;
+      color: #E2E8F0;
+    }
+
+    .hero-icon-container {
+      width: 256px;
+      height: 256px;
+      filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.6));
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .hero-icon-container:hover {
+      transform: scale(1.04) translateY(-4px);
+    }
+
+    .hero-icon-container img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .scales-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      margin-top: 36px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .scale-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .scale-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .dock-preview {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 16px;
+    }
+
+    .dock-app {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 22px;
+    }
+
+    .dock-target {
+      position: relative;
+    }
+
+    .dock-target::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #A855F7;
+      box-shadow: 0 0 6px #A855F7;
+    }
+
+    .specs-list {
+      list-style: none;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .spec-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      font-size: 13px;
+    }
+
+    .spec-name {
+      color: var(--text-muted);
+    }
+
+    .spec-val {
+      font-weight: 600;
+      color: #E2E8F0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">SRT4U Visual Redesign</div>
+    <h1>Nuevo Icono Oficial de la Aplicación</h1>
+    <p class="sub">Diseño dark glassmorphic alineado a la paleta, degradados violeta/cian y estética moderna de la interfaz.</p>
+  </header>
+
+  <div class="container">
+    <!-- Vista Principal 256px y Escalas -->
+    <div class="card">
+      <h2>Hero & Escalas de Resolución</h2>
+      <div class="hero-icon-container">
+        <img src="icon.svg" alt="SRT4U Icon Redesign">
+      </div>
+
+      <div class="scales-row">
+        <div class="scale-box">
+          <img src="icon.svg" width="96" height="96" alt="96px">
+          <span class="scale-label">96px</span>
+        </div>
+        <div class="scale-box">
+          <img src="icon.svg" width="64" height="64" alt="64px">
+          <span class="scale-label">64px</span>
+        </div>
+        <div class="scale-box">
+          <img src="icon.svg" width="48" height="48" alt="48px">
+          <span class="scale-label">48px</span>
+        </div>
+        <div class="scale-box">
+          <img src="icon.svg" width="32" height="32" alt="32px">
+          <span class="scale-label">32px (Taskbar)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contexto en Dock & Especificaciones -->
+    <div class="card">
+      <h2>Simulación en Barra de Tareas / Dock</h2>
+      <div class="dock-preview">
+        <div class="dock-app">📁</div>
+        <div class="dock-app">🌐</div>
+        <div class="dock-app dock-target" style="background: transparent;">
+          <img src="icon.svg" width="48" height="48" alt="SRT4U">
+        </div>
+        <div class="dock-app">⚙️</div>
+        <div class="dock-app">💬</div>
+      </div>
+
+      <h2 style="margin-top: 32px; margin-bottom: 16px;">Especificaciones Técnicas</h2>
+      <ul class="specs-list">
+        <li class="spec-item">
+          <span class="spec-name">Formato fuente</span>
+          <span class="spec-val">SVG Vectorial (512x512)</span>
+        </li>
+        <li class="spec-item">
+          <span class="spec-name">Geometría</span>
+          <span class="spec-val">Squircle continuo (radio 104px)</span>
+        </li>
+        <li class="spec-item">
+          <span class="spec-name">Paleta de color</span>
+          <span class="spec-val">Deep Indigo (#0E1322), Violet (#8B5CF6), Sky (#38BDF8)</span>
+        </li>
+        <li class="spec-item">
+          <span class="spec-name">Elementos clave</span>
+          <span class="spec-val">Pantalla glass, barras de subtítulo bilingüe, chispa AI</span>
+        </li>
+        <li class="spec-item">
+          <span class="spec-name">Compatibilidad</span>
+          <span class="spec-val">Linux (AppImage/desktop), Windows (.ico), macOS (.icns)</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
