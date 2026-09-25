@@ -48,7 +48,7 @@ jobs:
           path: dist/SRT4U-Windows-x64.exe
 
   build-linux:
-    name: Build Linux Binary
+    name: Build Linux (.AppImage)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -69,7 +69,8 @@ jobs:
             libxcb-render-util0 \
             libxcb-shape0 \
             libxcb-xinerama0 \
-            libxcb-xfixes0
+            libxcb-xfixes0 \
+            file
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -90,6 +91,44 @@ jobs:
             --add-data "assets:assets" \
             --icon "assets/icon.ico" \
             main.py
+
+      - name: Package AppImage
+        run: |
+          # 1. Preparar estructura AppDir
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp dist/SRT4U AppDir/usr/bin/SRT4U
+          cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/srt4u.png
+          cp assets/icon.png AppDir/srt4u.png
+
+          # 2. Archivo desktop
+          cat << 'EOF' > AppDir/srt4u.desktop
+          [Desktop Entry]
+          Name=SRT4U
+          Comment=Subtitle Processor & Translator
+          Exec=SRT4U
+          Icon=srt4u
+          Type=Application
+          Categories=AudioVideo;Utility;
+          Terminal=false
+          EOF
+
+          # 3. AppRun
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec "${HERE}/usr/bin/SRT4U" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          # 4. Descargar appimagetool y empaquetar AppImage
+          curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir dist/SRT4U-Linux-x86_64.AppImage
+
+          # Respaldo tarball
           cd dist
           tar -czvf SRT4U-Linux-x86_64.tar.gz SRT4U
           cd ..
@@ -98,7 +137,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SRT4U-Linux-x86_64
-          path: dist/SRT4U-Linux-x86_64.tar.gz
+          path: |
+            dist/SRT4U-Linux-x86_64.AppImage
+            dist/SRT4U-Linux-x86_64.tar.gz
 
   build-macos:
     name: Build macOS (.dmg)
@@ -153,6 +194,7 @@ jobs:
         with:
           files: |
             release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe
+            release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.AppImage
             release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.tar.gz
             release-artifacts/SRT4U-macOS/SRT4U-macOS.dmg
           generate_release_notes: true

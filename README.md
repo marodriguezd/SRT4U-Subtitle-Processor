@@ -56,7 +56,7 @@ python main.py
 ### Pre-built Binaries
 Standalone portable binaries are automatically built via GitHub Actions for every release tag:
 - **Windows**: `SRT4U-Windows-x64.exe`
-- **Linux**: `SRT4U-Linux-x86_64.tar.gz`
+- **Linux**: `SRT4U-Linux-x86_64.AppImage` (portable)
 - **macOS**: `SRT4U-macOS.dmg`
 
 ---

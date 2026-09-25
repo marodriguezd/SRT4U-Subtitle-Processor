@@ -56,7 +56,7 @@ python main.py
 ### Ejecutables precompilados
 GitHub Actions compila automáticamente binarios portables en cada tag de versión:
 - **Windows**: `SRT4U-Windows-x64.exe`
-- **Linux**: `SRT4U-Linux-x86_64.tar.gz`
+- **Linux**: `SRT4U-Linux-x86_64.AppImage` (portable)
 - **macOS**: `SRT4U-macOS.dmg`
 
 ---
