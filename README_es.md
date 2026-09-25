@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-26%20superados-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-29%20superados-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -16,6 +16,11 @@ Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de
 
 ## Funcionalidades principales
 
+- **Interfaz multi-idioma (i18n)**:
+  - Detección automática del idioma del sistema operativo al iniciar mediante `QLocale`.
+  - Cambio dinámico en tiempo real entre idiomas sin reiniciar la aplicación.
+  - 6 idiomas soportados: Español (`es`), Inglés (`en`), Portugués (`pt`), Alemán (`de`), Italiano (`it`) y Chino Simplificado (`zh-CN`).
+  - Doble selector: acceso rápido en la barra superior y selector permanente en la página de Configuración.
 - **Incrustación en vídeo (Hardsub / Burn-In)**:
   - Quema los subtítulos de forma permanente dentro del archivo de vídeo (`.mp4`, `.mkv`, `.webm`, etc.).
   - Configuración visual personalizada: Tamaño tipográfico, color (Blanco, Amarillo, Cian) y caja de fondo (Caja semitransparente, sólida o solo contorno).

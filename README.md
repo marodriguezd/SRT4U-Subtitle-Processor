@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-26%20passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-29%20passed-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -16,6 +16,11 @@ Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt
 
 ## Features
 
+- **Multi-language Interface (i18n)**:
+  - Automatic system language detection on startup via `QLocale`.
+  - Live on-the-fly language switching without restarting the app.
+  - 6 supported languages: English (`en`), Spanish (`es`), Portuguese (`pt`), German (`de`), Italian (`it`), and Simplified Chinese (`zh-CN`).
+  - Dual access: Quick switcher in the top bar and persistent selection in the Settings page.
 - **Video Burn-In (Hardsub Export)**:
   - Permanently embeds subtitles into video files (`.mp4`, `.mkv`, `.webm`, etc.).
   - Visual customization: Font size, color (White, Yellow, Cyan), and reading boxes (Semitransparent, Solid, or Border outline).
