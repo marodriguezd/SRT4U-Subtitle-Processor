@@ -322,6 +322,15 @@ class BurnInDialog(QDialog):
             QMessageBox.warning(self, "Ruta requerida", "Por favor, especifica el nombre del vídeo de salida.")
             return
 
+        if os.path.abspath(v_path) == os.path.abspath(o_path):
+            QMessageBox.warning(
+                self,
+                "Ruta inválida",
+                "El vídeo de salida no puede ser idéntico al vídeo original.\n"
+                "Por favor, elige un nombre de archivo o carpeta diferente."
+            )
+            return
+
         if not self.subtitle_items:
             QMessageBox.warning(self, "Sin subtítulos", "No hay subtítulos disponibles para incrustar.")
             return
@@ -381,6 +390,30 @@ class BurnInDialog(QDialog):
             }
             QComboBox:focus {
                 border-color: #8B5CF6;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #0F172A;
+                color: #F8FAFC;
+                selection-background-color: #8B5CF6;
+                selection-color: #FFFFFF;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                outline: none;
+                padding: 4px;
+            }
+            QComboBox QAbstractItemView::item {
+                color: #F8FAFC;
+                background-color: transparent;
+                min-height: 24px;
+                padding: 4px 8px;
+            }
+            QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover {
+                background-color: #8B5CF6;
+                color: #FFFFFF;
             }
         """
 

@@ -36,7 +36,7 @@ def test_generate_ass_script_styles():
     opts_default = BurnInOptions()
     script = VideoBurnerService.generate_ass_script(items, opts_default)
     assert "[Script Info]" in script
-    assert "Style: Default,Arial,24,&H00FFFFFF" in script
+    assert "Style: Default,sans-serif,24,&H00FFFFFF" in script
     assert "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,First line" in script
     assert "Second line with\\Nbreak" in script
 
@@ -47,7 +47,7 @@ def test_generate_ass_script_styles():
         box_style="Caja sólida",
     )
     script_yellow = VideoBurnerService.generate_ass_script(items, opts_yellow)
-    assert "Style: Default,Arial,32,&H0000FFFF" in script_yellow
+    assert "Style: Default,sans-serif,32,&H0000FFFF" in script_yellow
 
     # Test Pequeño, Cian, Sin fondo
     opts_cyan = BurnInOptions(
@@ -56,7 +56,7 @@ def test_generate_ass_script_styles():
         box_style="Sin fondo",
     )
     script_cyan = VideoBurnerService.generate_ass_script(items, opts_cyan)
-    assert "Style: Default,Arial,18,&H00FFFF00" in script_cyan
+    assert "Style: Default,sans-serif,18,&H00FFFF00" in script_cyan
 
 
 def test_video_duration_extraction():

@@ -29,20 +29,20 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Download Static FFmpeg (Windows)
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "."
+          $ffmpegDir = Get-ChildItem -Directory -Filter "ffmpeg-master*" | Select-Object -First 1
+          Copy-Item "$($ffmpegDir.FullName)\bin\ffmpeg.exe" .\ffmpeg.exe
+          .\ffmpeg.exe -version
+
       - name: Build executable with PyInstaller
         run: |
-          $ffmpegCmd = Get-Command ffmpeg -ErrorAction SilentlyContinue
-          if (-not $ffmpegCmd) {
-            choco install ffmpeg -y
-            $ffmpegPath = "C:\ProgramData\chocolatey\bin\ffmpeg.exe"
-          } else {
-            $ffmpegPath = $ffmpegCmd.Source
-          }
-          Write-Host "Embedding FFmpeg from: $ffmpegPath"
           pyinstaller --noconsole --onefile --name "SRT4U" `
             --add-data "application;application" `
             --add-data "assets;assets" `
-            --add-binary "$ffmpegPath;." `
+            --add-binary "ffmpeg.exe;." `
             --icon "assets/icon.ico" `
             main.py
 
@@ -63,7 +63,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Qt and multimedia dependencies
+      - name: Install Qt dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -79,8 +79,17 @@ jobs:
             libxcb-shape0 \
             libxcb-xinerama0 \
             libxcb-xfixes0 \
-            ffmpeg \
+            xz-utils \
             file
+
+      - name: Download Static FFmpeg (Linux)
+        run: |
+          curl -sL https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz -o ffmpeg-static.tar.xz
+          tar -xf ffmpeg-static.tar.xz
+          FFMPEG_DIR=$(find . -maxdepth 1 -type d -name "ffmpeg-master*" | head -n 1)
+          cp "$FFMPEG_DIR/bin/ffmpeg" ./ffmpeg
+          chmod +x ./ffmpeg
+          ./ffmpeg -version
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -96,12 +105,10 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          FFMPEG_PATH=$(which ffmpeg)
-          echo "Embedding FFmpeg from $FFMPEG_PATH"
           pyinstaller --noconsole --onefile --name "SRT4U" \
             --add-data "application:application" \
             --add-data "assets:assets" \
-            --add-binary "$FFMPEG_PATH:." \
+            --add-binary "ffmpeg:." \
             --icon "assets/icon.ico" \
             main.py
 
@@ -111,7 +118,7 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp dist/SRT4U AppDir/usr/bin/SRT4U
-          cp "$(which ffmpeg)" AppDir/usr/bin/ffmpeg
+          cp ./ffmpeg AppDir/usr/bin/ffmpeg
           cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/srt4u.png
           cp assets/icon.png AppDir/srt4u.png
 
