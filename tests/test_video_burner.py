@@ -36,7 +36,9 @@ def test_generate_ass_script_styles():
     opts_default = BurnInOptions()
     script = VideoBurnerService.generate_ass_script(items, opts_default)
     assert "[Script Info]" in script
-    assert "Style: Default,sans-serif,24,&H00FFFFFF" in script
+    assert "PlayResX: 1920" in script
+    assert "PlayResY: 1080" in script
+    assert "Style: Default,sans-serif,49,&H00FFFFFF" in script
     assert "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,First line" in script
     assert "Second line with\\Nbreak" in script
 
@@ -47,7 +49,7 @@ def test_generate_ass_script_styles():
         box_style="Caja sólida",
     )
     script_yellow = VideoBurnerService.generate_ass_script(items, opts_yellow)
-    assert "Style: Default,sans-serif,32,&H0000FFFF" in script_yellow
+    assert "Style: Default,sans-serif,63,&H0000FFFF" in script_yellow
 
     # Test Pequeño, Cian, Sin fondo
     opts_cyan = BurnInOptions(
@@ -56,7 +58,17 @@ def test_generate_ass_script_styles():
         box_style="Sin fondo",
     )
     script_cyan = VideoBurnerService.generate_ass_script(items, opts_cyan)
-    assert "Style: Default,sans-serif,18,&H00FFFF00" in script_cyan
+    assert "Style: Default,sans-serif,38,&H00FFFF00" in script_cyan
+
+
+def test_overlap_sanitization():
+    items = [
+        SubtitleItem(index=1, start_ms=1000, end_ms=5000, text="Overlap 1"),
+        SubtitleItem(index=2, start_ms=4000, end_ms=7000, text="Overlap 2"),
+    ]
+    script_fixed = VideoBurnerService.generate_ass_script(items, BurnInOptions(fix_overlaps=True))
+    assert "Dialogue: 0,0:00:01.00,0:00:03.96,Default,,0,0,0,,Overlap 1" in script_fixed
+    assert "Dialogue: 0,0:00:04.00,0:00:07.00,Default,,0,0,0,,Overlap 2" in script_fixed
 
 
 def test_video_duration_extraction():
@@ -81,3 +93,4 @@ def test_burn_in_dialog_ui(qapp):
     dlg.cb_size.setCurrentText("Grande")
     dlg.cb_box.setCurrentText("Caja sólida")
     assert dlg.cb_color.currentText() == "Amarillo"
+    assert dlg.chk_fix_overlaps.isChecked() is True

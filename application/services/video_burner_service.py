@@ -23,10 +23,10 @@ class BurnInOptions:
     font_color: str = "Blanco"  # "Blanco", "Amarillo", "Cian"
     box_style: str = "Caja semitransparente"  # "Sin fondo", "Caja semitransparente", "Caja sólida"
     quality_preset: str = "Alta calidad"  # "Alta calidad", "Rápido"
+    fix_overlaps: bool = True  # Ajusta tiempos automáticamente para evitar solapamientos
 
 
 class VideoBurnerService:
-    @staticmethod
     @staticmethod
     def _is_working_binary(path: str) -> bool:
         if not path or not os.path.isfile(path) or not os.access(path, os.X_OK):
@@ -113,17 +113,82 @@ class VideoBurnerService:
         return None
 
     @staticmethod
-    def generate_ass_script(items: List[SubtitleItem], options: BurnInOptions) -> str:
+    def get_video_dimensions(video_path: str, ffmpeg_path: Optional[str] = None) -> Tuple[int, int]:
         """
-        Genera el script ASS (Advanced SubStation Alpha) configurado con las opciones visuales.
+        Obtiene las dimensiones (ancho, alto) del archivo de vídeo.
+        Si no se detectan, devuelve (1920, 1080) por defecto.
         """
-        # Mapeo de tamaño
-        size_map = {
-            "Pequeño": 18,
-            "Mediano": 24,
-            "Grande": 32,
+        ffmpeg = ffmpeg_path or VideoBurnerService.get_ffmpeg_path()
+        if not ffmpeg or not os.path.exists(video_path):
+            return 1920, 1080
+
+        try:
+            cmd = [ffmpeg, "-i", video_path]
+            res = subprocess.run(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
+            )
+            match = re.search(r"Stream.*Video:.*,\s*(\d{2,5})x(\d{2,5})", res.stderr)
+            if match:
+                return int(match.group(1)), int(match.group(2))
+        except Exception:
+            pass
+
+        return 1920, 1080
+
+    @staticmethod
+    def generate_ass_script(
+        items: List[SubtitleItem],
+        options: BurnInOptions,
+        video_width: int = 1920,
+        video_height: int = 1080,
+    ) -> str:
+        """
+        Genera el script ASS (Advanced SubStation Alpha) configurado con las opciones visuales,
+        proporcional a la resolución del vídeo y corrigiendo solapamientos.
+        """
+        # 1. Sanitizar y corregir solapamientos temporales si está habilitado
+        processed_items: List[SubtitleItem] = []
+        if items:
+            sorted_items = sorted(items, key=lambda x: (x.start_ms, x.end_ms))
+            for i, it in enumerate(sorted_items):
+                s_ms = max(0, it.start_ms)
+                e_ms = max(s_ms + 250, it.end_ms)
+                processed_items.append(SubtitleItem(
+                    index=i + 1,
+                    start_ms=s_ms,
+                    end_ms=e_ms,
+                    text=it.text,
+                    style=it.style,
+                    extra=it.extra
+                ))
+
+            if options.fix_overlaps and len(processed_items) > 1:
+                for i in range(len(processed_items) - 1):
+                    curr_item = processed_items[i]
+                    next_item = processed_items[i + 1]
+                    if curr_item.end_ms > next_item.start_ms:
+                        if next_item.start_ms > curr_item.start_ms:
+                            # Acortar el actual dejando un respiro de 40ms antes del siguiente
+                            curr_item.end_ms = max(curr_item.start_ms + 200, next_item.start_ms - 40)
+
+        # 2. Resolución de referencia (PlayResX / PlayResY)
+        vw = max(320, video_width)
+        vh = max(240, video_height)
+
+        # Mapeo de tamaño proporcional a la altura del vídeo (evita subtítulos gigantes en cualquier resolución)
+        size_ratios = {
+            "Pequeño": 0.035,   # ~38px en 1080p, ~24px en 700p
+            "Mediano": 0.045,   # ~48px en 1080p, ~31px en 700p (legibilidad óptima estándar)
+            "Grande": 0.058,    # ~62px en 1080p, ~40px en 700p
         }
-        fontsize = size_map.get(options.font_size, 24)
+        ratio = size_ratios.get(options.font_size, 0.045)
+        fontsize = max(16, int(round(vh * ratio)))
 
         # Mapeo de color en formato ASS (&HAABBGGRR)
         color_map = {
@@ -133,24 +198,31 @@ class VideoBurnerService:
         }
         primary_color = color_map.get(options.font_color, "&H00FFFFFF")
 
+        # Márgenes proporcionales a la pantalla
+        margin_v = max(15, int(round(vh * 0.048)))
+        margin_lr = max(20, int(round(vw * 0.04)))
+
         # Mapeo de estilo de caja / fondo
         if options.box_style == "Sin fondo":
             # BorderStyle 1 = Outline + Drop Shadow
             border_style = 1
-            outline = 2
-            shadow = 1
-            back_color = "&H80000000"
+            outline = max(2, int(round(vh * 0.003)))
+            shadow = max(1, int(round(vh * 0.002)))
+            outline_color = "&H00000000"  # Contorno negro nítido
+            back_color = "&H80000000"     # Sombra semitransparente
         elif options.box_style == "Caja sólida":
-            # BorderStyle 3 = Opaque Box, BackColour con 90% opacidad (&H1A000000)
+            # BorderStyle 3 = Opaque Box (OutlineColour define el fondo de la caja)
             border_style = 3
-            outline = 4
+            outline = max(2, int(round(vh * 0.004)))
             shadow = 0
-            back_color = "&H1A000000"
+            outline_color = "&H00000000"  # Caja 100% opaca negra
+            back_color = "&H00000000"
         else:
-            # "Caja semitransparente" (por defecto, 50% opacidad &H80000000)
+            # "Caja semitransparente" (50% opacidad &H80000000)
             border_style = 3
-            outline = 4
+            outline = max(2, int(round(vh * 0.004)))
             shadow = 0
+            outline_color = "&H80000000"  # Caja semitransparente
             back_color = "&H80000000"
 
         header = f"""[Script Info]
@@ -159,16 +231,18 @@ ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
 YCbCr Matrix: TV.601
+PlayResX: {vw}
+PlayResY: {vh}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,sans-serif,{fontsize},{primary_color},&H000000FF,&H00000000,{back_color},-1,0,0,0,100,100,0,0,{border_style},{outline},{shadow},2,20,20,22,1
+Style: Default,sans-serif,{fontsize},{primary_color},&H000000FF,{outline_color},{back_color},0,0,0,0,100,100,0,0,{border_style},{outline},{shadow},2,{margin_lr},{margin_lr},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         events = []
-        for item in items:
+        for item in processed_items:
             clean_text = item.text or ""
             clean_text = clean_text.replace("<i>", r"{\i1}").replace("</i>", r"{\i0}")
             clean_text = clean_text.replace("<b>", r"{\b1}").replace("</b>", r"{\b0}")
@@ -234,9 +308,10 @@ class BurnInWorker(QThread):
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
 
-        # 1. Obtener duración del vídeo
+        # 1. Obtener duración y dimensiones del vídeo
         duration_ms = VideoBurnerService.get_video_duration_ms(self.video_path, ffmpeg_bin)
         duration_sec = (duration_ms / 1000.0) if duration_ms and duration_ms > 0 else None
+        vw, vh = VideoBurnerService.get_video_dimensions(self.video_path, ffmpeg_bin)
 
         # 2. Generar archivo ASS en directorio temporal
         temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
@@ -245,7 +320,9 @@ class BurnInWorker(QThread):
         stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
 
         try:
-            ass_content = VideoBurnerService.generate_ass_script(self.subtitle_items, self.options)
+            ass_content = VideoBurnerService.generate_ass_script(
+                self.subtitle_items, self.options, video_width=vw, video_height=vh
+            )
             with open(ass_path, "w", encoding="utf-8") as f:
                 f.write(ass_content)
 

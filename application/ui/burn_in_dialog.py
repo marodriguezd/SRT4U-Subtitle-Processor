@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
     QMessageBox,
+    QCheckBox,
 )
 
 from ..services.subtitle_service import SubtitleItem
@@ -200,6 +201,30 @@ class BurnInDialog(QDialog):
         self.cb_quality.setStyleSheet(self._combo_style())
         opt_layout.addWidget(self.cb_quality, 1, 3)
 
+        # Sincronización / Corrección de tiempos
+        self.chk_fix_overlaps = QCheckBox("Evitar solapamiento de tiempos entre subtítulos consecutivos")
+        self.chk_fix_overlaps.setChecked(True)
+        self.chk_fix_overlaps.setStyleSheet("""
+            QCheckBox {
+                color: #CBD5E1;
+                font-size: 11px;
+                font-weight: 500;
+                spacing: 6px;
+            }
+            QCheckBox::indicator {
+                width: 15px;
+                height: 15px;
+                border-radius: 4px;
+                border: 1px solid #475569;
+                background: #0F172A;
+            }
+            QCheckBox::indicator:checked {
+                background: #8B5CF6;
+                border-color: #A78BFA;
+            }
+        """)
+        opt_layout.addWidget(self.chk_fix_overlaps, 2, 0, 1, 4)
+
         layout.addWidget(opt_card)
 
         # 4. Live Preview Area
@@ -340,6 +365,7 @@ class BurnInDialog(QDialog):
             font_color=self.cb_color.currentText(),
             box_style=self.cb_box.currentText(),
             quality_preset=self.cb_quality.currentText(),
+            fix_overlaps=self.chk_fix_overlaps.isChecked(),
         )
 
         self.accept()

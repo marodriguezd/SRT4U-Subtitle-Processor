@@ -947,11 +947,13 @@ class VideoPreviewPlayer(QFrame):
             self.time_slider.setValue(pos)
         self._update_time_label(pos, self.player.duration())
 
-        active_text = ""
+        active_lines = []
         for item in self.current_subtitles:
             if item.start_ms <= pos <= item.end_ms:
-                active_text = item.text.replace("\n", " ").strip()
-                break
+                txt = item.text.strip()
+                if txt and txt not in active_lines:
+                    active_lines.append(txt)
+        active_text = "\n".join(active_lines)
 
         if active_text:
             self.sub_overlay.setText(active_text)
