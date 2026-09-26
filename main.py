@@ -15,6 +15,20 @@ def get_resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+def load_app_icon() -> QIcon:
+    """Load application icon with multi-platform fallbacks (PNG/SVG for Linux/Mac, ICO for Windows)."""
+    icon = QIcon()
+    png_path = get_resource_path(os.path.join("assets", "icon.png"))
+    if os.path.exists(png_path):
+        icon.addFile(png_path)
+    svg_path = get_resource_path(os.path.join("assets", "icon.svg"))
+    if os.path.exists(svg_path):
+        icon.addFile(svg_path)
+    ico_path = get_resource_path(os.path.join("assets", "icon.ico"))
+    if os.path.exists(ico_path):
+        icon.addFile(ico_path)
+    return icon
+
 if __name__ == '__main__':
     """
     Main execution block.
@@ -32,15 +46,21 @@ if __name__ == '__main__':
             os.environ['QT_XCB_GL_INTEGRATION'] = 'none'
 
     app = QApplication(sys.argv)
+    app.setApplicationName("SRT4U")
+    app.setApplicationDisplayName("SRT4U Subtitle Processor")
+    if hasattr(app, "setDesktopFileName"):
+        app.setDesktopFileName("srt4u")
     
-    # Set application icon
-    icon_path = get_resource_path(os.path.join("assets", "icon.ico"))
-    app.setWindowIcon(QIcon(icon_path))
+    # Set application icon (PNG/SVG prioritized on Linux, ICO on Windows)
+    app_icon = load_app_icon()
+    app.setWindowIcon(app_icon)
     
     # Optional: Set application-wide font
     font = QFont("Segoe UI", 10)
+    font.setStyleHint(QFont.StyleHint.SansSerif)
     app.setFont(font)
     
     processor = GlassMainWindow()
+    processor.setWindowIcon(app_icon)
     processor.show()
     sys.exit(app.exec())

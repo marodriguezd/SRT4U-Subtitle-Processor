@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=SRT4U
+GenericName=Subtitle Processor
+Comment=Subtitle Processor, Translator & Formatter
+Exec=python3 main.py
+Icon=assets/icon.png
+Terminal=false
+Type=Application
+Categories=AudioVideo;AudioVideoEditing;Utility;
+StartupWMClass=SRT4U
+Keywords=subtitle;srt;translate;video;audio;

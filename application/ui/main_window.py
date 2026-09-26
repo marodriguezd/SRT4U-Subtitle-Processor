@@ -5,7 +5,7 @@ import sys
 import time
 from typing import Optional, List
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QSize
 from PyQt6.QtGui import QIcon, QFont, QDesktopServices
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .styles import Styles
+from .icons import Icons
 from .widgets import (
     ModernToggle,
     DropZone,
@@ -191,21 +192,23 @@ class MainWindow(QMainWindow):
         # Nav Buttons
         self.nav_buttons: List[QPushButton] = []
         nav_items = [
-            ("🏠", "nav.home", 0),
-            ("🌐", "nav.translate", 1),
-            ("✨", "nav.clean", 2),
-            ("🔄", "nav.convert", 3),
-            ("📁", "nav.batch", 4),
-            ("⚙️", "nav.settings", 5),
-            ("ℹ️", "nav.about", 7),
+            ("home", "nav.home", 0),
+            ("translate", "nav.translate", 1),
+            ("clean", "nav.clean", 2),
+            ("convert", "nav.convert", 3),
+            ("batch", "nav.batch", 4),
+            ("settings", "nav.settings", 5),
+            ("about", "nav.about", 7),
         ]
 
-        for icon, key, page_idx in nav_items:
-            btn = QPushButton(f"{icon}  {t(key)}")
+        for icon_name, key, page_idx in nav_items:
+            btn = QPushButton(f"  {t(key)}")
             btn.setProperty("class", "nav-btn")
             btn.setProperty("page_index", page_idx)
-            btn.setProperty("icon_emoji", icon)
+            btn.setProperty("icon_name", icon_name)
             btn.setProperty("i18n_key", key)
+            btn.setIcon(Icons.get_icon(icon_name, size=18))
+            btn.setIconSize(QSize(18, 18))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked, idx=page_idx: self._switch_page(idx))
             layout.addWidget(btn)
@@ -219,6 +222,10 @@ class MainWindow(QMainWindow):
         for btn in self.nav_buttons:
             is_active = (btn.property("page_index") == page_index)
             btn.setProperty("active", "true" if is_active else "false")
+            icon_name = btn.property("icon_name")
+            if icon_name:
+                color = Icons.DEFAULT_ACTIVE if is_active else Icons.DEFAULT_MUTED
+                btn.setIcon(Icons.get_icon(icon_name, normal_color=color, active_color=Icons.DEFAULT_ACTIVE, size=18))
             btn.style().unpolish(btn)
             btn.style().polish(btn)
 
@@ -228,7 +235,10 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self):
         self.central_widget.setStyleSheet(Styles.get_main_style(self.dark_mode))
-        self.btn_theme.setText("☀️" if self.dark_mode else "🌙")
+        if hasattr(self, "btn_theme"):
+            self.btn_theme.setIcon(Icons.get_icon("sun" if self.dark_mode else "moon", normal_color="#F8FAFC", active_color="#F8FAFC", size=18))
+            self.btn_theme.setIconSize(QSize(18, 18))
+        self._switch_page(self.stack.currentIndex())
 
     # ------------------ PÁGINA: INICIO ------------------
     def _build_home_page(self) -> QWidget:
@@ -291,7 +301,9 @@ class MainWindow(QMainWindow):
             self.cb_top_lang.setCurrentIndex(top_idx)
         self.cb_top_lang.currentIndexChanged.connect(self._on_top_lang_changed)
 
-        self.btn_theme = QPushButton("☀️")
+        self.btn_theme = QPushButton()
+        self.btn_theme.setIcon(Icons.get_icon("sun" if self.dark_mode else "moon", normal_color="#F8FAFC", active_color="#F8FAFC", size=18))
+        self.btn_theme.setIconSize(QSize(18, 18))
         self.btn_theme.setFixedSize(38, 38)
         self.btn_theme.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_theme.setStyleSheet("""
@@ -430,7 +442,7 @@ class MainWindow(QMainWindow):
 
         header_text = QVBoxLayout()
         header_text.setSpacing(2)
-        self.lbl_preview_title = QLabel("🎬 " + t("preview.title"))
+        self.lbl_preview_title = QLabel(t("preview.title"))
         self.lbl_preview_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #F8FAFC;")
         self.lbl_preview_sub = QLabel(t("preview.subtitle"))
         self.lbl_preview_sub.setStyleSheet("font-size: 12px; color: #94A3B8;")
@@ -442,15 +454,18 @@ class MainWindow(QMainWindow):
 
         self.btn_open_orig = QPushButton(t("preview.btn_open"))
         self.btn_open_orig.setProperty("class", "secondary-btn")
+        self.btn_open_orig.setIcon(Icons.get_icon("folder", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=16))
         self.btn_open_orig.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_orig.clicked.connect(self._browse_preview_file)
 
         self.btn_export = QPushButton(t("preview.btn_save"))
         self.btn_export.setObjectName("PrimaryBtn")
+        self.btn_export.setIcon(Icons.get_icon("file", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.clicked.connect(self._export_result_file)
 
         self.btn_burn_in = QPushButton(t("preview.btn_burn"))
+        self.btn_burn_in.setIcon(Icons.get_icon("zap", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_burn_in.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_burn_in.setStyleSheet("""
             QPushButton {
@@ -606,6 +621,7 @@ class MainWindow(QMainWindow):
 
         self.btn_fast_clean = QPushButton(t("clean.btn_clean"))
         self.btn_fast_clean.setObjectName("PrimaryBtn")
+        self.btn_fast_clean.setIcon(Icons.get_icon("clean", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_fast_clean.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_fast_clean.setMinimumHeight(46)
         self.btn_fast_clean.clicked.connect(self._start_fast_clean)
@@ -652,6 +668,7 @@ class MainWindow(QMainWindow):
 
         self.btn_run_convert = QPushButton(t("convert.btn_convert"))
         self.btn_run_convert.setObjectName("PrimaryBtn")
+        self.btn_run_convert.setIcon(Icons.get_icon("convert", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_run_convert.setMinimumHeight(46)
         self.btn_run_convert.clicked.connect(self._run_format_conversion)
         layout.addWidget(self.btn_run_convert)
@@ -680,10 +697,12 @@ class MainWindow(QMainWindow):
         btn_layout = QHBoxLayout()
         self.btn_add_batch = QPushButton(t("batch.btn_add"))
         self.btn_add_batch.setProperty("class", "secondary-btn")
+        self.btn_add_batch.setIcon(Icons.get_icon("folder", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=16))
         self.btn_add_batch.clicked.connect(self._add_batch_files)
 
         self.btn_clear_batch = QPushButton(t("batch.btn_clear"))
         self.btn_clear_batch.setProperty("class", "secondary-btn")
+        self.btn_clear_batch.setIcon(Icons.get_icon("close", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=16))
         self.btn_clear_batch.clicked.connect(self._clear_batch_table)
 
         btn_layout.addWidget(self.btn_add_batch)
@@ -705,6 +724,7 @@ class MainWindow(QMainWindow):
 
         self.btn_start_batch = QPushButton(t("batch.btn_start"))
         self.btn_start_batch.setObjectName("PrimaryBtn")
+        self.btn_start_batch.setIcon(Icons.get_icon("zap", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_start_batch.setMinimumHeight(46)
         self.btn_start_batch.clicked.connect(self._run_batch_processing)
         layout.addWidget(self.btn_start_batch)
@@ -814,6 +834,7 @@ class MainWindow(QMainWindow):
 
         self.btn_save_settings = QPushButton(t("settings.btn_save"))
         self.btn_save_settings.setObjectName("PrimaryBtn")
+        self.btn_save_settings.setIcon(Icons.get_icon("check", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_save_settings.setMinimumHeight(46)
         self.btn_save_settings.clicked.connect(self._save_settings)
         layout.addWidget(self.btn_save_settings)
@@ -834,8 +855,8 @@ class MainWindow(QMainWindow):
 
         header_layout = QHBoxLayout()
         header_layout.setSpacing(14)
-        check_icon = QLabel("✅")
-        check_icon.setStyleSheet("font-size: 34px;")
+        check_icon = QLabel()
+        check_icon.setPixmap(Icons.get_pixmap("check", color=Icons.DEFAULT_SUCCESS, size=34))
         
         text_layout = QVBoxLayout()
         self.lbl_completed_title = QLabel(t("completed.title"))
@@ -853,9 +874,9 @@ class MainWindow(QMainWindow):
         # 3 Tarjetas de métricas
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(14)
-        self.card_lines = MetricCard("📄", "0", t("completed.card_lines"))
-        self.card_deleted = MetricCard("✨", "0", t("completed.card_deleted"))
-        self.card_time = MetricCard("⏱️", "00:00", t("completed.card_time"))
+        self.card_lines = MetricCard("file", "0", t("completed.card_lines"))
+        self.card_deleted = MetricCard("clean", "0", t("completed.card_deleted"))
+        self.card_time = MetricCard("clock", "00:00", t("completed.card_time"))
         cards_layout.addWidget(self.card_lines)
         cards_layout.addWidget(self.card_deleted)
         cards_layout.addWidget(self.card_time)
@@ -866,14 +887,17 @@ class MainWindow(QMainWindow):
         btn_row.setSpacing(12)
         self.btn_open_file = QPushButton(t("completed.btn_open_file"))
         self.btn_open_file.setObjectName("PrimaryBtn")
+        self.btn_open_file.setIcon(Icons.get_icon("file", normal_color="#FFFFFF", active_color="#FFFFFF", size=16))
         self.btn_open_file.clicked.connect(self._open_saved_file)
 
         self.btn_open_folder = QPushButton(t("completed.btn_open_folder"))
         self.btn_open_folder.setProperty("class", "secondary-btn")
+        self.btn_open_folder.setIcon(Icons.get_icon("folder", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=16))
         self.btn_open_folder.clicked.connect(self._open_output_folder)
 
         self.btn_to_preview = QPushButton(t("completed.btn_to_preview"))
         self.btn_to_preview.setProperty("class", "secondary-btn")
+        self.btn_to_preview.setIcon(Icons.get_icon("translate", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=16))
         self.btn_to_preview.clicked.connect(lambda: self._switch_page(1))
 
         btn_row.addWidget(self.btn_open_file)
@@ -1368,7 +1392,7 @@ class MainWindow(QMainWindow):
         d_layout.setContentsMargins(24, 20, 24, 20)
         d_layout.setSpacing(12)
 
-        dev_title = QLabel("👨‍💻 " + t("about.author_title"))
+        dev_title = QLabel(t("about.author_title"))
         dev_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
         self.lbl_dev_title = dev_title
         d_layout.addWidget(dev_title)
@@ -1390,6 +1414,7 @@ class MainWindow(QMainWindow):
 
         btn_github = QPushButton(t("about.btn_profile") + " (@marodriguezd)")
         btn_github.setStyleSheet(self._btn_link_style())
+        btn_github.setIcon(Icons.get_icon("external_link", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=14))
         btn_github.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_github.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd")))
         self.btn_github = btn_github
@@ -1397,6 +1422,7 @@ class MainWindow(QMainWindow):
 
         btn_repo = QPushButton(t("about.btn_repo") + " (SRT4U)")
         btn_repo.setStyleSheet(self._btn_link_style())
+        btn_repo.setIcon(Icons.get_icon("external_link", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=14))
         btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd/SRT4U-Subtitle-Processor")))
         self.btn_repo = btn_repo
@@ -1414,7 +1440,7 @@ class MainWindow(QMainWindow):
         l_layout.setContentsMargins(24, 20, 24, 20)
         l_layout.setSpacing(12)
 
-        lic_title = QLabel("⚖️ " + t("about.license_title"))
+        lic_title = QLabel(t("about.license_title"))
         lic_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
         self.lbl_lic_title = lic_title
         l_layout.addWidget(lic_title)
@@ -1455,6 +1481,7 @@ class MainWindow(QMainWindow):
         lic_btn_row.setSpacing(12)
         btn_view_lic = QPushButton(t("about.btn_open_license"))
         btn_view_lic.setStyleSheet(self._btn_link_style())
+        btn_view_lic.setIcon(Icons.get_icon("file", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=14))
         btn_view_lic.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_view_lic.clicked.connect(self._open_license_file)
         self.btn_open_license = btn_view_lic
@@ -1462,6 +1489,7 @@ class MainWindow(QMainWindow):
 
         btn_cc_web = QPushButton(t("about.btn_web_deed"))
         btn_cc_web.setStyleSheet(self._btn_link_style())
+        btn_cc_web.setIcon(Icons.get_icon("globe", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=14))
         btn_cc_web.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_cc_web.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/deed.es")))
         self.btn_web_deed = btn_cc_web
@@ -1502,10 +1530,9 @@ class MainWindow(QMainWindow):
     def retranslate_ui(self):
         # 1. Sidebar Nav
         for btn in self.nav_buttons:
-            icon = btn.property("icon_emoji")
             key = btn.property("i18n_key")
-            if key and icon:
-                btn.setText(f"{icon}  {t(key)}")
+            if key:
+                btn.setText(f"  {t(key)}")
 
         # 2. Home Page
         if hasattr(self, "lbl_home_title"):
@@ -1523,7 +1550,7 @@ class MainWindow(QMainWindow):
 
         # 3. Preview / Studio Page
         if hasattr(self, "lbl_preview_title"):
-            self.lbl_preview_title.setText("🎬 " + t("preview.title"))
+            self.lbl_preview_title.setText(t("preview.title"))
             self.lbl_preview_sub.setText(t("preview.subtitle"))
             self.btn_open_orig.setText(t("preview.btn_open"))
             self.btn_export.setText(t("preview.btn_save"))
@@ -1597,10 +1624,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "lbl_about_status"):
             self.lbl_about_status.setText(t("about.status"))
             self.lbl_about_desc.setText(t("about.desc"))
-            self.lbl_dev_title.setText("👨‍💻 " + t("about.author_title"))
+            self.lbl_dev_title.setText(t("about.author_title"))
             self.btn_github.setText(t("about.btn_profile") + " (@marodriguezd)")
             self.btn_repo.setText(t("about.btn_repo") + " (SRT4U)")
-            self.lbl_lic_title.setText("⚖️ " + t("about.license_title"))
+            self.lbl_lic_title.setText(t("about.license_title"))
             self.lbl_lic_name.setText(t("about.license_name"))
             self.lbl_lic_desc.setText(
                 f"• <b>{t('about.perm_title')}:</b> {t('about.perm_1')}<br>"

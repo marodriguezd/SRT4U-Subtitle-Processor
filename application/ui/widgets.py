@@ -25,6 +25,7 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from .styles import Styles
+from .icons import Icons
 from ..services.subtitle_service import SubtitleItem
 from ..services.i18n_service import t, get_i18n
 
@@ -259,9 +260,9 @@ class DropZone(QFrame):
         layout.setSpacing(6)
 
         # Icono de carpeta estilizado
-        self.icon_badge = QLabel("📁")
+        self.icon_badge = QLabel()
         self.icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.icon_badge.setStyleSheet("font-size: 34px; color: #818CF8; background: transparent;")
+        self.icon_badge.setStyleSheet("background: transparent;")
 
         self.title_label = QLabel()
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -283,7 +284,7 @@ class DropZone(QFrame):
 
     def retranslate(self):
         if not self.current_subtitle_path:
-            self.icon_badge.setText("📁")
+            self.icon_badge.setPixmap(Icons.get_pixmap("folder", color="#818CF8", size=42))
             self.title_label.setText(t("dropzone.title"))
             self.sub_label.setText(t("dropzone.subtitle"))
             self.sub_label.setStyleSheet("font-size: 13px; color: #94A3B8; background: transparent;")
@@ -291,7 +292,7 @@ class DropZone(QFrame):
         else:
             filename = os.path.basename(self.current_subtitle_path)
             size_kb = os.path.getsize(self.current_subtitle_path) / 1024 if os.path.exists(self.current_subtitle_path) else 0
-            self.icon_badge.setText("📄")
+            self.icon_badge.setPixmap(Icons.get_pixmap("file", color="#38BDF8", size=42))
             self.title_label.setText(filename)
             status_text = t("dropzone.size", size=size_kb)
             if self.current_video_path:
@@ -383,11 +384,12 @@ class MetricCard(QFrame):
         self.setObjectName("CardContainer")
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
 
-        icon_lbl = QLabel(icon_str)
-        icon_lbl.setStyleSheet("font-size: 22px; color: #6366F1;")
-        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_lbl = QLabel()
+        self.icon_lbl.setStyleSheet("background: transparent;")
+        self.icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.set_icon(icon_str)
 
         self.value_lbl = QLabel(value_str)
         self.value_lbl.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
@@ -397,9 +399,28 @@ class MetricCard(QFrame):
         self.desc_lbl.setStyleSheet("font-size: 12px; color: #94A3B8;")
         self.desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        layout.addWidget(icon_lbl)
+        layout.addWidget(self.icon_lbl)
         layout.addWidget(self.value_lbl)
         layout.addWidget(self.desc_lbl)
+
+    def set_icon(self, icon_str: str):
+        mapping = {
+            "file": "file",
+            "📄": "file",
+            "clean": "clean",
+            "✨": "clean",
+            "clock": "clock",
+            "⏱️": "clock",
+            "⏱": "clock",
+            "zap": "zap",
+            "⚡": "zap",
+            "check": "check",
+            "✅": "check",
+            "folder": "folder",
+            "📁": "folder",
+        }
+        icon_name = mapping.get(icon_str, "file")
+        self.icon_lbl.setPixmap(Icons.get_pixmap(icon_name, color="#818CF8", size=24))
 
     def set_value(self, val: str):
         self.value_lbl.setText(val)

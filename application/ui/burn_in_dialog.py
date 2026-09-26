@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 from ..services.subtitle_service import SubtitleItem
 from ..services.video_burner_service import BurnInOptions, BurnInWorker, VideoBurnerService
 from ..services.i18n_service import t
+from .icons import Icons
 
 
 class BurnInDialog(QDialog):
@@ -102,8 +103,9 @@ class BurnInDialog(QDialog):
         self.txt_video = QLineEdit(self.video_path)
         self.txt_video.setPlaceholderText("...")
         self.txt_video.setStyleSheet(self._input_style())
-        btn_browse_vid = QPushButton("📁 " + t("burn.btn_browse"))
+        btn_browse_vid = QPushButton(t("burn.btn_browse"))
         btn_browse_vid.setStyleSheet(self._btn_secondary_style())
+        btn_browse_vid.setIcon(Icons.get_icon("folder", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=15))
         btn_browse_vid.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_browse_vid.clicked.connect(self._browse_video)
         v_row.addWidget(self.txt_video, stretch=1)
@@ -127,8 +129,9 @@ class BurnInDialog(QDialog):
         self.txt_output = QLineEdit(default_out)
         self.txt_output.setPlaceholderText("...")
         self.txt_output.setStyleSheet(self._input_style())
-        btn_browse_out = QPushButton("📁 " + t("burn.btn_browse"))
+        btn_browse_out = QPushButton(t("burn.btn_browse"))
         btn_browse_out.setStyleSheet(self._btn_secondary_style())
+        btn_browse_out.setIcon(Icons.get_icon("folder", normal_color=Icons.DEFAULT_MUTED, active_color="#FFFFFF", size=15))
         btn_browse_out.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_browse_out.clicked.connect(self._browse_output)
         o_row.addWidget(self.txt_output, stretch=1)
@@ -563,11 +566,13 @@ class BurnInProgressModal(QDialog):
             }
             QPushButton:hover { background: #059669; }
         """)
+        self.btn_play.setIcon(Icons.get_icon("play", normal_color="#FFFFFF", active_color="#FFFFFF", size=15))
         self.btn_play.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_play.clicked.connect(self._open_video)
         self.btn_play.hide()
 
-        self.btn_folder = QPushButton("📁 Abrir carpeta")
+        self.btn_folder = QPushButton("Abrir carpeta")
+        self.btn_folder.setIcon(Icons.get_icon("folder", normal_color="#F8FAFC", active_color="#FFFFFF", size=15))
         self.btn_folder.setStyleSheet("""
             QPushButton {
                 background: #1E293B;
@@ -628,7 +633,7 @@ class BurnInProgressModal(QDialog):
     def _on_success(self, output_path: str):
         self._is_completed = True
         self.progress_bar.setValue(100)
-        self.lbl_title.setText("✅ ¡Subtítulos incrustados con éxito!")
+        self.lbl_title.setText("¡Subtítulos incrustados con éxito!")
         self.lbl_title.setStyleSheet("font-size: 16px; font-weight: 800; color: #10B981;")
         self.lbl_status.setText(f"Archivo generado:\n{os.path.basename(output_path)}")
         self.lbl_speed.hide()
@@ -640,7 +645,7 @@ class BurnInProgressModal(QDialog):
         self.btn_close.show()
 
     def _on_failed(self, error_msg: str):
-        self.lbl_title.setText("❌ Error al incrustar subtítulos")
+        self.lbl_title.setText("Error al incrustar subtítulos")
         self.lbl_title.setStyleSheet("font-size: 16px; font-weight: 800; color: #EF4444;")
         self.lbl_status.setText("Se produjo un error durante el proceso de codificación.")
         self.btn_cancel.setText("Cerrar")

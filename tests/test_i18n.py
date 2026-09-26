@@ -71,8 +71,10 @@ def test_main_window_i18n_switching(qapp):
     # Switch to English
     win.cb_top_lang.setCurrentIndex(win.cb_top_lang.findData("en"))
     assert win.i18n.current_language == "en"
-    assert win.nav_buttons[0].text().strip() == "🏠  Home"
-    assert win.btn_fast_clean.text().strip() == "🧹 Clean File Now"
+    assert win.nav_buttons[0].text().strip() == "Home"
+    assert not win.nav_buttons[0].icon().isNull()
+    assert win.btn_fast_clean.text().strip() == "Clean File Now"
+    assert not win.btn_fast_clean.icon().isNull()
 
     # Verify settings combo is synchronized
     assert win.cb_settings_lang.currentData() == "en"
@@ -80,18 +82,24 @@ def test_main_window_i18n_switching(qapp):
     # Switch to Spanish via settings combo
     win.cb_settings_lang.setCurrentIndex(win.cb_settings_lang.findData("es"))
     assert win.i18n.current_language == "es"
-    assert win.nav_buttons[0].text().strip() == "🏠  Inicio"
-    assert win.btn_fast_clean.text().strip() == "🧹 Limpiar archivo ahora"
+    assert win.nav_buttons[0].text().strip() == "Inicio"
+    assert not win.nav_buttons[0].icon().isNull()
+    assert win.btn_fast_clean.text().strip() == "Limpiar archivo ahora"
+    assert not win.btn_fast_clean.icon().isNull()
     assert win.cb_top_lang.currentData() == "es"
 
     # Switch to German
     win.cb_top_lang.setCurrentIndex(win.cb_top_lang.findData("de"))
     assert win.i18n.current_language == "de"
-    assert win.nav_buttons[0].text().strip() == "🏠  Startseite"
-    assert win.btn_fast_clean.text().strip() == "🧹 Datei jetzt bereinigen"
+    assert win.nav_buttons[0].text().strip() == "Startseite"
+    assert not win.nav_buttons[0].icon().isNull()
+    assert win.btn_fast_clean.text().strip() == "Datei jetzt bereinigen"
+    assert not win.btn_fast_clean.icon().isNull()
 
     # Switch to Chinese
     win.cb_top_lang.setCurrentIndex(win.cb_top_lang.findData("zh-CN"))
     assert win.i18n.current_language == "zh-CN"
-    assert win.nav_buttons[0].text().strip() == "🏠  首页"
-    assert win.btn_fast_clean.text().strip() == "🧹 立即清理文件"
+    assert win.nav_buttons[0].text().strip() == "首页"
+    assert not win.nav_buttons[0].icon().isNull()
+    assert win.btn_fast_clean.text().strip() == "立即清理文件"
+    assert not win.btn_fast_clean.icon().isNull()
