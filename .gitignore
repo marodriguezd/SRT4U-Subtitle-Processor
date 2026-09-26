@@ -42,3 +42,4 @@ settings.json
 *_converted.*
 tests/fixtures/*_converted.*
 tests/fixtures/*_processed.*
+release_backup/

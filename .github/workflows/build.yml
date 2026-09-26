@@ -216,17 +216,35 @@ jobs:
     needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
 
+      - name: Prepare Assets & Generate Checksums
+        run: |
+          mkdir -p release-dist
+          cp release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe release-dist/
+          cp release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.AppImage release-dist/
+          cp release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.tar.gz release-dist/
+          cp release-artifacts/SRT4U-macOS/SRT4U-macOS.dmg release-dist/
+          cd release-dist
+          sha256sum SRT4U-* > checksums.txt
+          echo "Generated Checksums:"
+          cat checksums.txt
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "SRT4U ${{ github.ref_name }} — Subtitle Processor & Translator"
+          body_path: RELEASE_NOTES.md
           files: |
-            release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe
-            release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.AppImage
-            release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.tar.gz
-            release-artifacts/SRT4U-macOS/SRT4U-macOS.dmg
-          generate_release_notes: true
+            release-dist/SRT4U-Windows-x64.exe
+            release-dist/SRT4U-Linux-x86_64.AppImage
+            release-dist/SRT4U-Linux-x86_64.tar.gz
+            release-dist/SRT4U-macOS.dmg
+            release-dist/checksums.txt
+
