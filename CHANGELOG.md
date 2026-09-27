@@ -7,12 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- **End-to-End Suite on Real Media**: `tests/test_e2e_real_media.py` (26 tests, 21 app areas) exercises the whole application against a real 1-minute 1920×1080/60 fps video and its 25-cue SRT — reading, cleaning, free Google translation (online and offline branches), the six-step pipeline, all four output formats, FFmpeg metadata, ASS generation for every style combination, a full-minute hardsub validated **pixel by pixel** (subtitle band verified, the source's 30–31 s gap verified empty), broken-video error handling, the preview player and its synchronized overlay, and every UI page (process, convert, clean, batch, burn-in dialog, settings persistence, all 6 UI languages). The media is located via `SRT4U_E2E_MEDIA` and the whole module skips when absent, so CI stays green without it.
-
 ## [1.1.0] - 2026-09-27
 
 ### Added
+- **End-to-End Suite on Real Media**: `tests/test_e2e_real_media.py` (26 tests, 21 app areas) exercises the whole application against a real 1-minute 1920×1080/60 fps video and its 25-cue SRT — reading, cleaning, free Google translation (online and offline branches), the six-step pipeline, all four output formats, FFmpeg metadata, ASS generation for every style combination, a full-minute hardsub validated **pixel by pixel** (subtitle band verified, the source's 30–31 s gap verified empty), broken-video error handling, the preview player and its synchronized overlay, and every UI page (process, convert, clean, batch, burn-in dialog, settings persistence, all 6 UI languages). The media is located via `SRT4U_E2E_MEDIA` and the whole module skips when absent, so CI stays green without it.
 - **Layout Regression Suite**: 54 offscreen UI tests (`tests/test_ui_layout.py`) covering clipped-text detection across all 8 pages, burn-in dialog fit, ×1.5 scaled-font variants for the settings/about pages and all progress dialogs, and a `minimumSize >= minimumSizeHint` invariant for every app dialog in all 6 UI languages and both themes.
 - **Dynamic Dialog Minimum Sizing**: New `Styles.sync_minimum_size()` helper keeps every dialog's declared minimum size in sync with its real content (`ensurePolished` + layout activation + `minimumSizeHint`), with design floors as lower bounds; applied to `BurnInDialog`, `BurnInProgressModal`, and `ProgressModal` (replacing fixed sizing).
 - **Centralized Multiplatform Helpers**: New `application/platform_utils.py` (`open_path`, `reveal_path`) replacing five duplicated platform-dispatch blocks.

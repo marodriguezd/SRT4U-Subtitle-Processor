@@ -1,6 +1,6 @@
 ## What's New in 1.1.0
 
-> ⚠️ **Pre-release**: this is a quality-focused pre-release. It contains no new end-user features; it hardens the 1.0.0 codebase ahead of the next feature release.
+> This is a quality-focused release. It contains no new end-user features; it hardens the 1.0.0 codebase ahead of the next feature release.
 
 ### Highlights
 
