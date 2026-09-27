@@ -1,8 +1,8 @@
-# application/services/translation_service.py
 """
 Servicio unificado de traducción con soporte para Google Translate, DeepL y LLMs (OpenAI / Ollama).
 Incluye fallback autónomo con urllib estándar sin depender obligatoriamente de librerías externas.
 """
+
 import json
 import urllib.request
 import urllib.parse
@@ -11,6 +11,7 @@ from .config_service import ConfigService
 
 try:
     from deep_translator import GoogleTranslator
+
     HAS_DEEP_TRANSLATOR = True
 except ImportError:
     HAS_DEEP_TRANSLATOR = False
@@ -22,16 +23,16 @@ class TranslationService:
     """
 
     SUPPORTED_LANGUAGES: List[Dict[str, str]] = [
-        {"code": "es", "name": "Español", "flag": "🇪🇸"},
-        {"code": "en", "name": "English", "flag": "🇬🇧"},
-        {"code": "fr", "name": "Français", "flag": "🇫🇷"},
-        {"code": "de", "name": "Deutsch", "flag": "🇩🇪"},
-        {"code": "it", "name": "Italiano", "flag": "🇮🇹"},
-        {"code": "pt", "name": "Português", "flag": "🇵🇹"},
-        {"code": "ja", "name": "日本語 (Japanese)", "flag": "🇯🇵"},
-        {"code": "ko", "name": "한국어 (Korean)", "flag": "🇰🇷"},
-        {"code": "zh-CN", "name": "简体中文 (Chinese)", "flag": "🇨🇳"},
-        {"code": "ru", "name": "Русский (Russian)", "flag": "🇷🇺"},
+        {"code": "es", "name": "Español"},
+        {"code": "en", "name": "English"},
+        {"code": "fr", "name": "Français"},
+        {"code": "de", "name": "Deutsch"},
+        {"code": "it", "name": "Italiano"},
+        {"code": "pt", "name": "Português"},
+        {"code": "ja", "name": "日本語 (Japanese)"},
+        {"code": "ko", "name": "한국어 (Korean)"},
+        {"code": "zh-CN", "name": "简体中文 (Chinese)"},
+        {"code": "ru", "name": "Русский (Russian)"},
     ]
 
     def __init__(self, config_service: Optional[ConfigService] = None):
@@ -76,13 +77,14 @@ class TranslationService:
             encoded_text = urllib.parse.quote(text)
             url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={src}&tl={target}&dt=t&q={encoded_text}"
             req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 if data and isinstance(data[0], list):
-                    return "".join(segment[0] for segment in data[0] if segment and segment[0])
+                    return "".join(
+                        segment[0] for segment in data[0] if segment and segment[0]
+                    )
         except Exception:
             pass
 
@@ -94,7 +96,11 @@ class TranslationService:
             return self._translate_google(text, target, source)
 
         is_pro = self.config_service.get("deepl_type", "free") == "pro"
-        url = "https://api.deepl.com/v2/translate" if is_pro else "https://api-free.deepl.com/v2/translate"
+        url = (
+            "https://api.deepl.com/v2/translate"
+            if is_pro
+            else "https://api-free.deepl.com/v2/translate"
+        )
 
         target_code = target.upper()
         if target_code == "EN":
@@ -129,7 +135,9 @@ class TranslationService:
 
     def _translate_openai(self, text: str, target: str, source: str) -> str:
         api_key = self.config_service.get("openai_api_key", "").strip()
-        base_url = self.config_service.get("openai_base_url", "https://api.openai.com/v1").rstrip("/")
+        base_url = self.config_service.get(
+            "openai_base_url", "https://api.openai.com/v1"
+        ).rstrip("/")
         model = self.config_service.get("openai_model", "gpt-4o-mini")
 
         if not api_key and "localhost" not in base_url and "127.0.0.1" not in base_url:
@@ -153,9 +161,9 @@ class TranslationService:
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
+                {"role": "user", "content": text},
             ],
-            "temperature": 0.2
+            "temperature": 0.2,
         }
 
         data = json.dumps(payload).encode("utf-8")

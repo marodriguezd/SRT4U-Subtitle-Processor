@@ -1,3 +1,20 @@
+## What's New in 1.1.0
+
+> ⚠️ **Pre-release**: this is a quality-focused pre-release. It contains no new end-user features; it hardens the 1.0.0 codebase ahead of the next feature release.
+
+### Highlights
+
+- **Audited & Remediated Codebase**: a full read-only audit (~58 findings) was remediated end to end — dead code removed, ~65 hardcoded UI strings migrated to the i18n catalog, palette and file-dialog filters centralized, and ineffective tests repaired.
+- **UI Robustness Across Languages & Themes**: a new 54-case layout regression suite verifies that no label or button clips its text in any of the 6 UI languages, in both dark and light themes, including ×1.5 scaled-font checks for the settings/about pages and all progress dialogs.
+- **Light Theme Fixed**: text colors are now theme-aware, eliminating white-on-white labels in light mode (WCAG contrast ≥ 3.0 verified offscreen).
+- **Dialogs That Always Fit**: burn-in and progress dialogs now derive their minimum size from their real content, so they can always be resized large enough in every language (620–684 px wide depending on locale).
+- **Emoji-Free Interface**: all emoji and bitmap glyph usage in the UI was replaced with crisp recolorable SVG icons, per the project's design rules.
+- **Quality Gates in CI**: the test job now runs a pinned ruff lint (shared `ruff.toml`), a `ruff format --check`, a screenshot-tool smoke test, and the full 84-test suite before any platform build is produced.
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete list of changes.
+
+---
+
 ## Overview
 
 SRT4U is a standalone, cross-platform desktop application for processing, translating, editing, and burning subtitles into video files. It bundles all core dependencies—including a static build of FFmpeg—into self-contained packages requiring no external runtime installation.

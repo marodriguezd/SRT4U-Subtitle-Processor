@@ -16,9 +16,7 @@ def sub_service(trans_service):
 def test_free_google_translation(trans_service):
     # Prueba la traducción usando la capa gratuita (GoogleTranslate)
     translated = trans_service.translate_text(
-        text="Hello world",
-        target_language="es",
-        engine="google"
+        text="Hello world", target_language="es", engine="google"
     )
     assert translated is not None
     assert len(translated) > 0
@@ -34,34 +32,32 @@ def test_parallel_vs_sequential_subtitles_translation(sub_service):
 
     # Ejecución paralela
     res_parallel = sub_service.translate_subtitles(
-        items=items,
-        target_language="es",
-        engine="google",
-        parallel=True
+        items=items, target_language="es", engine="google", parallel=True
     )
     assert len(res_parallel) == 2
     assert res_parallel[0].text != "Good morning."
-    assert "buen" in res_parallel[0].text.lower() or "día" in res_parallel[0].text.lower()
+    assert (
+        "buen" in res_parallel[0].text.lower() or "día" in res_parallel[0].text.lower()
+    )
 
     # Ejecución secuencial
     res_seq = sub_service.translate_subtitles(
-        items=items,
-        target_language="es",
-        engine="google",
-        parallel=False
+        items=items, target_language="es", engine="google", parallel=False
     )
     assert len(res_seq) == 2
     assert "gracias" in res_seq[1].text.lower() or "muchas" in res_seq[1].text.lower()
 
 
-def test_translation_fallback_offline_resilience(trans_service):
-    # Prueba que un error de red o timeout no rompe la ejecución sino que retorna el texto base de forma segura
-    class MockFailingService(TranslationService):
-        def _translate_google(self, text, target, source):
-            raise ConnectionError("Simulated offline network")
+def test_translation_fallback_offline_resilience(trans_service, monkeypatch):
+    # Un error de red no debe romper la ejecución: el servicio devuelve el texto base
+    import application.services.translation_service as ts
 
-    failing = MockFailingService()
-    try:
-        failing.translate_text("Safe text", "es", "auto", "google")
-    except Exception:
-        pass
+    monkeypatch.setattr(ts, "HAS_DEEP_TRANSLATOR", False)
+
+    def _raise_offline(*args, **kwargs):
+        raise ConnectionError("Simulated offline network")
+
+    monkeypatch.setattr(ts.urllib.request, "urlopen", _raise_offline)
+
+    result = trans_service.translate_text("Safe text", "es", "auto", "google")
+    assert result == "Safe text"

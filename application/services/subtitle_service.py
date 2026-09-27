@@ -1,4 +1,3 @@
-# application/services/subtitle_service.py
 import re
 import os
 import time
@@ -121,7 +120,11 @@ class SubtitleService:
         r"(?i)<font[^>]*>.*?</font>",
     ]
 
-    def __init__(self, translation_service: Optional[TranslationService] = None, batch_size: int = 50):
+    def __init__(
+        self,
+        translation_service: Optional[TranslationService] = None,
+        batch_size: int = 50,
+    ):
         self.translation_service = translation_service or TranslationService()
         self.batch_size = batch_size
         self.spam_patterns = [re.compile(p) for p in self.DEFAULT_SPAM_PATTERNS]
@@ -133,7 +136,7 @@ class SubtitleService:
             ext = os.path.splitext(file_path)[1].lower()
             if ext in [".srt", ".vtt", ".ass", ".ssa", ".txt"]:
                 return "ass" if ext in [".ass", ".ssa"] else ext.lstrip(".")
-        
+
         stripped = content.strip()
         if stripped.startswith("WEBVTT"):
             return "vtt"
@@ -143,7 +146,9 @@ class SubtitleService:
             return "srt"
         return "txt"
 
-    def parse_subtitles(self, content: str, file_format: str = "srt") -> List[SubtitleItem]:
+    def parse_subtitles(
+        self, content: str, file_format: str = "srt"
+    ) -> List[SubtitleItem]:
         format_lower = file_format.lower()
         if format_lower == "vtt":
             return self._parse_vtt(content)
@@ -162,7 +167,7 @@ class SubtitleService:
 
         curr_idx = 1
         for block in raw_blocks:
-            lines = [l.strip() for l in block.splitlines() if l.strip()]
+            lines = [line.strip() for line in block.splitlines() if line.strip()]
             if not lines:
                 continue
 
@@ -177,14 +182,13 @@ class SubtitleService:
             if match and time_line_idx >= 0:
                 start_ms = parse_timestamp_to_ms(match.group(1))
                 end_ms = parse_timestamp_to_ms(match.group(2))
-                text = "\n".join(lines[time_line_idx + 1:])
+                text = "\n".join(lines[time_line_idx + 1 :])
                 if text.strip():
-                    items.append(SubtitleItem(
-                        index=curr_idx,
-                        start_ms=start_ms,
-                        end_ms=end_ms,
-                        text=text
-                    ))
+                    items.append(
+                        SubtitleItem(
+                            index=curr_idx, start_ms=start_ms, end_ms=end_ms, text=text
+                        )
+                    )
                     curr_idx += 1
         return items
 
@@ -215,7 +219,7 @@ class SubtitleService:
                 start_ms = parse_timestamp_to_ms(match.group(1))
                 end_ms = parse_timestamp_to_ms(match.group(2))
                 time_line_full = line
-                after_match = time_line_full[match.end():].strip()
+                after_match = time_line_full[match.end() :].strip()
                 if after_match:
                     extra = after_match
 
@@ -227,13 +231,15 @@ class SubtitleService:
 
                 text = "\n".join(text_lines)
                 if text.strip():
-                    items.append(SubtitleItem(
-                        index=curr_idx,
-                        start_ms=start_ms,
-                        end_ms=end_ms,
-                        text=text,
-                        extra=extra
-                    ))
+                    items.append(
+                        SubtitleItem(
+                            index=curr_idx,
+                            start_ms=start_ms,
+                            end_ms=end_ms,
+                            text=text,
+                            extra=extra,
+                        )
+                    )
                     curr_idx += 1
             else:
                 i += 1
@@ -243,7 +249,7 @@ class SubtitleService:
         items: List[SubtitleItem] = []
         dialogue_regex = re.compile(
             r"^Dialogue:\s*[^,]+,([^,]+),([^,]+),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),(.*)$",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
         curr_idx = 1
         for line in content.splitlines():
@@ -253,18 +259,24 @@ class SubtitleService:
 
             match = dialogue_regex.match(line_str)
             if match:
-                start_str, end_str, style = match.group(1), match.group(2), match.group(3)
+                start_str, end_str, style = (
+                    match.group(1),
+                    match.group(2),
+                    match.group(3),
+                )
                 raw_text = match.group(9)
                 start_ms = parse_timestamp_to_ms(start_str)
                 end_ms = parse_timestamp_to_ms(end_str)
                 text = raw_text.replace(r"\N", "\n").replace(r"\n", "\n")
-                items.append(SubtitleItem(
-                    index=curr_idx,
-                    start_ms=start_ms,
-                    end_ms=end_ms,
-                    text=text,
-                    style=style
-                ))
+                items.append(
+                    SubtitleItem(
+                        index=curr_idx,
+                        start_ms=start_ms,
+                        end_ms=end_ms,
+                        text=text,
+                        style=style,
+                    )
+                )
                 curr_idx += 1
         return items
 
@@ -277,17 +289,21 @@ class SubtitleService:
             if not text:
                 continue
             duration = max(2000, len(text) * 60)
-            items.append(SubtitleItem(
-                index=curr_idx,
-                start_ms=curr_ms,
-                end_ms=curr_ms + duration,
-                text=text
-            ))
+            items.append(
+                SubtitleItem(
+                    index=curr_idx,
+                    start_ms=curr_ms,
+                    end_ms=curr_ms + duration,
+                    text=text,
+                )
+            )
             curr_ms += duration + 500
             curr_idx += 1
         return items
 
-    def clean_subtitles(self, items: List[SubtitleItem]) -> Tuple[List[SubtitleItem], int, int]:
+    def clean_subtitles(
+        self, items: List[SubtitleItem]
+    ) -> Tuple[List[SubtitleItem], int, int]:
         cleaned_items: List[SubtitleItem] = []
         total_lines = 0
         deleted_lines = 0
@@ -313,7 +329,7 @@ class SubtitleService:
                     end_ms=item.end_ms,
                     text="\n".join(kept_lines),
                     style=item.style,
-                    extra=item.extra
+                    extra=item.extra,
                 )
                 cleaned_items.append(item_cleaned)
 
@@ -334,7 +350,9 @@ class SubtitleService:
 
         results: List[Optional[SubtitleItem]] = [None] * total_items
 
-        def translate_single_item(idx: int, item: SubtitleItem) -> Tuple[int, SubtitleItem]:
+        def translate_single_item(
+            idx: int, item: SubtitleItem
+        ) -> Tuple[int, SubtitleItem]:
             original_text = item.text.strip()
             if not original_text:
                 return idx, item
@@ -344,7 +362,7 @@ class SubtitleService:
                     text=original_text,
                     target_language=target_language,
                     source_language=source_language,
-                    engine=engine
+                    engine=engine,
                 )
                 new_item = SubtitleItem(
                     index=item.index,
@@ -352,7 +370,7 @@ class SubtitleService:
                     end_ms=item.end_ms,
                     text=translated_text,
                     style=item.style,
-                    extra=item.extra
+                    extra=item.extra,
                 )
                 return idx, new_item
             except Exception:
@@ -360,7 +378,9 @@ class SubtitleService:
 
         completed = 0
         if parallel:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.max_workers
+            ) as executor:
                 future_to_idx = {
                     executor.submit(translate_single_item, i, item): i
                     for i, item in enumerate(items)
@@ -382,7 +402,9 @@ class SubtitleService:
 
         return [it for it in results if it is not None]
 
-    def format_output(self, items: List[SubtitleItem], target_format: str = "srt") -> str:
+    def format_output(
+        self, items: List[SubtitleItem], target_format: str = "srt"
+    ) -> str:
         fmt = target_format.lower().lstrip(".")
         if fmt == "vtt":
             return self._format_vtt(items)
@@ -471,7 +493,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if do_clean:
             if progress_callback:
                 progress_callback("step_cleaning", True)
-            current_items, tot_lines, deleted_lines_count = self.clean_subtitles(current_items)
+            current_items, tot_lines, deleted_lines_count = self.clean_subtitles(
+                current_items
+            )
             total_original_lines = tot_lines
 
         # Paso 4: Traducción
@@ -502,12 +526,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             total_lines=total_original_lines,
             deleted_lines=deleted_lines_count,
             processed_items_count=len(current_items),
-            elapsed_time=round(elapsed, 2)
+            elapsed_time=round(elapsed, 2),
         )
 
         return ProcessingResult(
             stats=stats,
             original_items=original_items,
             processed_items=current_items,
-            output_content=output_content
+            output_content=output_content,
         )

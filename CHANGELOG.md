@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-27
+
+### Added
+- **Layout Regression Suite**: 54 offscreen UI tests (`tests/test_ui_layout.py`) covering clipped-text detection across all 8 pages, burn-in dialog fit, ×1.5 scaled-font variants for the settings/about pages and all progress dialogs, and a `minimumSize >= minimumSizeHint` invariant for every app dialog in all 6 UI languages and both themes.
+- **Dynamic Dialog Minimum Sizing**: New `Styles.sync_minimum_size()` helper keeps every dialog's declared minimum size in sync with its real content (`ensurePolished` + layout activation + `minimumSizeHint`), with design floors as lower bounds; applied to `BurnInDialog`, `BurnInProgressModal`, and `ProgressModal` (replacing fixed sizing).
+- **Centralized Multiplatform Helpers**: New `application/platform_utils.py` (`open_path`, `reveal_path`) replacing five duplicated platform-dispatch blocks.
+- **Screenshot Utility**: `tools/regenerate_screenshots.py` regenerates the offscreen visual-verification gallery (main window pages × languages × themes plus per-language dialogs) with a smoke test (`tests/test_screenshot_tool.py`) wired into CI.
+- **Shared Lint Configuration**: `ruff.toml` (pyflakes, pycodestyle statement/parse errors, flake8-bugbear) now drives both local and CI linting, complemented by a `ruff format --check` gate; CI test job runs lint → format → screenshot smoke test → full suite before any build.
+- **Expanded i18n Catalog**: ~65 new translation keys across the burn-in dialog, progress modals, preview counters, and alerts; 212 consistent keys per language verified by invariant scripts.
+
+### Changed
+- **Full Codebase Remediation** (audit §16, 13/13 items): removed all dead code (`FileService`, unused constants, 24 unused imports), migrated ~65 hardcoded UI strings to the i18n service, centralized the color palette in `Styles`, centralized file-dialog filters as i18n keys, repaired ineffective tests (J1–J5), and de-duplicated test fixtures into `conftest.py`.
+- **Emoji-Free UI**: removed all emoji/graphic-symbol prefixes (`🔥`, `⌛`, `✓`, `⏱`, `▶`, `⏸`, `🔊`/`🔉`/`🔇`, flag emojis) from widgets and translation strings per project style rules; replaced with recolorable SVG icons (`pause`, `volume`, `volume_low`, `volume_mute`).
+- **Neutral Combo Values**: burn-in dialog options (size, color, box style, quality) now use language-neutral IDs resolved via `currentData()`, keeping `BurnInOptions` stable across translations.
+- **Config Persistence**: Home-page choices (source/target language, engine, cleaning and format options) are now loaded from and saved to user configuration; the default engine respects `preferred_engine`.
+- **Light Theme Correctness**: inline text colors are now theme-aware via `Styles.retint_inline_text()`, fixing white-on-white labels in light mode while preserving permanent-dark surfaces.
+- **CI Quality Gates**: test job gained a ruff lint step (shared config, pinned version), a `ruff format --check` step, and an explicit screenshot-tool smoke test ahead of the full suite; builds run only after all gates pass.
+
+### Fixed
+- **Light theme contrast**: labels rendered white-on-white (~1.0 contrast) in light mode; all inline text now retints to the active theme (WCAG ≥ 3.0 verified offscreen in 6 languages × 2 themes).
+- **Clipped text across languages**: missing `setWordWrap` on `OptionCard`, `DropZone`, page subtitles, and burn-in captions clipped long German/Portuguese/Italian/English strings; all now wrap and the burn-in dialog auto-sizes per language (620–684 px wide).
+- **Burn-in dialog minimum size**: its declared minimum (620 px) could fall below the content-driven `minimumSizeHint` (654 px in English); minimums are now content-derived, so the dialog can always be resized to fit.
+- **German license text truncation** on the About page (word wrap + flexible layout).
+- **Batch wording** in `README.md` (files, not folders) and `.desktop` alignment in CI packaging (added `GenericName`, `Categories`, `StartupWMClass`, `Keywords`).
+- **Test suite reliability**: generated FFmpeg fixture replaces a hardcoded personal path; offline-resilience and conversion tests now assert real outcomes; QMessageBox monkeypatching centralized.
+
+[1.1.0]: https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.1.0
+
 ## [1.0.0] - 2026-09-26
 
 ### Added

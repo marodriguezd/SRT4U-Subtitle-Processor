@@ -1,22 +1,5 @@
-import os
-import sys
-import pytest
-from PyQt6.QtWidgets import QApplication, QMessageBox
-
-QMessageBox.information = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
-QMessageBox.warning = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
-QMessageBox.critical = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
-
-from application.services.i18n_service import I18nService, t, get_i18n
+from application.services.i18n_service import I18nService
 from application.ui.main_window import MainWindow
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    return app
 
 
 def test_i18n_service_translations():

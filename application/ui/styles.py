@@ -1,7 +1,22 @@
-# application/ui/styles.py
 """
 Estilos Glassmorphism con transparencias RGBA, iluminación ambiental y alto contraste.
 """
+
+from PyQt6.QtCore import QSize
+from PyQt6.QtWidgets import QDialog
+
+
+def sync_minimum_size(dialog: QDialog, floor: QSize) -> None:
+    """
+    Fija el tamaño mínimo real de un diálogo según su contenido ya construido,
+    con un suelo de diseño como cota inferior. Evita que el mínimo declarado
+    se quede corto respecto al `minimumSizeHint` real (recortes) si el
+    contenido crece en futuras iteraciones.
+    """
+    dialog.ensurePolished()
+    dialog.layout().activate()
+    dialog.setMinimumSize(dialog.minimumSizeHint().expandedTo(floor))
+
 
 class Styles:
     # Paleta Dark Glass
@@ -16,7 +31,25 @@ class Styles:
     PRIMARY_HOVER = "#4F46E5"
     PRIMARY_LIGHT = "rgba(99, 102, 241, 0.25)"
     ACCENT = "#8B5CF6"
+    ACCENT_HOVER = "#7C3AED"
+    ACCENT_LIGHT = "#A78BFA"
     SUCCESS = "#10B981"
+    DANGER = "#EF4444"
+    INFO = "#38BDF8"
+
+    # Superficies y bordes compartidos por los diálogos y paneles oscuros
+    SURFACE = "#0F172A"
+    SURFACE_DEEP = "#0B0F19"
+    SURFACE_ALT = "#111827"
+    SURFACE_RAISED = "#1E293B"
+    BORDER = "#334155"
+    BORDER_SUBTLE = "#1F2937"
+
+    # Texto
+    TEXT = "#F8FAFC"
+    TEXT_SUBTLE = "#CBD5E1"
+    TEXT_MUTED = "#94A3B8"
+    TEXT_FAINT = "#64748B"
 
     # Paleta Light Glass
     BG_LIGHT_GRADIENT = "qradialgradient(cx:0.5, cy:0.2, radius:0.9, fx:0.5, fy:0.2, stop:0 #EEF2FF, stop:0.5 #F8FAFC, stop:1 #F1F5F9)"
@@ -24,7 +57,77 @@ class Styles:
     CARD_LIGHT = "rgba(255, 255, 255, 0.88)"
     CARD_BORDER_LIGHT = "rgba(226, 232, 240, 0.95)"
     TEXT_MAIN_LIGHT = "#0F172A"
+    TEXT_SUBTLE_LIGHT = "#334155"
     TEXT_MUTED_LIGHT = "#64748B"
+
+    # Colores de texto que usan los estilos inline de las vistas (tema oscuro)
+    INLINE_TEXT_DARK = "#F8FAFC"
+    INLINE_MUTED_DARK = "#94A3B8"
+    INLINE_SUBTLE_DARK = "#CBD5E1"
+    INLINE_ACCENT_DARK = "#A78BFA"
+    INLINE_ACCENT2_DARK = "#818CF8"
+    INLINE_SUCCESS_DARK = "#10B981"
+    INLINE_SUCCESS_LIGHT = "#047857"
+
+    # Superficies de widgets deliberadamente oscuros (reproductor, tarjetas de vídeo)
+    PERMANENT_DARK_SURFACES = ("#070B14", "#0B0F19")
+
+    @classmethod
+    def retint_inline_text(cls, root, dark: bool) -> None:
+        """
+        Adapta los colores de texto definidos inline en las vistas al tema activo.
+        Solo afecta a etiquetas/botones que heredan el fondo del tema (no a widgets
+        sobre superficies permanentemente oscuras como el reproductor de vídeo).
+        """
+        from PyQt6.QtWidgets import QLabel, QAbstractButton
+
+        main = cls.INLINE_TEXT_DARK if dark else cls.TEXT_MAIN_LIGHT
+        muted = cls.INLINE_MUTED_DARK if dark else cls.TEXT_MUTED_LIGHT
+        subtle = cls.INLINE_SUBTLE_DARK if dark else cls.TEXT_SUBTLE_LIGHT
+        accent = cls.INLINE_ACCENT_DARK if dark else cls.PRIMARY
+        accent2 = cls.INLINE_ACCENT2_DARK if dark else cls.PRIMARY_HOVER
+        success = cls.INLINE_SUCCESS_DARK if dark else cls.INLINE_SUCCESS_LIGHT
+
+        candidates = list(root.findChildren(QLabel)) + list(
+            root.findChildren(QAbstractButton)
+        )
+        for widget in candidates:
+            sheet = widget.styleSheet()
+            if not sheet:
+                continue
+            # Los widgets con fondo propio o sobre superficies oscuras fijas no se retocan
+            if "background" in sheet and "transparent" not in sheet:
+                continue
+            if cls._has_permanent_dark_ancestor(widget):
+                continue
+
+            original = widget.property("_theme_source_style")
+            if original is None:
+                original = sheet
+                widget.setProperty("_theme_source_style", original)
+
+            new_sheet = (
+                original.replace(cls.INLINE_TEXT_DARK, main)
+                .replace(cls.INLINE_MUTED_DARK, muted)
+                .replace(cls.INLINE_SUBTLE_DARK, subtle)
+                .replace(cls.INLINE_ACCENT_DARK, accent)
+                .replace(cls.INLINE_ACCENT2_DARK, accent2)
+                .replace(cls.INLINE_SUCCESS_DARK, success)
+            )
+            if new_sheet != sheet:
+                widget.setStyleSheet(new_sheet)
+
+    @classmethod
+    def _has_permanent_dark_ancestor(cls, widget) -> bool:
+        parent = widget.parentWidget()
+        while parent is not None:
+            parent_sheet = parent.styleSheet() if hasattr(parent, "styleSheet") else ""
+            if parent_sheet and any(
+                surface in parent_sheet for surface in cls.PERMANENT_DARK_SURFACES
+            ):
+                return True
+            parent = parent.parentWidget()
+        return False
 
     @classmethod
     def get_main_style(cls, dark: bool = True) -> str:

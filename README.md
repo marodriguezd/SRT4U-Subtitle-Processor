@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-29%20passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-84%20passed-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -37,7 +37,7 @@ Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt
   - OpenAI / Local LLMs: Compatible with OpenAI, Ollama, and OpenRouter endpoints.
 - **Automated Cleaner**: Strips out Telegram channels (`t.me`), URLs, fansub credits, ads, and musical markers (`♪`) while preserving valid dialogue and formatting tags (`<i>`, `<b>`, ASS styles).
 - **Format Converter**: Bi-directional conversion between `.srt`, `.vtt`, `.ass`, and plain text `.txt`.
-- **Batch Processing**: Queue entire folders or multiple files with per-file progress tracking.
+- **Batch Processing**: Queue multiple files with per-file progress tracking.
 - **Parallel Execution**: Multi-threaded block translation to speed up large subtitle files.
 - **Dark / Light Glass Theme**: Modern Glassmorphism UI with instant theme switching.
 
@@ -77,11 +77,28 @@ Standalone portable binaries are built via GitHub Actions for every release tag.
 
 ## Running Tests
 
-The test suite covers parsing, cleaning, cross-format conversion, free translation, and UI flows:
+The test suite covers parsing, cleaning, cross-format conversion, free translation, UI flows, UI layout regression (clipped-text detection in 6 languages × 2 themes), and dialog geometry invariants:
 
 ```bash
 pytest tests/ -v
 ```
+
+---
+
+## Developer Tools
+
+### Screenshot Gallery Generator
+
+`tools/regenerate_screenshots.py` regenerates the offscreen visual-verification gallery used during UI review: the main window pages (Home, Settings, About) × languages × dark/light themes, plus the burn-in dialog and progress modals per language.
+
+```bash
+QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
+```
+
+- Output defaults to `/tmp/srt4u-shots` (28 PNGs); previous PNGs in the target directory are overwritten.
+- The Qt offscreen platform is used when no display is available, and the FFmpeg burn-in worker is neutralized, so the tool is safe to run headless.
+- Each dialog's resulting size and declared minimum size are printed as a quick geometry sanity check (`size == min` expected).
+- The tool is protected against bit-rot by the `tests/test_screenshot_tool.py` smoke test, which runs it in a subprocess on every CI test job.
 
 ---
 

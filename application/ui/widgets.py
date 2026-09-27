@@ -1,11 +1,10 @@
-# application/ui/widgets.py
 """
 Componentes visuales Glassmorphism según el mockup de SRT4U con alto contraste y diseño responsivo.
 """
+
 import os
-import math
 from typing import Optional, List
-from PyQt6.QtCore import Qt, QRect, QRectF, QSize, pyqtSignal, QUrl, QPoint, QEvent
+from PyQt6.QtCore import Qt, QRectF, QSize, pyqtSignal, QUrl, QPoint, QEvent
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPaintEvent
 from PyQt6.QtWidgets import (
     QWidget,
@@ -24,16 +23,17 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
-from .styles import Styles
 from .icons import Icons
+from .styles import Styles, sync_minimum_size
 from ..services.subtitle_service import SubtitleItem
-from ..services.i18n_service import t, get_i18n
+from ..services.i18n_service import t
 
 
 class ModernToggle(QAbstractButton):
     """
     Switch redondeado moderno estilo iOS / macOS con acento índigo y alto contraste.
     """
+
     def __init__(self, parent=None, checked=False):
         super().__init__(parent)
         self.setCheckable(True)
@@ -58,7 +58,6 @@ class ModernToggle(QAbstractButton):
         p.setBrush(QBrush(bg_color))
         p.drawRoundedRect(0, 0, w, h, radius, radius)
 
-        # Círculo blanco (Knob)
         knob_size = h - 6
         knob_x = (w - knob_size - 3) if self.isChecked() else 3
         knob_y = 3
@@ -75,6 +74,7 @@ class LogoBadge(QWidget):
     """
     Insignia de logo violeta con icono de documento y texto SRT.
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedSize(42, 42)
@@ -83,13 +83,11 @@ class LogoBadge(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Fondo degradado violeta
         rect = QRectF(0, 0, self.width(), self.height())
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(QColor("#6366F1")))
         p.drawRoundedRect(rect, 10, 10)
 
-        # Texto SRT blanco
         p.setPen(QColor("#FFFFFF"))
         p.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "SRT")
@@ -100,6 +98,7 @@ class CircularProgress(QWidget):
     """
     Indicador de progreso circular con porcentaje central y tiempo estimado.
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedSize(130, 130)
@@ -116,13 +115,11 @@ class CircularProgress(QWidget):
         rect = QRectF(12, 12, self.width() - 24, self.height() - 24)
         pen_width = 8
 
-        # Anillo de fondo
         bg_pen = QPen(QColor("#1E293B"), pen_width)
         bg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(bg_pen)
         p.drawEllipse(rect)
 
-        # Anillo activo
         fg_pen = QPen(QColor("#6366F1"), pen_width)
         fg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(fg_pen)
@@ -131,7 +128,6 @@ class CircularProgress(QWidget):
         span_angle = -int(self.progress * 360 * 16)
         p.drawArc(rect, start_angle, span_angle)
 
-        # Porcentaje
         p.setPen(QColor("#F8FAFC"))
         p.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         text = f"{int(self.progress * 100)}%"
@@ -143,12 +139,12 @@ class ProgressModal(QDialog):
     """
     Modal de 'Procesamiento en curso' con gráfico circular y lista de etapas.
     """
+
     cancelled = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Procesamiento en curso")
-        self.setFixedSize(500, 360)
+        self.setWindowTitle(t("progress.window_title"))
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setStyleSheet("""
             QDialog {
@@ -164,8 +160,8 @@ class ProgressModal(QDialog):
 
         # Header
         h_layout = QHBoxLayout()
-        title = QLabel("Procesamiento en curso")
-        title.setStyleSheet("font-size: 16px; font-weight: 700; color: #F8FAFC;")
+        title = QLabel(t("progress.title"))
+        title.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {Styles.TEXT};")
         h_layout.addWidget(title)
         h_layout.addStretch()
         layout.addLayout(h_layout)
@@ -176,31 +172,34 @@ class ProgressModal(QDialog):
 
         steps_box = QVBoxLayout()
         steps_box.setSpacing(10)
-        self.step_labels = [
-            QLabel("⌛ Leyendo archivo..."),
-            QLabel("⌛ Analizando subtítulos..."),
-            QLabel("⌛ Limpiando contenido no deseado..."),
-            QLabel("⌛ Traduciendo..."),
-            QLabel("⌛ Aplicando formato original..."),
-            QLabel("⌛ Guardando archivo..."),
+        self._step_texts = [
+            t("progress.step_reading"),
+            t("progress.step_analyzing"),
+            t("progress.step_cleaning"),
+            t("progress.step_translating"),
+            t("progress.step_formatting"),
+            t("progress.step_saving"),
         ]
+        self.step_labels = [QLabel(text) for text in self._step_texts]
         for lbl in self.step_labels:
-            lbl.setStyleSheet("font-size: 13px; color: #94A3B8;")
+            lbl.setStyleSheet(f"font-size: 13px; color: {Styles.TEXT_MUTED};")
             steps_box.addWidget(lbl)
         body_layout.addLayout(steps_box, stretch=3)
 
         right_box = QVBoxLayout()
         right_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.circle = CircularProgress()
-        self.lbl_time = QLabel("Tiempo restante: --:--")
-        self.lbl_time.setStyleSheet("font-size: 12px; color: #94A3B8; margin-top: 6px;")
+        self.lbl_time = QLabel(t("progress.remaining", time="--:--"))
+        self.lbl_time.setStyleSheet(
+            f"font-size: 12px; color: {Styles.TEXT_MUTED}; margin-top: 6px;"
+        )
         right_box.addWidget(self.circle)
         right_box.addWidget(self.lbl_time)
         body_layout.addLayout(right_box, stretch=2)
 
         layout.addLayout(body_layout)
 
-        btn_cancel = QPushButton("Cancelar")
+        btn_cancel = QPushButton(t("progress.cancel"))
         btn_cancel.setStyleSheet("""
             QPushButton {
                 background: #1E293B;
@@ -214,23 +213,23 @@ class ProgressModal(QDialog):
         """)
         btn_cancel.clicked.connect(self._on_cancel)
         layout.addWidget(btn_cancel, alignment=Qt.AlignmentFlag.AlignRight)
+        sync_minimum_size(self, QSize(500, 360))
+        self.resize(self.minimumSize())
 
     def update_step(self, step_idx: int, done: bool = True, text_override: str = ""):
         if 0 <= step_idx < len(self.step_labels):
             lbl = self.step_labels[step_idx]
-            original_text = text_override or lbl.text().lstrip("✓⌛◯ ")
+            lbl.setText(text_override or self._step_texts[step_idx])
             if done:
-                lbl.setText(f"✓ {original_text}")
                 lbl.setStyleSheet("font-size: 13px; color: #10B981; font-weight: 600;")
             else:
-                lbl.setText(f"◯ {original_text}")
                 lbl.setStyleSheet("font-size: 13px; color: #818CF8; font-weight: 600;")
 
     def set_progress(self, ratio: float, remaining_seconds: int = 0):
         self.circle.set_progress(ratio)
         m = remaining_seconds // 60
         s = remaining_seconds % 60
-        self.lbl_time.setText(f"Tiempo restante: {m:02d}:{s:02d}")
+        self.lbl_time.setText(t("progress.remaining", time=f"{m:02d}:{s:02d}"))
 
     def _on_cancel(self):
         self.cancelled.emit()
@@ -241,6 +240,7 @@ class DropZone(QFrame):
     """
     Área interactiva para arrastrar y soltar subtítulos con alto contraste y feedback visual.
     """
+
     file_dropped = pyqtSignal(str, str)
 
     def __init__(self, parent=None):
@@ -266,15 +266,24 @@ class DropZone(QFrame):
 
         self.title_label = QLabel()
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setStyleSheet("font-size: 15px; font-weight: 700; color: #F8FAFC; background: transparent;")
+        self.title_label.setWordWrap(True)
+        self.title_label.setStyleSheet(
+            f"font-size: 15px; font-weight: 700; color: {Styles.TEXT}; background: transparent;"
+        )
 
         self.sub_label = QLabel()
         self.sub_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.sub_label.setStyleSheet("font-size: 13px; color: #94A3B8; background: transparent;")
+        self.sub_label.setWordWrap(True)
+        self.sub_label.setStyleSheet(
+            f"font-size: 13px; color: {Styles.TEXT_MUTED}; background: transparent;"
+        )
 
         self.formats_label = QLabel()
         self.formats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.formats_label.setStyleSheet("font-size: 11px; color: #64748B; margin-top: 4px; background: transparent;")
+        self.formats_label.setWordWrap(True)
+        self.formats_label.setStyleSheet(
+            f"font-size: 11px; color: {Styles.TEXT_FAINT}; margin-top: 4px; background: transparent;"
+        )
 
         layout.addWidget(self.icon_badge)
         layout.addWidget(self.title_label)
@@ -284,28 +293,45 @@ class DropZone(QFrame):
 
     def retranslate(self):
         if not self.current_subtitle_path:
-            self.icon_badge.setPixmap(Icons.get_pixmap("folder", color="#818CF8", size=42))
+            self.icon_badge.setPixmap(
+                Icons.get_pixmap("folder", color="#818CF8", size=42)
+            )
             self.title_label.setText(t("dropzone.title"))
             self.sub_label.setText(t("dropzone.subtitle"))
-            self.sub_label.setStyleSheet("font-size: 13px; color: #94A3B8; background: transparent;")
+            self.sub_label.setStyleSheet(
+                f"font-size: 13px; color: {Styles.TEXT_MUTED}; background: transparent;"
+            )
             self.formats_label.setText(t("dropzone.formats"))
         else:
             filename = os.path.basename(self.current_subtitle_path)
-            size_kb = os.path.getsize(self.current_subtitle_path) / 1024 if os.path.exists(self.current_subtitle_path) else 0
-            self.icon_badge.setPixmap(Icons.get_pixmap("file", color="#38BDF8", size=42))
+            size_kb = (
+                os.path.getsize(self.current_subtitle_path) / 1024
+                if os.path.exists(self.current_subtitle_path)
+                else 0
+            )
+            self.icon_badge.setPixmap(
+                Icons.get_pixmap("file", color="#38BDF8", size=42)
+            )
             self.title_label.setText(filename)
             status_text = t("dropzone.size", size=size_kb)
             if self.current_video_path:
-                status_text += " | " + t("dropzone.video_detected", name=os.path.basename(self.current_video_path))
+                status_text += " | " + t(
+                    "dropzone.video_detected",
+                    name=os.path.basename(self.current_video_path),
+                )
             self.sub_label.setText(status_text)
-            self.sub_label.setStyleSheet("font-size: 12px; color: #38BDF8; font-weight: 500;")
+            self.sub_label.setStyleSheet(
+                "font-size: 12px; color: #38BDF8; font-weight: 500;"
+            )
             self.formats_label.setText(t("dropzone.replace_hint"))
 
     def set_file(self, file_path: str, video_path: Optional[str] = None):
         self.current_subtitle_path = file_path
         self.current_video_path = video_path or self._find_matching_video(file_path)
         self.retranslate()
-        self.file_dropped.emit(self.current_subtitle_path, self.current_video_path or "")
+        self.file_dropped.emit(
+            self.current_subtitle_path, self.current_video_path or ""
+        )
 
     def _find_matching_video(self, sub_path: str) -> Optional[str]:
         base, _ = os.path.splitext(sub_path)
@@ -318,10 +344,7 @@ class DropZone(QFrame):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             file_path, _ = QFileDialog.getOpenFileName(
-                self,
-                t("dropzone.dialog_title"),
-                "",
-                t("dropzone.filter")
+                self, t("dropzone.dialog_title"), "", t("dropzone.filter")
             )
             if file_path:
                 self.set_file(file_path)
@@ -351,6 +374,7 @@ class OptionCard(QFrame):
     """
     Tarjeta de opción compacta para cuadrícula 2x2 con colores nítidos.
     """
+
     def __init__(self, title: str, description: str, toggle: ModernToggle, parent=None):
         super().__init__(parent)
         self.setObjectName("CardContainer")
@@ -362,9 +386,13 @@ class OptionCard(QFrame):
         text_layout.setSpacing(3)
 
         self.t_lbl = QLabel(title)
-        self.t_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #F8FAFC;")
+        self.t_lbl.setStyleSheet(
+            f"font-size: 14px; font-weight: 700; color: {Styles.TEXT};"
+        )
+        self.t_lbl.setWordWrap(True)
         self.d_lbl = QLabel(description)
-        self.d_lbl.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        self.d_lbl.setStyleSheet(f"font-size: 12px; color: {Styles.TEXT_MUTED};")
+        self.d_lbl.setWordWrap(True)
 
         text_layout.addWidget(self.t_lbl)
         text_layout.addWidget(self.d_lbl)
@@ -392,11 +420,13 @@ class MetricCard(QFrame):
         self.set_icon(icon_str)
 
         self.value_lbl = QLabel(value_str)
-        self.value_lbl.setStyleSheet("font-size: 24px; font-weight: 800; color: #F8FAFC;")
+        self.value_lbl.setStyleSheet(
+            f"font-size: 24px; font-weight: 800; color: {Styles.TEXT};"
+        )
         self.value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.desc_lbl = QLabel(label_str)
-        self.desc_lbl.setStyleSheet("font-size: 12px; color: #94A3B8;")
+        self.desc_lbl.setStyleSheet(f"font-size: 12px; color: {Styles.TEXT_MUTED};")
         self.desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(self.icon_lbl)
@@ -404,22 +434,7 @@ class MetricCard(QFrame):
         layout.addWidget(self.desc_lbl)
 
     def set_icon(self, icon_str: str):
-        mapping = {
-            "file": "file",
-            "📄": "file",
-            "clean": "clean",
-            "✨": "clean",
-            "clock": "clock",
-            "⏱️": "clock",
-            "⏱": "clock",
-            "zap": "zap",
-            "⚡": "zap",
-            "check": "check",
-            "✅": "check",
-            "folder": "folder",
-            "📁": "folder",
-        }
-        icon_name = mapping.get(icon_str, "file")
+        icon_name = _METRIC_ICONS.get(icon_str, "file")
         self.icon_lbl.setPixmap(Icons.get_pixmap(icon_name, color="#818CF8", size=24))
 
     def set_value(self, val: str):
@@ -429,11 +444,23 @@ class MetricCard(QFrame):
         self.desc_lbl.setText(lbl)
 
 
+_METRIC_ICONS = {
+    "file": "file",
+    "clean": "clean",
+    "clock": "clock",
+    "zap": "zap",
+    "check": "check",
+    "folder": "folder",
+}
+
+
 class SubtitleCard(QFrame):
     jump_clicked = pyqtSignal(int)
     text_changed = pyqtSignal()
 
-    def __init__(self, original_item: SubtitleItem, edited_item: SubtitleItem, parent=None):
+    def __init__(
+        self, original_item: SubtitleItem, edited_item: SubtitleItem, parent=None
+    ):
         super().__init__(parent)
         self.original_item = original_item
         self.edited_item = edited_item
@@ -498,8 +525,10 @@ class SubtitleCard(QFrame):
 
         # Time range
         time_str = self.edited_item.get_srt_time()
-        time_lbl = QLabel(f"⏱ {time_str}")
-        time_lbl.setStyleSheet("font-family: monospace; font-size: 11px; color: #94A3B8; font-weight: 600;")
+        time_lbl = QLabel(time_str)
+        time_lbl.setStyleSheet(
+            f"font-family: monospace; font-size: 11px; color: {Styles.TEXT_MUTED}; font-weight: 600;"
+        )
         meta_layout.addWidget(time_lbl)
 
         # Duration
@@ -529,7 +558,9 @@ class SubtitleCard(QFrame):
                 border-color: #6366F1;
             }
         """)
-        self.btn_jump.clicked.connect(lambda: self.jump_clicked.emit(self.edited_item.start_ms))
+        self.btn_jump.clicked.connect(
+            lambda: self.jump_clicked.emit(self.edited_item.start_ms)
+        )
         meta_layout.addWidget(self.btn_jump)
 
         layout.addLayout(meta_layout)
@@ -543,13 +574,17 @@ class SubtitleCard(QFrame):
         left_col = QVBoxLayout()
         left_col.setSpacing(3)
         self.lbl_orig_tag = QLabel(t("preview.tag_orig"))
-        self.lbl_orig_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;")
+        self.lbl_orig_tag.setStyleSheet(
+            "font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;"
+        )
         left_col.addWidget(self.lbl_orig_tag)
 
         orig_txt = self.original_item.text if self.original_item else ""
         self.lbl_orig = QLabel(orig_txt)
         self.lbl_orig.setWordWrap(True)
-        self.lbl_orig.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.lbl_orig.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         self.lbl_orig.setStyleSheet("""
             QLabel {
                 background: #0B0F19;
@@ -568,13 +603,15 @@ class SubtitleCard(QFrame):
         right_col = QVBoxLayout()
         right_col.setSpacing(3)
         self.lbl_edit_tag = QLabel(t("preview.tag_edit"))
-        self.lbl_edit_tag.setStyleSheet("font-size: 10px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;")
+        self.lbl_edit_tag.setStyleSheet(
+            "font-size: 10px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;"
+        )
         right_col.addWidget(self.lbl_edit_tag)
 
         self.edit_text = QPlainTextEdit()
         self.edit_text.setPlainText(self.edited_item.text)
         self.edit_text.setTabChangesFocus(True)
-        line_count = max(1, self.edited_item.text.count('\n') + 1)
+        line_count = max(1, self.edited_item.text.count("\n") + 1)
         self.edit_text.setFixedHeight(max(40, min(140, line_count * 22 + 18)))
         self.edit_text.setStyleSheet("""
             QPlainTextEdit {
@@ -599,7 +636,7 @@ class SubtitleCard(QFrame):
     def _on_text_changed(self):
         new_text = self.edit_text.toPlainText()
         self.edited_item.text = new_text
-        line_count = max(1, new_text.count('\n') + 1)
+        line_count = max(1, new_text.count("\n") + 1)
         self.edit_text.setFixedHeight(max(40, min(140, line_count * 22 + 18)))
         self.text_changed.emit()
 
@@ -657,7 +694,9 @@ class SubtitleDiffViewer(QWidget):
         self.scroll_area.setWidget(self.cards_container)
         layout.addWidget(self.scroll_area)
 
-    def load_subtitles(self, original_items: List[SubtitleItem], processed_items: List[SubtitleItem]):
+    def load_subtitles(
+        self, original_items: List[SubtitleItem], processed_items: List[SubtitleItem]
+    ):
         self.original_items = original_items or []
         self.processed_items = processed_items or []
         self.active_card = None
@@ -739,7 +778,9 @@ class SubtitleDiffViewer(QWidget):
 class VideoPreviewPlayer(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background-color: #070B14; border-radius: 12px; border: 1px solid #25304B;")
+        self.setStyleSheet(
+            "background-color: #070B14; border-radius: 12px; border: 1px solid #25304B;"
+        )
         self.setMinimumHeight(180)
         self.setAcceptDrops(True)
 
@@ -766,10 +807,7 @@ class VideoPreviewPlayer(QFrame):
         self.player.setVideoOutput(self.video_widget)
         v_layout.addWidget(self.video_widget)
 
-        self.sub_overlay = QLabel(
-            "Haz clic aquí o arrastra un video (.mp4, .mkv, .webm) para previsualizar",
-            self.video_container
-        )
+        self.sub_overlay = QLabel(t("preview.overlay_hint"), self.video_container)
         self.sub_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.sub_overlay.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sub_overlay.setWordWrap(True)
@@ -784,8 +822,12 @@ class VideoPreviewPlayer(QFrame):
                 border: 1px solid rgba(255, 255, 255, 0.2);
             }
         """)
-        self.sub_overlay.mousePressEvent = lambda e: self._browse_video() if (not self.player.source().isValid() or self.player.source().isEmpty()) else None
-        
+        self.sub_overlay.mousePressEvent = lambda e: (
+            self._browse_video()
+            if (not self.player.source().isValid() or self.player.source().isEmpty())
+            else None
+        )
+
         self.video_container.installEventFilter(self)
         self.video_widget.installEventFilter(self)
         layout.addWidget(self.video_container)
@@ -794,7 +836,12 @@ class VideoPreviewPlayer(QFrame):
         ctrl_layout.setContentsMargins(4, 0, 4, 0)
         ctrl_layout.setSpacing(10)
 
-        self.play_btn = QPushButton("▶")
+        self.play_btn = QPushButton()
+        self.play_btn.setIcon(
+            Icons.get_icon(
+                "play", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
+            )
+        )
         self.play_btn.setFixedSize(32, 32)
         self.play_btn.setStyleSheet("""
             QPushButton {
@@ -816,9 +863,16 @@ class VideoPreviewPlayer(QFrame):
         """)
 
         self.time_lbl = QLabel("00:00:00 / 00:00:00")
-        self.time_lbl.setStyleSheet("color: #94A3B8; font-size: 11px; font-family: monospace;")
+        self.time_lbl.setStyleSheet(
+            f"color: {Styles.TEXT_MUTED}; font-size: 11px; font-family: monospace;"
+        )
 
-        self.btn_mute = QPushButton("🔊")
+        self.btn_mute = QPushButton()
+        self.btn_mute.setIcon(
+            Icons.get_icon(
+                "volume", normal_color="#94A3B8", active_color="#FFFFFF", size=16
+            )
+        )
         self.btn_mute.setFixedSize(28, 28)
         self.btn_mute.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mute.setStyleSheet("""
@@ -875,6 +929,7 @@ class VideoPreviewPlayer(QFrame):
 
     def retranslate(self):
         self.btn_load_video.setText(t("preview.btn_load_video"))
+        self.sub_overlay.setText(t("preview.overlay_hint"))
 
     def _on_tracks_changed(self):
         if len(self.player.audioTracks()) > 0 and self.player.activeAudioTrack() == -1:
@@ -883,24 +938,34 @@ class VideoPreviewPlayer(QFrame):
     def _on_volume_changed(self, val: int):
         vol = val / 100.0
         self.audio_output.setVolume(vol)
-        if val == 0:
-            self.btn_mute.setText("🔇")
-        elif val < 50:
-            self.btn_mute.setText("🔉")
-        else:
-            self.btn_mute.setText("🔊")
+        self._update_mute_icon(val)
 
     def _toggle_mute(self):
         is_muted = self.audio_output.isMuted()
         self.audio_output.setMuted(not is_muted)
         if not is_muted:
-            self.btn_mute.setText("🔇")
+            self._update_mute_icon(0)
         else:
-            val = self.vol_slider.value()
-            self.btn_mute.setText("🔊" if val >= 50 else "🔉")
+            self._update_mute_icon(self.vol_slider.value())
+
+    def _update_mute_icon(self, volume: int):
+        if self.audio_output.isMuted() or volume == 0:
+            icon_name = "volume_mute"
+        elif volume < 50:
+            icon_name = "volume_low"
+        else:
+            icon_name = "volume"
+        self.btn_mute.setIcon(
+            Icons.get_icon(
+                icon_name, normal_color="#94A3B8", active_color="#FFFFFF", size=16
+            )
+        )
 
     def eventFilter(self, watched, event):
-        if watched in (self.video_container, self.video_widget) and event.type() == QEvent.Type.Resize:
+        if (
+            watched in (self.video_container, self.video_widget)
+            and event.type() == QEvent.Type.Resize
+        ):
             self._reposition_overlay()
         return super().eventFilter(watched, event)
 
@@ -924,10 +989,7 @@ class VideoPreviewPlayer(QFrame):
 
     def _browse_video(self):
         path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seleccionar vídeo para previsualizar",
-            "",
-            "Archivos de vídeo (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos los archivos (*.*)"
+            self, t("preview.select_video_title"), "", t("preview.video_filter")
         )
         if path:
             self.load_video(path)
@@ -936,7 +998,7 @@ class VideoPreviewPlayer(QFrame):
         if event.mimeData().hasUrls():
             for url in event.mimeData().urls():
                 ext = os.path.splitext(url.toLocalFile())[1].lower()
-                if ext in ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.m4v']:
+                if ext in [".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".m4v"]:
                     event.acceptProposedAction()
                     return
         super().dragEnterEvent(event)
@@ -946,7 +1008,7 @@ class VideoPreviewPlayer(QFrame):
             for url in event.mimeData().urls():
                 file_path = url.toLocalFile()
                 ext = os.path.splitext(file_path)[1].lower()
-                if ext in ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.m4v']:
+                if ext in [".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".m4v"]:
                     self.load_video(file_path)
                     event.acceptProposedAction()
                     return
@@ -961,7 +1023,7 @@ class VideoPreviewPlayer(QFrame):
     def load_video(self, video_path: str):
         if os.path.exists(video_path):
             self.player.setSource(QUrl.fromLocalFile(video_path))
-            self.sub_overlay.setText("Video cargado - Listo para reproducir")
+            self.sub_overlay.setText(t("preview.video_loaded"))
             self._reposition_overlay()
             self.sub_overlay.show()
             self.sub_overlay.raise_()
@@ -973,7 +1035,9 @@ class VideoPreviewPlayer(QFrame):
             self._on_position_changed(self.player.position())
 
     def seek_to_ms(self, ms: int):
-        was_playing = (self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState)
+        was_playing = (
+            self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        )
         self.player.setPosition(ms)
         self._on_position_changed(ms)
         if was_playing:
@@ -982,10 +1046,18 @@ class VideoPreviewPlayer(QFrame):
     def _toggle_playback(self):
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self.player.pause()
-            self.play_btn.setText("▶")
+            self.play_btn.setIcon(
+                Icons.get_icon(
+                    "play", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
+                )
+            )
         else:
             self.player.play()
-            self.play_btn.setText("⏸")
+            self.play_btn.setIcon(
+                Icons.get_icon(
+                    "pause", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
+                )
+            )
 
     def _on_duration_changed(self, duration: int):
         self.time_slider.setRange(0, duration)
@@ -1014,7 +1086,7 @@ class VideoPreviewPlayer(QFrame):
                 self.sub_overlay.setText("")
                 self.sub_overlay.hide()
             else:
-                self.sub_overlay.setText("Haz clic aquí o arrastra un video (.mp4, .mkv, .webm) para previsualizar")
+                self.sub_overlay.setText(t("preview.overlay_hint"))
                 self._reposition_overlay()
                 self.sub_overlay.show()
                 self.sub_overlay.raise_()
@@ -1030,5 +1102,5 @@ class VideoPreviewPlayer(QFrame):
     def _format_ms(self, ms: int) -> str:
         s = (ms // 1000) % 60
         m = (ms // 60000) % 60
-        h = (ms // 3600000)
+        h = ms // 3600000
         return f"{h:02d}:{m:02d}:{s:02d}"

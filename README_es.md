@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-29%20superados-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-84%20superados-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -77,11 +77,28 @@ GitHub Actions compila automáticamente binarios portables en cada tag de versi�
 
 ## Pruebas automatizadas
 
-La flota de tests evalúa parseo, limpieza, conversiones entre formatos, traducción gratuita e interfaz headless:
+La flota de tests evalúa parseo, limpieza, conversiones entre formatos, traducción gratuita, flujos de interfaz, regresión de layout (detección de texto recortado en 6 idiomas × 2 temas) e invariantes de geometría de diálogos:
 
 ```bash
 pytest tests/ -v
 ```
+
+---
+
+## Herramientas de desarrollo
+
+### Generador de galería de capturas
+
+`tools/regenerate_screenshots.py` regenera la galería de verificación visual offscreen utilizada en la revisión de UI: páginas de la ventana principal (Inicio, Ajustes, Acerca de) × idiomas × temas oscuro/claro, más el diálogo de burn-in y los modales de progreso por idioma.
+
+```bash
+QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
+```
+
+- La salida va por defecto a `/tmp/srt4u-shots` (28 PNG); los PNG previos del directorio se sobrescriben.
+- Usa la plataforma offscreen de Qt si no hay display disponible y neutraliza el worker de FFmpeg, por lo que puede ejecutarse headless sin riesgo.
+- Imprime el tamaño resultante y el mínimo declarado de cada diálogo como comprobación rápida de geometría (se espera `size == min`).
+- La utilidad está protegida contra degradación por el test de humo `tests/test_screenshot_tool.py`, que la ejecuta en un subproceso en cada job de tests de CI.
 
 ---
 

@@ -2,16 +2,60 @@ name: Build & Release Multiplatform
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff==0.16.9
+
+      - name: Lint with ruff (ruff.toml: F,E7,E9,B)
+        run: ruff check application main.py conftest.py tests
+
+      - name: Check formatting with ruff format
+        run: ruff format --check application main.py conftest.py tests
+
+      - name: Run screenshot tool smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/test_screenshot_tool.py -v
+
+      - name: Run full test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/ -q
+
   build-windows:
     name: Build Windows (.exe)
+    needs: test
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -58,6 +102,7 @@ jobs:
 
   build-linux:
     name: Build Linux (.AppImage)
+    needs: test
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -126,12 +171,15 @@ jobs:
           cat << 'EOF' > AppDir/srt4u.desktop
           [Desktop Entry]
           Name=SRT4U
-          Comment=Subtitle Processor & Translator
+          GenericName=Subtitle Processor
+          Comment=Subtitle Processor, Translator & Formatter
           Exec=SRT4U
           Icon=srt4u
           Type=Application
-          Categories=AudioVideo;Utility;
+          Categories=AudioVideo;AudioVideoEditing;Utility;
           Terminal=false
+          StartupWMClass=SRT4U
+          Keywords=subtitle;srt;translate;video;audio;
           EOF
 
           # 3. AppRun
@@ -165,6 +213,7 @@ jobs:
 
   build-macos:
     name: Build macOS (.dmg)
+    needs: test
     runs-on: macos-14
     steps:
       - name: Checkout repository
@@ -241,6 +290,7 @@ jobs:
         with:
           name: "SRT4U ${{ github.ref_name }} — Subtitle Processor & Translator"
           body_path: RELEASE_NOTES.md
+          prerelease: true  # v1.1.0 ships as pre-release; flip to false for stable releases
           files: |
             release-dist/SRT4U-Windows-x64.exe
             release-dist/SRT4U-Linux-x86_64.AppImage

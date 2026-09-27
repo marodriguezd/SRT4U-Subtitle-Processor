@@ -1,12 +1,13 @@
-# application/services/config_service.py
 import os
 import json
 from typing import Any, Dict
+
 
 class ConfigService:
     """
     Gestiona la configuración y credenciales del usuario de manera persistente en disco.
     """
+
     DEFAULT_CONFIG = {
         "deepl_api_key": "",
         "deepl_type": "free",  # "free" o "pro"
@@ -18,7 +19,6 @@ class ConfigService:
         "preferred_engine": "google",
         "auto_clean": True,
         "preserve_format": True,
-        "output_dir": "",
         "ui_language": "auto",
     }
 

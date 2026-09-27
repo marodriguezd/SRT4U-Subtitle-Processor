@@ -1,9 +1,9 @@
-# application/services/video_burner_service.py
 """
 Servicio de quemado de subtítulos en vídeo (Hardsub / Burn-In) mediante FFmpeg.
 Soporta detección multiplataforma de binarios, generación de estilos ASS avanzados
 y cálculo de progreso/ETA en tiempo real.
 """
+
 import os
 import re
 import sys
@@ -19,11 +19,13 @@ from .subtitle_service import SubtitleItem
 
 @dataclass
 class BurnInOptions:
-    font_size: str = "Mediano"  # "Pequeño", "Mediano", "Grande"
-    font_color: str = "Blanco"  # "Blanco", "Amarillo", "Cian"
-    box_style: str = "Caja semitransparente"  # "Sin fondo", "Caja semitransparente", "Caja sólida"
-    quality_preset: str = "Alta calidad"  # "Alta calidad", "Rápido"
-    fix_overlaps: bool = True  # Ajusta tiempos automáticamente para evitar solapamientos
+    font_size: str = "medium"  # "small", "medium", "large"
+    font_color: str = "white"  # "white", "yellow", "cyan"
+    box_style: str = "semi"  # "none", "semi", "solid"
+    quality_preset: str = "high"  # "high", "fast"
+    fix_overlaps: bool = (
+        True  # Ajusta tiempos automáticamente para evitar solapamientos
+    )
 
 
 class VideoBurnerService:
@@ -32,7 +34,12 @@ class VideoBurnerService:
         if not path or not os.path.isfile(path) or not os.access(path, os.X_OK):
             return False
         try:
-            res = subprocess.run([path, "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+            res = subprocess.run(
+                [path, "-version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2,
+            )
             return res.returncode == 0
         except Exception:
             return False
@@ -58,7 +65,9 @@ class VideoBurnerService:
             candidates.append(os.path.join(exe_dir, "..", "Resources", "ffmpeg"))
 
         # 2. Local app directory bin/
-        app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        app_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
         local_exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
         candidates.append(os.path.join(app_root, "bin", local_exe))
 
@@ -68,7 +77,11 @@ class VideoBurnerService:
             candidates.append(system_ffmpeg)
 
         # 4. Fallbacks comunes en Linux/Unix
-        for fallback in ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg"]:
+        for fallback in [
+            "/usr/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/opt/homebrew/bin/ffmpeg",
+        ]:
             if fallback not in candidates:
                 candidates.append(fallback)
 
@@ -79,7 +92,9 @@ class VideoBurnerService:
         return None
 
     @staticmethod
-    def get_video_duration_ms(video_path: str, ffmpeg_path: Optional[str] = None) -> Optional[int]:
+    def get_video_duration_ms(
+        video_path: str, ffmpeg_path: Optional[str] = None
+    ) -> Optional[int]:
         """
         Obtiene la duración total del archivo de vídeo en milisegundos usando ffmpeg -i.
         """
@@ -100,7 +115,9 @@ class VideoBurnerService:
                 timeout=10,
             )
             # Buscar "Duration: 00:02:15.34"
-            match = re.search(r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)", res.stderr)
+            match = re.search(
+                r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)", res.stderr
+            )
             if match:
                 hours = int(match.group(1))
                 minutes = int(match.group(2))
@@ -113,7 +130,9 @@ class VideoBurnerService:
         return None
 
     @staticmethod
-    def get_video_dimensions(video_path: str, ffmpeg_path: Optional[str] = None) -> Tuple[int, int]:
+    def get_video_dimensions(
+        video_path: str, ffmpeg_path: Optional[str] = None
+    ) -> Tuple[int, int]:
         """
         Obtiene las dimensiones (ancho, alto) del archivo de vídeo.
         Si no se detectan, devuelve (1920, 1080) por defecto.
@@ -159,14 +178,16 @@ class VideoBurnerService:
             for i, it in enumerate(sorted_items):
                 s_ms = max(0, it.start_ms)
                 e_ms = max(s_ms + 250, it.end_ms)
-                processed_items.append(SubtitleItem(
-                    index=i + 1,
-                    start_ms=s_ms,
-                    end_ms=e_ms,
-                    text=it.text,
-                    style=it.style,
-                    extra=it.extra
-                ))
+                processed_items.append(
+                    SubtitleItem(
+                        index=i + 1,
+                        start_ms=s_ms,
+                        end_ms=e_ms,
+                        text=it.text,
+                        style=it.style,
+                        extra=it.extra,
+                    )
+                )
 
             if options.fix_overlaps and len(processed_items) > 1:
                 for i in range(len(processed_items) - 1):
@@ -175,7 +196,9 @@ class VideoBurnerService:
                     if curr_item.end_ms > next_item.start_ms:
                         if next_item.start_ms > curr_item.start_ms:
                             # Acortar el actual dejando un respiro de 40ms antes del siguiente
-                            curr_item.end_ms = max(curr_item.start_ms + 200, next_item.start_ms - 40)
+                            curr_item.end_ms = max(
+                                curr_item.start_ms + 200, next_item.start_ms - 40
+                            )
 
         # 2. Resolución de referencia (PlayResX / PlayResY)
         vw = max(320, video_width)
@@ -183,18 +206,18 @@ class VideoBurnerService:
 
         # Mapeo de tamaño proporcional a la altura del vídeo (evita subtítulos gigantes en cualquier resolución)
         size_ratios = {
-            "Pequeño": 0.035,   # ~38px en 1080p, ~24px en 700p
-            "Mediano": 0.045,   # ~48px en 1080p, ~31px en 700p (legibilidad óptima estándar)
-            "Grande": 0.058,    # ~62px en 1080p, ~40px en 700p
+            "small": 0.035,  # ~38px en 1080p, ~24px en 700p
+            "medium": 0.045,  # ~48px en 1080p, ~31px en 700p (legibilidad óptima estándar)
+            "large": 0.058,  # ~62px en 1080p, ~40px en 700p
         }
         ratio = size_ratios.get(options.font_size, 0.045)
         fontsize = max(16, int(round(vh * ratio)))
 
         # Mapeo de color en formato ASS (&HAABBGGRR)
         color_map = {
-            "Blanco": "&H00FFFFFF",
-            "Amarillo": "&H0000FFFF",  # Blue=0, Green=FF, Red=FF
-            "Cian": "&H00FFFF00",      # Blue=FF, Green=FF, Red=0
+            "white": "&H00FFFFFF",
+            "yellow": "&H0000FFFF",  # Blue=0, Green=FF, Red=FF
+            "cyan": "&H00FFFF00",  # Blue=FF, Green=FF, Red=0
         }
         primary_color = color_map.get(options.font_color, "&H00FFFFFF")
 
@@ -203,14 +226,14 @@ class VideoBurnerService:
         margin_lr = max(20, int(round(vw * 0.04)))
 
         # Mapeo de estilo de caja / fondo
-        if options.box_style == "Sin fondo":
+        if options.box_style == "none":
             # BorderStyle 1 = Outline + Drop Shadow
             border_style = 1
             outline = max(2, int(round(vh * 0.003)))
             shadow = max(1, int(round(vh * 0.002)))
             outline_color = "&H00000000"  # Contorno negro nítido
-            back_color = "&H80000000"     # Sombra semitransparente
-        elif options.box_style == "Caja sólida":
+            back_color = "&H80000000"  # Sombra semitransparente
+        elif options.box_style == "solid":
             # BorderStyle 3 = Opaque Box (OutlineColour define el fondo de la caja)
             border_style = 3
             outline = max(2, int(round(vh * 0.004)))
@@ -218,7 +241,7 @@ class VideoBurnerService:
             outline_color = "&H00000000"  # Caja 100% opaca negra
             back_color = "&H00000000"
         else:
-            # "Caja semitransparente" (50% opacidad &H80000000)
+            # "semi" (50% opacidad &H80000000)
             border_style = 3
             outline = max(2, int(round(vh * 0.004)))
             shadow = 0
@@ -257,9 +280,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 class BurnInWorker(QThread):
-    progress_updated = pyqtSignal(float, str, str)  # (percent 0-100, speed_str, eta_str)
-    finished_success = pyqtSignal(str)              # output_path
-    failed = pyqtSignal(str)                        # error_message
+    progress_updated = pyqtSignal(
+        float, str, str
+    )  # (percent 0-100, speed_str, eta_str)
+    finished_success = pyqtSignal(str)  # output_path
+    failed = pyqtSignal(str)  # error_message
     cancelled = pyqtSignal()
 
     def __init__(
@@ -309,8 +334,12 @@ class BurnInWorker(QThread):
             os.makedirs(out_dir, exist_ok=True)
 
         # 1. Obtener duración y dimensiones del vídeo
-        duration_ms = VideoBurnerService.get_video_duration_ms(self.video_path, ffmpeg_bin)
-        duration_sec = (duration_ms / 1000.0) if duration_ms and duration_ms > 0 else None
+        duration_ms = VideoBurnerService.get_video_duration_ms(
+            self.video_path, ffmpeg_bin
+        )
+        duration_sec = (
+            (duration_ms / 1000.0) if duration_ms and duration_ms > 0 else None
+        )
         vw, vh = VideoBurnerService.get_video_dimensions(self.video_path, ffmpeg_bin)
 
         # 2. Generar archivo ASS en directorio temporal
@@ -327,7 +356,7 @@ class BurnInWorker(QThread):
                 f.write(ass_content)
 
             # 3. Configurar parámetros de codificación
-            if self.options.quality_preset == "Rápido":
+            if self.options.quality_preset == "fast":
                 v_preset = "ultrafast"
                 v_crf = "23"
             else:
@@ -337,13 +366,20 @@ class BurnInWorker(QThread):
             cmd = [
                 ffmpeg_bin,
                 "-y",
-                "-i", os.path.abspath(self.video_path),
-                "-vf", f"ass={ass_filename}",
-                "-c:v", "libx264",
-                "-preset", v_preset,
-                "-crf", v_crf,
-                "-c:a", "copy",
-                "-progress", "pipe:1",
+                "-i",
+                os.path.abspath(self.video_path),
+                "-vf",
+                f"ass={ass_filename}",
+                "-c:v",
+                "libx264",
+                "-preset",
+                v_preset,
+                "-crf",
+                v_crf,
+                "-c:a",
+                "copy",
+                "-progress",
+                "pipe:1",
                 os.path.abspath(self.output_path),
             ]
 
@@ -390,9 +426,15 @@ class BurnInWorker(QThread):
                             current_speed_str = val
 
                     # Emitir progreso periódico al recibir progress=continue
-                    if line.startswith("progress=") and duration_sec and duration_sec > 0:
-                        percent = min(100.0, max(0.0, (current_time_sec / duration_sec) * 100.0))
-                        
+                    if (
+                        line.startswith("progress=")
+                        and duration_sec
+                        and duration_sec > 0
+                    ):
+                        percent = min(
+                            100.0, max(0.0, (current_time_sec / duration_sec) * 100.0)
+                        )
+
                         # Calcular ETA
                         speed_float = 1.0
                         try:
@@ -402,7 +444,9 @@ class BurnInWorker(QThread):
                         except Exception:
                             speed_float = 1.0
 
-                        remaining_sec = max(0.0, (duration_sec - current_time_sec) / speed_float)
+                        remaining_sec = max(
+                            0.0, (duration_sec - current_time_sec) / speed_float
+                        )
                         eta_mins = int(remaining_sec // 60)
                         eta_secs = int(remaining_sec % 60)
                         eta_str = f"{eta_mins:02d}:{eta_secs:02d}"
@@ -427,11 +471,15 @@ class BurnInWorker(QThread):
                 stderr_text = ""
                 if os.path.exists(stderr_log_path):
                     try:
-                        with open(stderr_log_path, "r", encoding="utf-8", errors="replace") as ef:
+                        with open(
+                            stderr_log_path, "r", encoding="utf-8", errors="replace"
+                        ) as ef:
                             stderr_text = ef.read()
                     except Exception:
                         pass
-                self.failed.emit(f"FFmpeg finalizó con error (código {self._process.returncode}):\n{stderr_text[-600:]}")
+                self.failed.emit(
+                    f"FFmpeg finalizó con error (código {self._process.returncode}):\n{stderr_text[-600:]}"
+                )
 
         except Exception as e:
             if not self._is_cancelled:

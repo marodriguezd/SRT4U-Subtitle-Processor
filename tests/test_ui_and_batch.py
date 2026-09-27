@@ -1,25 +1,16 @@
+import copy
 import os
-import sys
-import pytest
-from PyQt6.QtWidgets import QApplication, QMessageBox
-
-QMessageBox.information = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
-QMessageBox.warning = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
-QMessageBox.critical = lambda *args, **kwargs: QMessageBox.StandardButton.Ok
 
 from application.ui.main_window import MainWindow
-from application.ui.widgets import ModernToggle, CircularProgress, DropZone, SubtitleDiffViewer, SubtitleCard
+from application.ui.widgets import (
+    ModernToggle,
+    CircularProgress,
+    DropZone,
+    SubtitleDiffViewer,
+)
 from application.services.subtitle_service import SubtitleService, SubtitleItem
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    return app
 
 
 def test_ui_components(qapp):
@@ -60,8 +51,9 @@ def test_main_window_flow(qapp, tmp_path):
     win._run_format_conversion()
 
     expected_converted = os.path.join(FIXTURES_DIR, "sample_converted.vtt")
-    if os.path.exists(expected_converted):
-        os.remove(expected_converted)
+    assert os.path.exists(expected_converted)
+    assert os.path.getsize(expected_converted) > 0
+    os.remove(expected_converted)
 
 
 def test_batch_processing_logic(tmp_path):
@@ -73,10 +65,7 @@ def test_batch_processing_logic(tmp_path):
 
     for f in files:
         res = service.process_subtitles(
-            file_path=f,
-            do_clean=True,
-            do_translate=False,
-            target_language="es"
+            file_path=f, do_clean=True, do_translate=False, target_language="es"
         )
         assert res.stats.total_lines > 0
         assert len(res.output_content) > 0
@@ -139,13 +128,12 @@ def test_preview_page_studio_integration(qapp):
     sample_srt = os.path.join(FIXTURES_DIR, "sample.srt")
     with open(sample_srt, "r", encoding="utf-8") as f:
         items = win.subtitle_service.parse_subtitles(f.read(), "srt")
-    import copy
     win.diff_viewer.load_subtitles(items, copy.deepcopy(items))
     assert len(win.diff_viewer.cards) > 0
 
-    # Test search input
+    # Test search input (se fija el idioma para validar el texto traducido)
+    win.i18n.set_language("es", save_to_config=False)
     win.preview_search_input.setText("xyz_not_found_token_999")
     assert win.lbl_preview_sub_counter.text().startswith("Mostrando 0")
     win.preview_search_input.setText("")
     assert "Total:" in win.lbl_preview_sub_counter.text()
-
