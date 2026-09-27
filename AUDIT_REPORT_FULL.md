@@ -232,3 +232,72 @@ etiqueta de idioma efectivo: cabe en 1-2 líneas en las 6 lenguas al ancho míni
 ```
 
 **Pendiente recomendado (fuera del alcance de esta corrección):** hack de los dos espacios en la navegación (D5), fuente por plataforma (D6), `.desktop` instalable con `MimeType` (D7) y cota de versión de PyQt6 (B4, corregida).
+
+---
+
+# 11. Verificación extremo a extremo con material real
+
+Toda la corrección anterior se había validado con fixtures diminutos y vídeos
+sintéticos. Para comprobar la aplicación **al cien por cien en su entorno
+gratuito real**, se ha ejecutado un recorrido completo sobre material
+aportado por el usuario:
+
+| Fichero | Datos verificados con `ffprobe` |
+|---|---|
+| `S1pK5hmTzkE_1min.mp4` | 1920×1080, h264 (High), 60 fps, aac LC 48 kHz estéreo, 60 000 ms, 44.6 MB |
+| `S1pK5hmTzkE_1min.srt` | 25 bloques, 22 solapados, 1 hueco exacto de 30,0–31,0 s |
+
+El SRT real tiene precisamente las dos dificultades que el resto de la suite
+sintética no ejercita: **solapamientos** (22 de 25 bloques) y un **hueco** de un
+segundo en el que no debe aparecer nada. Ambas se comprueban de forma explícita.
+
+Todo esto queda automatizado en **`tests/test_e2e_real_media.py`** (26 casos,
+21 áreas de la aplicación). El módulo se localiza el material con la variable
+`SRT4U_E2E_MEDIA` y **se omite entero** si los ficheros no están, de modo que la
+suite sigue siendo ejecutable en CI sin ese material.
+
+## Resultados por apartado
+
+| # | Apartado | Comprobación | Resultado |
+|---|---|---|---|
+| 1 | Lectura | Los 25 bloques, índices 1-25, `0-5 s` … `59-60 s`, solapamientos conservados | OK |
+| 2 | Conversión | SRT→SRT/VTT/ASS/TXT y vuelta: 25 bloques y 25 textos idénticos | OK |
+| 3 | Conversión (TXT) | TXT es texto plano: conserva los 25 textos, sin marcas de tiempo (por diseño) | OK |
+| 4 | Limpieza | 25 bloques conservados, textos intactos, tiempos sin tocar | OK |
+| 5 | Traducción gratuita | Google sin clave: 5 bloques traducidos, `translation_failures == 0` | OK |
+| 6 | Traducción sin red | Rama offline: texto original intacto y fallos contabilizados y avisados | OK |
+| 7 | Pipeline completo | Los 6 pasos se emiten en orden (`reading`→`saving`), 0 errores en el log | OK |
+| 8 | Idempotencia | Reprocesar el resultado no pierde bloques | OK |
+| 9 | Metadatos FFmpeg | 60 000 ms, 1920×1080, h264 + aac detectados | OK |
+| 10 | Generación ASS | `PlayResX/Y` 1920×1080, 25 `Dialogue:`, ningún inicio en el hueco | OK |
+| 11 | ASS por opciones | small/medium/large × white/yellow/cyan × none/semi/solid | OK (3/3) |
+| 12 | **Burn-in real** | Minuto completo grabado: **52 s, 51.8 MB, 60 000 ms**, h264 1920×1080, audio aac copiado | OK |
+| 13 | **Hardsub en píxeles** | t=1/3/8 s: banda alta <1 % (sólo reencode) y banda de subtítulo 10-20× más alterada, con texto legible | OK |
+| 14 | **Respeto del hueco** | t=29 s y t=32 s con subtítulo, **t=30,5 s con 0 píxeles claros** | OK |
+| 15 | Gestión de errores | Vídeo corrupto → `failed` con diagnóstico, sin fichero a medias | OK |
+| 16 | Reproductor | `LoadedMedia`, 60 000 ms, sin errores, `seek_to_ms(30000)` exacto | OK |
+| 17 | Overlay de subtítulos | Sincronizado en 1 s y 52 s, vacío dentro del hueco | OK |
+| 18 | Flujo principal | Procesar → 25+25 items → `*_processed.srt` en disco → página 6 → 25 tarjetas en el visor de diferencias | OK |
+| 19 | Buscador de la vista previa | Filtra los subtítulos reales y el contador cambia y se restaura | OK |
+| 20 | Página de conversión | Los 4 formatos generados desde la UI y releídos con 25 bloques | OK |
+| 21 | Página de limpieza | 25 bloques en la salida; **el original nunca se sobrescribe** | OK |
+| 22 | Lote | 3 ficheros → 3 salidas y las 3 filas con estado "completado" | OK |
+| 23 | Diálogo de hardsub | Precarga el vídeo real, las 3 cajas y genera un ASS válido | OK |
+| 24 | Persistencia de ajustes | Opciones guardadas y recuperadas por una ventana nueva | OK |
+| 25 | Los 6 idiomas de la UI | en/es/pt/de/it/zh-CN montan la vista previa con el contenido real, sin recortes | OK |
+| 26 | Servicio de traducción | Responde sin reventar con el contenido real | OK |
+
+## Comandos y resultados
+
+```
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/test_e2e_real_media.py -q -> 26 passed (1 m 13 s)
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q                       -> 156 passed (2 m 51 s)
+.venv/bin/ruff check application main.py conftest.py tests --select F,E7,E9,B       -> All checks passed!
+.venv/bin/ruff format application main.py conftest.py tests tools                    -> 1 file reformatted, 32 unchanged
+```
+
+**Conclusión:** las 8 páginas de la aplicación, los 4 formatos, los 6 idiomas de
+interfaz, el motor de traducción gratuito, el hardsub sobre el minuto real y
+los caminos de error funcionan correctamente con material real, sin ningún
+cambio en el código de la aplicación: las 26 pruebas son comprobaciones
+externas. No se ha detectado ningún defecto pendiente en este recorrido.

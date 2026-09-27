@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **End-to-End Suite on Real Media**: `tests/test_e2e_real_media.py` (26 tests, 21 app areas) exercises the whole application against a real 1-minute 1920×1080/60 fps video and its 25-cue SRT — reading, cleaning, free Google translation (online and offline branches), the six-step pipeline, all four output formats, FFmpeg metadata, ASS generation for every style combination, a full-minute hardsub validated **pixel by pixel** (subtitle band verified, the source's 30–31 s gap verified empty), broken-video error handling, the preview player and its synchronized overlay, and every UI page (process, convert, clean, batch, burn-in dialog, settings persistence, all 6 UI languages). The media is located via `SRT4U_E2E_MEDIA` and the whole module skips when absent, so CI stays green without it.
+
 ## [1.1.0] - 2026-09-27
 
 ### Added
