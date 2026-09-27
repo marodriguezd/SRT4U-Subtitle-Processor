@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-84%20passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-114%20passed-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -99,6 +99,20 @@ QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--
 - The Qt offscreen platform is used when no display is available, and the FFmpeg burn-in worker is neutralized, so the tool is safe to run headless.
 - Each dialog's resulting size and declared minimum size are printed as a quick geometry sanity check (`size == min` expected).
 - The tool is protected against bit-rot by the `tests/test_screenshot_tool.py` smoke test, which runs it in a subprocess on every CI test job.
+
+---
+
+## Logs & Troubleshooting
+
+Failures are written to a rotating log file (512 KB × 3) instead of being swallowed:
+
+| Platform | Location |
+|---|---|
+| Windows | `%APPDATA%\SRT4U\srt4u.log` |
+| macOS | `~/Library/Application Support/SRT4U/srt4u.log` |
+| Linux | `~/.config/SRT4U/srt4u.log` (or `$XDG_CONFIG_HOME/SRT4U/srt4u.log`) |
+
+It records configuration read/write failures, per-block translation engine errors, FFmpeg detection/duration/dimension problems, unexpected exceptions (with traceback) and the final exit code. When a failure is user-visible — settings not saved, incomplete translation, unreadable settings file, unhandled error — the app shows a dialog pointing to this file.
 
 ---
 

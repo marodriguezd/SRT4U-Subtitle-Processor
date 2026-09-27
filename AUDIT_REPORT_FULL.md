@@ -25,8 +25,9 @@
 4. Dos tests de traducción hacían **llamadas de red reales sin marcador** → flakeo/fallo en entornos sin Internet. **Corregido** (marcador `network` + degradación a skip).
 5. El gate de lint/formato de CI **no cubría `tools/`**, y `tools/regenerate_screenshots.py` estaba sin formatear. **Corregido**.
 6. `requests` figuraba en `requirements.txt` **sin usarse** en el código. **Corregido**.
+7. **26 fallos silenciosos** (`except: pass`, un `print()`) ocultaban problemas de traducción, configuración, FFmpeg e i18n. **Corregido**: log rotativo + avisos al usuario donde importa (§9).
 
-**Cobertura de verificación final:** `104 passed` con PyQt6 6.11, `102 passed` con la mínima declarada (PyQt6 6.6.1), `ruff check` limpio, `ruff format --check` limpio, invariante i18n OK (212 claves × 6 idiomas), 46 capturas offscreen regeneradas.
+**Cobertura de verificación final:** `114 passed` con PyQt6 6.11, `102 passed` con la mínima declarada (PyQt6 6.6.1), `ruff check` limpio, `ruff format --check` limpio, invariante i18n OK (212 claves × 6 idiomas), 46 capturas offscreen regeneradas.
 
 ---
 
@@ -36,9 +37,9 @@ Todas las comprobaciones se ejecutaron sobre el árbol real en `.venv` (Python 3
 
 | Herramienta | Comando | Resultado |
 |---|---|---|
-| Tests | `.venv/bin/python -m pytest tests/ -q` | **104 passed** (84 previos + 20 nuevos) |
+| Tests | `.venv/bin/python -m pytest tests/ -q` | **114 passed** (84 previos + 20 de diálogos + 10 de logging) |
 | Lint | `.venv/bin/ruff check application main.py conftest.py tests tools` | All checks passed! |
-| Formato | `.venv/bin/ruff format --check application main.py conftest.py tests tools` | 29 files already formatted |
+| Formato | `.venv/bin/ruff format --check application main.py conftest.py tests tools` | 31 files already formatted |
 | Vulture | `.venv/bin/python -m vulture application main.py conftest.py tests tools --min-confidence 80` | 0 hallazgos reales (ver §6) |
 | Pyflakes | `.venv/bin/python -m pyflakes application main.py conftest.py tests tools` | sin salida |
 | i18n | script de invariantes (claves/placeholders/vacíos/uso) | 212 × 6 idénticas, 0 vacíos, 0 placeholders inconsistentes |
@@ -130,8 +131,8 @@ Las fixtures de pytest se inyectan por nombre (su efecto es el valor) y `lambda 
 |---|---|---|
 | D1 | `ThemedMessageBox.question()` nunca se usaba (código muerto, 4.º método estático) | **Corregido** (eliminado) |
 | D2 | `MainWindow.__init__` fijaba `setWindowTitle("SRT4U - Subtitle Processor")` y `retranslate_ui()` lo sobrescribía en la misma construcción | **Corregido** (línea redundante eliminada) |
-| D3 | 11 bloques `except Exception: pass` (traducción, FFmpeg, config) | Documentado · los de red son intencionales (fallback), pero ocultan fallos reales de FFmpeg/config; recomendado registrar en un log |
-| D4 | `ConfigService.save()` informa de errores con `print()` (único `print` en código de app) | Documentado · recomendado `logging` o aviso al usuario |
+| D3 | 26 bloques `except Exception` que silenciaban fallos (`pass`/`return` sin traza) en traducción, FFmpeg, config e i18n | **Corregido** (ver §9) |
+| D4 | `ConfigService.save()` informaba de errores con `print()` (único `print` en código de app) | **Corregido** (log + `save_error` + aviso en la UI) |
 | D5 | Etiquetas de navegación con dos espacios iniciales (`f"  {t(key)}"`) como hack de layout (los tests hacen `.strip()`) | Documentado · recomendado margen/padding en QSS |
 | D6 | `main.py` fija `QFont("Segoe UI", 10)` en todas las plataformas (no existe en Linux/macOS; fallback silencioso) | Documentado · recomendado selección de fuente por plataforma |
 | D7 | `.desktop` del repo con `Exec=python3 main.py` / `Icon=assets/icon.png` (no instalable tal cual) y sin `MimeType` para subtítulos | Documentado · el de la AppImage sí es correcto |
@@ -164,6 +165,15 @@ Las fixtures de pytest se inyectan por nombre (su efecto es el valor) y `lambda 
 | `application/ui/message_boxes.py` | ✅ `build()` público + Fusion + paleta; `question()` eliminado |
 | `application/ui/icons.py` | ✅ 8 iconos nuevos (`arrow_left/right/up`, `folder_plus`, `list`, `grid`, `monitor`, `drive`) |
 | `application/ui/main_window.py` | ✅ `Styles.set_dark()` + tooltips por tema, `LICENSE` desde bundle, título redundante fuera |
+| `application/logging_setup.py` | ✅ **nuevo**: log rotativo (512 KB × 3) en el directorio de configuración, `get_logger()`/`setup_logging()` |
+| `application/services/config_service.py` | ✅ log de lectura/escritura, `load_error`/`save_error`, `save()`/`set()` devuelven éxito |
+| `application/services/translation_service.py` | ✅ `last_error` **por hilo**, log de cada fallo de motor y de los fallbacks |
+| `application/services/subtitle_service.py` | ✅ `ProcessingStats.translation_failures`, log por bloque y resumen de traducción incompleta |
+| `application/services/video_burner_service.py` | ✅ log de detector de FFmpeg, duración/dimensiones, cancelación, limpieza, salida de error de FFmpeg |
+| `application/services/i18n_service.py` | ✅ log de fallos de `QLocale` y de formateo de traducciones |
+| `application/ui/main_window.py` | ✅ avisos al usuario (traducción incompleta, ajustes no guardados, config ilegible), log de arranque y de fallos de worker/lote |
+| `main.py` | ✅ `setup_logging()` + `sys.excepthook` que registra la traza y avisa al usuario |
+| `tests/test_logging.py` | ✅ **nuevo**: 10 tests de logging, errores de config y avisos al usuario |
 | `conftest.py` | ✅ configuración aislada, marcador `network` |
 | `tests/test_system_dialogs.py` | ✅ 20 tests nuevos de tema de diálogos |
 | `tests/test_translation_free.py` | ✅ marcador `network` + skip sin conectividad |
@@ -180,13 +190,31 @@ Las fixtures de pytest se inyectan por nombre (su efecto es el valor) y `lambda 
 
 ---
 
-## 9. Verificación final
+## 9. Fallos silenciosos → log + aviso al usuario (D3/D4)
+
+Se convirtieron **los 26 bloques `except Exception`** del código (y el único `print()`) en registro con contexto, distinguiendo lo esperado (fallbacks de red) de lo anómalo (configuración no escribible, FFmpeg sin permisos):
+
+| Área | Antes | Ahora |
+|---|---|---|
+| Traducción | `except: return item` (bloque sin traducir, sin rastro) | log por bloque + `TranslationService.last_error` **por hilo** (los workers paralelos no se pisan el error) + `ProcessingStats.translation_failures` |
+| Configuración | `print()` y `except: pass` (config corrupta ≡ config inexistente) | `logger.exception` + `load_error`/`save_error` + `save()`/`set()` devuelven éxito |
+| FFmpeg | fallbacks mudos a 1920x1080 y limpiezas que fallaban en silencio | log de binario descartado, duración/dimensiones no detectadas, terminación forzada, archivo parcial no eliminable, stderr de FFmpeg al fallar |
+| i18n | `QLocale` caído y `format()` con placeholders incorrectos pasaban desapercibidos | log debug/warning con la clave afectada |
+| Arranque | `sys._MEIPASS` ausente sin traza | log debug + `sys.excepthook` que registra la traza de cualquier excepción no controlada |
+
+**Avisos al usuario (UI, i18n × 6 idiomas — 8 claves nuevas, 220 por idioma):** traducción incompleta (`{failed}` de `{total}`), ajustes no guardados (con la ruta), configuración ilegible/restaurada, y error inesperado con la ruta del log. Los fallos que no requieren acción del usuario (persistencia automática de opciones, heurísticas de FFmpeg) se registran sin interrumpir.
+
+**Destino del log:** `<config>/SRT4U/srt4u.log` (`%APPDATA%`, `~/Library/Application Support`, `~/.config`), rotativo 512 KB × 3, documentado en ambos README.
+
+---
+
+## 10. Verificación final
 
 ```
-.venv/bin/python -m pytest tests/ -q                          -> 104 passed
+.venv/bin/python -m pytest tests/ -q                          -> 114 passed
 .venv/bin/ruff check application main.py conftest.py tests tools -> All checks passed!
-.venv/bin/ruff format --check …                                -> 29 files already formatted
-i18n: 6 lenguas × 212 claves idénticas · 0 vacías              -> OK
+.venv/bin/ruff format --check …                                -> 31 files already formatted
+i18n: 6 lenguas × 220 claves idénticas · 0 vacías              -> OK
 QT_QPA_PLATFORM=offscreen .venv/bin/python tools/regenerate_screenshots.py -> 46 PNG
 contraste paleta diálogos: texto/superficie 17.06 · atenuado/fondo 7.47 (dark) · 4.76 (light)
 iconos de barra de herramientas del QFileDialog: 12.94–13.26 (dark) · 10.54–10.80 (light)
@@ -194,4 +222,4 @@ píxeles ámbar (iconos del escritorio sin tematizar): 25 -> 0
 venv temporal con la cota mínima (PyQt6 6.6.1 + PyQt6-Qt6 6.6.x): 102 passed
 ```
 
-**Pendiente recomendado (fuera del alcance de esta corrección):** logging en lugar de `print()`/`pass` en los fallos silenciosos (D3/D4), hack de los dos espacios en la navegación (D5), fuente por plataforma (D6), `.desktop` instalable con `MimeType` (D7) y cota de versión de PyQt6 (B4).
+**Pendiente recomendado (fuera del alcance de esta corrección):** hack de los dos espacios en la navegación (D5), fuente por plataforma (D6), `.desktop` instalable con `MimeType` (D7) y cota de versión de PyQt6 (B4, corregida).

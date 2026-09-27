@@ -4,10 +4,15 @@ Incluye fallback autónomo con urllib estándar sin depender obligatoriamente de
 """
 
 import json
+import threading
 import urllib.request
 import urllib.parse
 from typing import Callable, Optional, Dict, List
+
+from ..logging_setup import get_logger
 from .config_service import ConfigService
+
+logger = get_logger("translation")
 
 try:
     from deep_translator import GoogleTranslator
@@ -37,6 +42,20 @@ class TranslationService:
 
     def __init__(self, config_service: Optional[ConfigService] = None):
         self.config_service = config_service or ConfigService()
+        # El último error se guarda por hilo: la traducción en paralelo comparte el
+        # servicio entre workers y cada uno debe leer sólo el resultado de su llamada.
+        self._tls = threading.local()
+
+    @property
+    def last_error(self) -> Optional[str]:
+        """
+        Descripción del fallo del motor en la última llamada de este hilo
+        (`None` si la traducción se completó correctamente).
+        """
+        return getattr(self._tls, "last_error", None)
+
+    def _set_last_error(self, message: Optional[str]) -> None:
+        self._tls.last_error = message
 
     def translate_text(
         self,
@@ -48,6 +67,7 @@ class TranslationService:
     ) -> str:
         """
         Traduce un fragmento de texto usando el motor especificado.
+        Si el motor falla, devuelve el texto original y el motivo queda en `last_error`.
         """
         engine_lower = engine.lower()
 
@@ -68,9 +88,13 @@ class TranslationService:
         if HAS_DEEP_TRANSLATOR:
             try:
                 translator = GoogleTranslator(source=src, target=target)
-                return translator.translate(text)
-            except Exception:
-                pass
+                translated = translator.translate(text)
+                self._set_last_error(None)
+                return translated
+            except Exception as exc:
+                logger.debug(
+                    "deep-translator falló (se intenta el fallback con urllib): %s", exc
+                )
 
         # Fallback directo con urllib nativo
         try:
@@ -82,17 +106,24 @@ class TranslationService:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 if data and isinstance(data[0], list):
+                    self._set_last_error(None)
                     return "".join(
                         segment[0] for segment in data[0] if segment and segment[0]
                     )
-        except Exception:
-            pass
+            self._set_last_error("respuesta inesperada del servicio de traducción")
+        except Exception as exc:
+            self._set_last_error(str(exc))
+            logger.warning(
+                "Google Translate no está disponible (%s); se devuelve el texto original",
+                exc,
+            )
 
         return text
 
     def _translate_deepl(self, text: str, target: str, source: str) -> str:
         api_key = self.config_service.get("deepl_api_key", "").strip()
         if not api_key:
+            logger.debug("DeepL sin clave API configurada: se usa Google Translate")
             return self._translate_google(text, target, source)
 
         is_pro = self.config_service.get("deepl_type", "free") == "pro"
@@ -127,8 +158,12 @@ class TranslationService:
                 resp_json = json.loads(resp.read().decode("utf-8"))
                 translations = resp_json.get("translations", [])
                 if translations:
+                    self._set_last_error(None)
                     return translations[0].get("text", text)
-        except Exception:
+            self._set_last_error("respuesta sin traducciones de DeepL")
+        except Exception as exc:
+            self._set_last_error(f"DeepL: {exc}")
+            logger.warning("DeepL falló (%s); se usa Google Translate", exc)
             return self._translate_google(text, target, source)
 
         return text
@@ -141,6 +176,7 @@ class TranslationService:
         model = self.config_service.get("openai_model", "gpt-4o-mini")
 
         if not api_key and "localhost" not in base_url and "127.0.0.1" not in base_url:
+            logger.debug("OpenAI sin clave API configurada: se usa Google Translate")
             return self._translate_google(text, target, source)
 
         url = f"{base_url}/chat/completions"
@@ -174,8 +210,12 @@ class TranslationService:
                 resp_json = json.loads(resp.read().decode("utf-8"))
                 choices = resp_json.get("choices", [])
                 if choices:
+                    self._set_last_error(None)
                     return choices[0]["message"]["content"].strip()
-        except Exception:
+            self._set_last_error("respuesta sin resultados del modelo")
+        except Exception as exc:
+            self._set_last_error(f"OpenAI: {exc}")
+            logger.warning("El endpoint LLM falló (%s); se usa Google Translate", exc)
             return self._translate_google(text, target, source)
 
         return text

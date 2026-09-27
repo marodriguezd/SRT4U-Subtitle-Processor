@@ -4,7 +4,11 @@ import time
 import concurrent.futures
 from dataclasses import dataclass, field
 from typing import Optional, Callable, List, Tuple
+
+from ..logging_setup import get_logger
 from .translation_service import TranslationService
+
+logger = get_logger("subtitles")
 
 
 def ms_to_srt_time(ms: int) -> str:
@@ -84,6 +88,8 @@ class ProcessingStats:
     deleted_lines: int = 0
     processed_items_count: int = 0
     elapsed_time: float = 0.0
+    # Bloques que el motor de traducción no pudo traducir (mantienen el texto original)
+    translation_failures: int = 0
 
 
 @dataclass
@@ -127,6 +133,8 @@ class SubtitleService:
     ):
         self.translation_service = translation_service or TranslationService()
         self.batch_size = batch_size
+        # Resultado de la última llamada a `translate_subtitles`
+        self.last_translation_failures = 0
         self.spam_patterns = [re.compile(p) for p in self.DEFAULT_SPAM_PATTERNS]
         cpu_threads = os.cpu_count() or 4
         self.max_workers = max(1, round(cpu_threads * 0.8))
@@ -345,10 +353,15 @@ class SubtitleService:
         progress_callback: Optional[Callable[[str, object], None]] = None,
     ) -> List[SubtitleItem]:
         total_items = len(items)
+        self.last_translation_failures = 0
         if total_items == 0:
             return []
 
         results: List[Optional[SubtitleItem]] = [None] * total_items
+        # `list.append` es atómico bajo el GIL, así que los workers pueden registrar
+        # sus fallos sin bloqueos adicionales.
+        failed_indices: List[int] = []
+        failed_notes: List[str] = []
 
         def translate_single_item(
             idx: int, item: SubtitleItem
@@ -364,6 +377,16 @@ class SubtitleService:
                     source_language=source_language,
                     engine=engine,
                 )
+                engine_error = getattr(self.translation_service, "last_error", None)
+                if engine_error:
+                    failed_indices.append(item.index)
+                    failed_notes.append(engine_error)
+                    logger.warning(
+                        "El motor '%s' no pudo traducir el bloque %s: %s",
+                        engine,
+                        item.index,
+                        engine_error,
+                    )
                 new_item = SubtitleItem(
                     index=item.index,
                     start_ms=item.start_ms,
@@ -373,7 +396,14 @@ class SubtitleService:
                     extra=item.extra,
                 )
                 return idx, new_item
-            except Exception:
+            except Exception as exc:
+                failed_indices.append(item.index)
+                failed_notes.append(str(exc))
+                logger.exception(
+                    "Excepción al traducir el bloque %s con el motor '%s'",
+                    item.index,
+                    engine,
+                )
                 return idx, item
 
         completed = 0
@@ -399,6 +429,15 @@ class SubtitleService:
                 completed += 1
                 if progress_callback:
                     progress_callback("step_translating", (completed, total_items))
+
+        self.last_translation_failures = len(failed_indices)
+        if failed_indices:
+            logger.warning(
+                "Traducción incompleta: %s de %s bloques mantienen el texto original (%s)",
+                self.last_translation_failures,
+                total_items,
+                failed_notes[0] if failed_notes else "motor no disponible",
+            )
 
         return [it for it in results if it is not None]
 
@@ -499,6 +538,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             total_original_lines = tot_lines
 
         # Paso 4: Traducción
+        translation_failures = 0
         if do_translate and target_language:
             if progress_callback:
                 progress_callback("step_translating", (0, len(current_items)))
@@ -510,6 +550,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 parallel=parallel,
                 progress_callback=progress_callback,
             )
+            translation_failures = self.last_translation_failures
 
         # Paso 5: Aplicar formato original
         if progress_callback:
@@ -527,6 +568,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             deleted_lines=deleted_lines_count,
             processed_items_count=len(current_items),
             elapsed_time=round(elapsed, 2),
+            translation_failures=translation_failures,
         )
 
         return ProcessingResult(

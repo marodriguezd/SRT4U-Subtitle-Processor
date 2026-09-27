@@ -12,7 +12,11 @@ Soporta detección automática del idioma del sistema y cambio dinámico entre:
 import os
 from typing import Dict, Optional
 from PyQt6.QtCore import QObject, pyqtSignal, QLocale
+
+from ..logging_setup import get_logger
 from .config_service import ConfigService
+
+logger = get_logger("i18n")
 
 
 class I18nService(QObject):
@@ -268,6 +272,14 @@ class I18nService(QObject):
             "alert.batch_empty_desc": "Add files to the queue first.",
             "alert.batch_done_title": "Batch finished",
             "alert.batch_done_desc": "All files in the batch were processed.",
+            "alert.translation_failures_title": "Translation incomplete",
+            "alert.translation_failures_desc": "The engine returned the original text for {failed} of {total} blocks.\nCheck your internet connection or the translation settings.",
+            "alert.settings_save_error_title": "Settings not saved",
+            "alert.settings_save_error_desc": "Could not write the settings file:\n{path}\n\nCheck the folder permissions. Details are in the log file.",
+            "alert.settings_load_error_title": "Settings reset",
+            "alert.settings_load_error_desc": "The settings file could not be read, so the default values were restored:\n{path}\n\nDetails are in the log file.",
+            "alert.unexpected_error_title": "Unexpected error",
+            "alert.unexpected_error_desc": "An unexpected error occurred. Details were saved to the log file:\n{path}",
         },
         # ------------------ ES (ESPAÑOL) ------------------
         "es": {
@@ -503,6 +515,14 @@ class I18nService(QObject):
             "alert.batch_empty_desc": "Añade archivos a la cola primero.",
             "alert.batch_done_title": "Lote finalizado",
             "alert.batch_done_desc": "Se procesaron todos los archivos del lote.",
+            "alert.translation_failures_title": "Traducción incompleta",
+            "alert.translation_failures_desc": "El motor devolvió el texto original en {failed} de {total} bloques.\nComprueba tu conexión a Internet o la configuración de traducción.",
+            "alert.settings_save_error_title": "Ajustes no guardados",
+            "alert.settings_save_error_desc": "No se pudo escribir el archivo de configuración:\n{path}\n\nComprueba los permisos de la carpeta. Los detalles están en el archivo de log.",
+            "alert.settings_load_error_title": "Ajustes restablecidos",
+            "alert.settings_load_error_desc": "No se pudo leer el archivo de configuración, así que se restauraron los valores por defecto:\n{path}\n\nLos detalles están en el archivo de log.",
+            "alert.unexpected_error_title": "Error inesperado",
+            "alert.unexpected_error_desc": "Se produjo un error inesperado. Los detalles se guardaron en el archivo de log:\n{path}",
         },
         # ------------------ PT (PORTUGUÊS) ------------------
         "pt": {
@@ -738,6 +758,14 @@ class I18nService(QObject):
             "alert.batch_empty_desc": "Adicione arquivos à fila primeiro.",
             "alert.batch_done_title": "Lote finalizado",
             "alert.batch_done_desc": "Todos os arquivos do lote foram processados.",
+            "alert.translation_failures_title": "Tradução incompleta",
+            "alert.translation_failures_desc": "O motor devolveu o texto original em {failed} de {total} blocos.\nVerifica a ligação à Internet ou as definições de tradução.",
+            "alert.settings_save_error_title": "Definições não guardadas",
+            "alert.settings_save_error_desc": "Não foi possível escrever o ficheiro de definições:\n{path}\n\nVerifica as permissões da pasta. Os detalhes estão no ficheiro de registo (log).",
+            "alert.settings_load_error_title": "Definições repostas",
+            "alert.settings_load_error_desc": "Não foi possível ler o ficheiro de definições, por isso foram repostos os valores predefinidos:\n{path}\n\nOs detalhes estão no ficheiro de registo (log).",
+            "alert.unexpected_error_title": "Erro inesperado",
+            "alert.unexpected_error_desc": "Ocorreu um erro inesperado. Os detalhes foram guardados no ficheiro de registo (log):\n{path}",
         },
         # ------------------ DE (DEUTSCH) ------------------
         "de": {
@@ -973,6 +1001,14 @@ class I18nService(QObject):
             "alert.batch_empty_desc": "Fügen Sie zuerst Dateien zur Warteschlange hinzu.",
             "alert.batch_done_title": "Stapel abgeschlossen",
             "alert.batch_done_desc": "Alle Dateien im Stapel wurden verarbeitet.",
+            "alert.translation_failures_title": "Übersetzung unvollständig",
+            "alert.translation_failures_desc": "Die Engine hat bei {failed} von {total} Blöcken den Originaltext zurückgegeben.\nPrüfe die Internetverbindung oder die Übersetzungseinstellungen.",
+            "alert.settings_save_error_title": "Einstellungen nicht gespeichert",
+            "alert.settings_save_error_desc": "Die Einstellungsdatei konnte nicht geschrieben werden:\n{path}\n\nPrüfe die Ordnerberechtigungen. Details stehen im Protokoll (Log).",
+            "alert.settings_load_error_title": "Einstellungen zurückgesetzt",
+            "alert.settings_load_error_desc": "Die Einstellungsdatei konnte nicht gelesen werden, daher wurden die Standardwerte wiederhergestellt:\n{path}\n\nDetails stehen im Protokoll (Log).",
+            "alert.unexpected_error_title": "Unerwarteter Fehler",
+            "alert.unexpected_error_desc": "Ein unerwarteter Fehler ist aufgetreten. Die Details wurden ins Protokoll (Log) geschrieben:\n{path}",
         },
         # ------------------ IT (ITALIANO) ------------------
         "it": {
@@ -1208,6 +1244,14 @@ class I18nService(QObject):
             "alert.batch_empty_desc": "Aggiungi prima dei file alla coda.",
             "alert.batch_done_title": "Batch completato",
             "alert.batch_done_desc": "Tutti i file del batch sono stati elaborati.",
+            "alert.translation_failures_title": "Traduzione incompleta",
+            "alert.translation_failures_desc": "Il motore ha restituito il testo originale in {failed} di {total} blocchi.\nControlla la connessione a Internet o le impostazioni di traduzione.",
+            "alert.settings_save_error_title": "Impostazioni non salvate",
+            "alert.settings_save_error_desc": "Non è stato possibile scrivere il file delle impostazioni:\n{path}\n\nControlla i permessi della cartella. I dettagli sono nel file di log.",
+            "alert.settings_load_error_title": "Impostazioni ripristinate",
+            "alert.settings_load_error_desc": "Non è stato possibile leggere il file delle impostazioni, quindi sono stati ripristinati i valori predefiniti:\n{path}\n\nI dettagli sono nel file di log.",
+            "alert.unexpected_error_title": "Errore imprevisto",
+            "alert.unexpected_error_desc": "Si è verificato un errore imprevisto. I dettagli sono stati salvati nel file di log:\n{path}",
         },
         # ------------------ ZH-CN (简体中文) ------------------
         "zh-CN": {
@@ -1443,6 +1487,14 @@ class I18nService(QObject):
             "alert.batch_empty_desc": "请先向队列添加文件。",
             "alert.batch_done_title": "批处理完成",
             "alert.batch_done_desc": "队列中的所有文件均已处理完毕。",
+            "alert.translation_failures_title": "翻译不完整",
+            "alert.translation_failures_desc": "翻译引擎对 {total} 个片段中的 {failed} 个返回了原文。\n请检查网络连接或翻译设置。",
+            "alert.settings_save_error_title": "设置未保存",
+            "alert.settings_save_error_desc": "无法写入设置文件：\n{path}\n\n请检查文件夹权限。详细信息见日志文件。",
+            "alert.settings_load_error_title": "设置已重置",
+            "alert.settings_load_error_desc": "无法读取设置文件，已恢复默认值：\n{path}\n\n详细信息见日志文件。",
+            "alert.unexpected_error_title": "意外错误",
+            "alert.unexpected_error_desc": "发生意外错误，详细信息已保存到日志文件：\n{path}",
         },
     }
 
@@ -1469,8 +1521,10 @@ class I18nService(QObject):
         locale_str = ""
         try:
             locale_str = QLocale.system().name().lower()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "QLocale no disponible (%s); se usan las variables de entorno", exc
+            )
 
         if not locale_str:
             for env_var in ["LC_ALL", "LC_MESSAGES", "LANG"]:
@@ -1555,7 +1609,13 @@ class I18nService(QObject):
         if kwargs:
             try:
                 return val.format(**kwargs)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo formatear la traducción '%s' con %s: %s",
+                    key,
+                    kwargs,
+                    exc,
+                )
                 return val
 
         return val

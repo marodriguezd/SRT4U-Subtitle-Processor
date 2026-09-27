@@ -1,6 +1,10 @@
-import os
 import json
-from typing import Any, Dict
+import os
+from typing import Any, Dict, Optional
+
+from ..logging_setup import get_logger
+
+logger = get_logger("config")
 
 
 class ConfigService:
@@ -26,6 +30,9 @@ class ConfigService:
         self.config_dir = self._get_config_dir()
         self.config_file = os.path.join(self.config_dir, "settings.json")
         self.config: Dict[str, Any] = dict(self.DEFAULT_CONFIG)
+        # Últimos fallos de lectura/escritura, para que la UI pueda avisar al usuario
+        self.load_error: Optional[str] = None
+        self.save_error: Optional[str] = None
         self.load()
 
     def _get_config_dir(self) -> str:
@@ -41,25 +48,43 @@ class ConfigService:
         return path
 
     def load(self) -> None:
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        self.config.update(data)
-            except Exception:
-                pass
+        """Carga la configuración desde disco; registra el fallo si el archivo es ilegible."""
+        if not os.path.exists(self.config_file):
+            return
+        try:
+            with open(self.config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    self.config.update(data)
+                else:
+                    raise ValueError("el contenido no es un objeto JSON")
+            self.load_error = None
+        except Exception as exc:
+            self.load_error = str(exc)
+            logger.warning(
+                "No se pudo leer la configuración %s; se usan los valores por defecto: %s",
+                self.config_file,
+                exc,
+            )
 
-    def save(self) -> None:
+    def save(self) -> bool:
+        """Escribe la configuración en disco. Devuelve False si no se pudo guardar."""
         try:
             with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error al guardar configuración: {e}")
+            self.save_error = None
+            return True
+        except Exception as exc:
+            self.save_error = str(exc)
+            logger.exception(
+                "No se pudo guardar la configuración en %s", self.config_file
+            )
+            return False
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.config.get(key, self.DEFAULT_CONFIG.get(key, default))
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any) -> bool:
+        """Asigna un valor y persiste. Devuelve False si la escritura falló."""
         self.config[key] = value
-        self.save()
+        return self.save()

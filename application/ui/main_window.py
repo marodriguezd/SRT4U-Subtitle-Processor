@@ -49,6 +49,9 @@ from ..services.config_service import ConfigService
 from ..services.subtitle_service import SubtitleService, ProcessingResult
 from ..services.translation_service import TranslationService
 from ..services.i18n_service import t, get_i18n
+from ..logging_setup import get_logger
+
+logger = get_logger("ui")
 
 
 class ProcessWorker(QThread):
@@ -97,6 +100,7 @@ class ProcessWorker(QThread):
             )
             self.completed.emit(result)
         except Exception as e:
+            logger.exception("Fallo al procesar %s", self.file_path)
             self.failed.emit(str(e))
 
 
@@ -123,6 +127,22 @@ class MainWindow(QMainWindow):
         self._apply_theme()
         self.i18n.language_changed.connect(self.retranslate_ui)
         self.retranslate_ui()
+
+        logger.info(
+            "Interfaz inicializada (tema=%s, idioma=%s)",
+            "oscuro" if self.dark_mode else "claro",
+            self.i18n.current_language,
+        )
+        if self.config_service.load_error:
+            # La configuración no se pudo leer y se han restaurado los valores por defecto
+            ThemedMessageBox.warning(
+                self,
+                t("alert.settings_load_error_title"),
+                t(
+                    "alert.settings_load_error_desc",
+                    path=self.config_service.config_file,
+                ),
+            )
 
     def _apply_initial_geometry(self):
         """Ajusta el tamaño inicial al espacio disponible de la pantalla."""
@@ -1208,7 +1228,25 @@ class MainWindow(QMainWindow):
 
         self._switch_page(6)
 
+        failures = result.stats.translation_failures
+        if failures:
+            logger.warning(
+                "Traducción incompleta: %s de %s bloques mantienen el texto original",
+                failures,
+                len(result.processed_items),
+            )
+            ThemedMessageBox.warning(
+                self,
+                t("alert.translation_failures_title"),
+                t(
+                    "alert.translation_failures_desc",
+                    failed=failures,
+                    total=len(result.processed_items),
+                ),
+            )
+
     def _on_processing_failed(self, error_msg: str):
+        logger.error("Procesamiento fallido: %s", error_msg)
         if hasattr(self, "modal") and self.modal.isVisible():
             self.modal.reject()
         ThemedMessageBox.critical(
@@ -1468,6 +1506,7 @@ class MainWindow(QMainWindow):
                     row, 3, QTableWidgetItem(t("batch.status_completed"))
                 )
             except Exception as e:
+                logger.exception("Fallo al procesar el archivo del lote %s", file_path)
                 self.batch_table.setItem(
                     row, 3, QTableWidgetItem(t("batch.status_error", err=e))
                 )
@@ -1515,20 +1554,54 @@ class MainWindow(QMainWindow):
 
     def _persist_home_options(self):
         """Guarda en disco las opciones de la página de inicio elegidas por el usuario."""
-        self.config_service.set("source_lang", self.cb_source_lang.currentData())
-        self.config_service.set("target_lang", self.cb_target_lang.currentData())
-        self.config_service.set("preferred_engine", self.cb_engine.currentData())
-        self.config_service.set("auto_clean", self.toggle_clean.isChecked())
-        self.config_service.set("preserve_format", self.toggle_preserve.isChecked())
+        saved = [
+            self.config_service.set("source_lang", self.cb_source_lang.currentData()),
+            self.config_service.set("target_lang", self.cb_target_lang.currentData()),
+            self.config_service.set("preferred_engine", self.cb_engine.currentData()),
+            self.config_service.set("auto_clean", self.toggle_clean.isChecked()),
+            self.config_service.set(
+                "preserve_format", self.toggle_preserve.isChecked()
+            ),
+        ]
+        if not all(saved):
+            # No se interrumpe el procesamiento por esto: sólo se registra
+            logger.warning(
+                "No se pudieron guardar las opciones de la página de inicio (%s): %s",
+                self.config_service.config_file,
+                self.config_service.save_error,
+            )
 
     def _save_settings(self):
-        self.config_service.set("deepl_api_key", self.txt_deepl_key.text().strip())
-        self.config_service.set(
-            "deepl_type", "pro" if self.rb_deepl_pro.isChecked() else "free"
-        )
-        self.config_service.set("openai_api_key", self.txt_openai_key.text().strip())
-        self.config_service.set("openai_base_url", self.txt_openai_url.text().strip())
-        self.config_service.set("openai_model", self.txt_openai_model.text().strip())
+        saved = [
+            self.config_service.set("deepl_api_key", self.txt_deepl_key.text().strip()),
+            self.config_service.set(
+                "deepl_type", "pro" if self.rb_deepl_pro.isChecked() else "free"
+            ),
+            self.config_service.set(
+                "openai_api_key", self.txt_openai_key.text().strip()
+            ),
+            self.config_service.set(
+                "openai_base_url", self.txt_openai_url.text().strip()
+            ),
+            self.config_service.set(
+                "openai_model", self.txt_openai_model.text().strip()
+            ),
+        ]
+        if not all(saved):
+            logger.error(
+                "No se pudieron guardar los ajustes en %s: %s",
+                self.config_service.config_file,
+                self.config_service.save_error,
+            )
+            ThemedMessageBox.warning(
+                self,
+                t("alert.settings_save_error_title"),
+                t(
+                    "alert.settings_save_error_desc",
+                    path=self.config_service.config_file,
+                ),
+            )
+            return
         ThemedMessageBox.information(
             self, t("settings.save_success_title"), t("settings.save_success")
         )

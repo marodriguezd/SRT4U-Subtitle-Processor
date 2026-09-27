@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-84%20superados-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-114%20superados-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -99,6 +99,20 @@ QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--
 - Usa la plataforma offscreen de Qt si no hay display disponible y neutraliza el worker de FFmpeg, por lo que puede ejecutarse headless sin riesgo.
 - Imprime el tamaño resultante y el mínimo declarado de cada diálogo como comprobación rápida de geometría (se espera `size == min`).
 - La utilidad está protegida contra degradación por el test de humo `tests/test_screenshot_tool.py`, que la ejecuta en un subproceso en cada job de tests de CI.
+
+---
+
+## Logs y solución de problemas
+
+Los fallos se escriben en un archivo de log rotativo (512 KB × 3) en lugar de silenciarse:
+
+| Plataforma | Ubicación |
+|---|---|
+| Windows | `%APPDATA%\SRT4U\srt4u.log` |
+| macOS | `~/Library/Application Support/SRT4U/srt4u.log` |
+| Linux | `~/.config/SRT4U/srt4u.log` (o `$XDG_CONFIG_HOME/SRT4U/srt4u.log`) |
+
+Registra fallos de lectura/escritura de la configuración, errores del motor de traducción por bloque, problemas de detección de FFmpeg (duración/dimensiones), excepciones inesperadas (con traza) y el código de salida final. Cuando el fallo afecta al usuario — ajustes no guardados, traducción incompleta, configuración ilegible, error inesperado — la app muestra un diálogo indicando ese archivo.
 
 ---
 

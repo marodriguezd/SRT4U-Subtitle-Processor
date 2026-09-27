@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Centralized Multiplatform Helpers**: New `application/platform_utils.py` (`open_path`, `reveal_path`) replacing five duplicated platform-dispatch blocks.
 - **Screenshot Utility**: `tools/regenerate_screenshots.py` regenerates the offscreen visual-verification gallery (main window pages × languages × themes plus per-language dialogs) with a smoke test (`tests/test_screenshot_tool.py`) wired into CI.
 - **Shared Lint Configuration**: `ruff.toml` (pyflakes, pycodestyle statement/parse errors, flake8-bugbear) now drives both local and CI linting, complemented by a `ruff format --check` gate; CI test job runs lint → format → screenshot smoke test → full suite before any build.
+- **Diagnostic Logging**: new `application/logging_setup.py` configures a rotating log file (512 KB × 3) in the user config directory; the app no longer fails silently (see below) and records startup, theme/language, FFmpeg detection, translation-engine errors and the final exit code.
+- **User-Visible Failure Notices**: incomplete translations, settings that could not be saved, an unreadable settings file and unhandled exceptions now raise a themed dialog explaining what happened and pointing to the log file.
+- **Compatibility Gate for the Declared Minimum**: `compat-min-pyqt6` CI job (see below).
 - **Themed System Dialogs**: `QFileDialog` and `QMessageBox` are now rendered non-natively with a deterministic Fusion style, an explicit palette, a scoped stylesheet, a themed SVG icon provider (file/folder/drive/monitor icons) and SVG toolbar icons, replacing the desktop-theme icons that clashed with the app (one of them invisible). Both follow the active dark/light theme via `Styles.set_dark()`.
 - **Themed Tooltips**: the application-level tooltip stylesheet is now theme-aware and re-applied whenever the theme changes.
 - **License Bundled in Binaries**: `LICENSE` is packaged into the Windows, Linux and macOS builds, so the About page "View license" button opens the local file instead of always falling back to the web page.
@@ -32,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hermetic Test Configuration**: the suite redirects `ConfigService` to a temporary directory, so tests no longer read or overwrite the real user `settings.json` (previously the UI language persisted by a test could change later results).
 - **Network-Dependent Tests Marked**: the free Google Translate tests are tagged `network` and skip gracefully when the engine returns untranslated text (no connectivity), instead of failing the run.
 - **Dependency Cleanup**: removed the unused `requests` dependency from `requirements.txt`.
+- **Silent Failures Removed**: the 26 `except Exception` blocks that hid problems behind `pass`/`print()` now log with context — configuration read/write (`ConfigService.save()` returns a success flag), translation engine failures (`TranslationService.last_error`, per thread so parallel workers do not race), per-block translation failures (counted in `ProcessingStats.translation_failures`), FFmpeg binary/duration/dimension detection and cleanup failures, i18n formatting errors and PyInstaller path fallbacks.
 
 ### Fixed
 - **Light theme contrast**: labels rendered white-on-white (~1.0 contrast) in light mode; all inline text now retints to the active theme (WCAG ≥ 3.0 verified offscreen in 6 languages × 2 themes).
