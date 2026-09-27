@@ -161,7 +161,7 @@ Las fixtures de pytest se inyectan por nombre (su efecto es el valor) y `lambda 
 | Archivo | Cambio |
 |---|---|
 | `application/ui/file_dialogs.py` | ✅ `prepare_dialog()`, `ThemedFileIconProvider`, iconos SVG de barra, sin iconos nativos en botones, `QSizeGrip` oculto |
-| `application/ui/styles.py` | ✅ `set_dark/is_dark`, `dialog_colors()`, `dialog_palette()`, QSS de archivos/mensajes/tooltips por tema y acotado |
+| `application/ui/styles.py` | ✅ `set_dark/is_dark`, `dialog_colors()`, `dialog_palette()`, QSS de archivos/mensajes/tooltips por tema y acotado; colores de la barra lateral por tema (`NAV_ACTIVE_TEXT_*`, `NAV_ACTIVE_ICON_*`, `NAV_IDLE_ICON_*`) |
 | `application/ui/message_boxes.py` | ✅ `build()` público + Fusion + paleta; `question()` eliminado |
 | `application/ui/icons.py` | ✅ 8 iconos nuevos (`arrow_left/right/up`, `folder_plus`, `list`, `grid`, `monitor`, `drive`) |
 | `application/ui/main_window.py` | ✅ `Styles.set_dark()` + tooltips por tema, `LICENSE` desde bundle, título redundante fuera |
@@ -176,6 +176,8 @@ Las fixtures de pytest se inyectan por nombre (su efecto es el valor) y `lambda 
 | `tests/test_logging.py` | ✅ **nuevo**: 13 tests de logging, mensajes de Qt, errores de config y avisos al usuario |
 | `conftest.py` | ✅ configuración aislada, marcador `network` |
 | `tests/test_system_dialogs.py` | ✅ 20 tests nuevos de tema de diálogos |
+| `tests/test_nav_theme.py` | ✅ **nuevo**: 9 tests de contraste de la barra lateral en ambos temas (componiendo los fondos translúcidos y los píxeles reales) |
+| `tests/test_i18n.py` | ✅ idioma por defecto (auto → sistema, guardado → override) y etiqueta de idioma efectivo |
 | `tests/test_translation_free.py` | ✅ marcador `network` + skip sin conectividad |
 | `tests/test_ui_and_batch.py` | ✅ conversión sobre copia temporal |
 | `tests/test_screenshot_tool.py` | ✅ nuevas capturas esperadas (24) |
@@ -213,7 +215,7 @@ Se convirtieron **los 26 bloques `except Exception`** del código (y el único `
 ## 10. Verificación final
 
 ```
-.venv/bin/python -m pytest tests/ -q                          -> 117 passed
+.venv/bin/python -m pytest tests/ -q                          -> 130 passed
 .venv/bin/ruff check application main.py conftest.py tests tools -> All checks passed!
 .venv/bin/ruff format --check …                                -> 31 files already formatted
 i18n: 6 lenguas × 220 claves idénticas · 0 vacías              -> OK
@@ -224,6 +226,9 @@ píxeles ámbar (iconos del escritorio sin tematizar): 25 -> 0
 venv temporal con la cota mínima (PyQt6 6.6.1 + PyQt6-Qt6 6.6.1): 115 passed, 2 deselected
 message handler de Qt: qWarning/qCritical simulados -> presentes en srt4u.log con su nivel y categoría
 arranque real offscreen (XDG_CONFIG_HOME temporal) -> srt4u.qt registra los mensajes, stderr limpio de avisos de Qt
+barra lateral, píxeles renderizados: pestaña activa 1.1:1 -> 5.69:1 (claro) · 9.39:1 (oscuro)
+pestañas inactivas: 4.72:1 (claro) · 7.20:1 (oscuro) · iconos ≥ 3:1 en ambos temas
+etiqueta de idioma efectivo: cabe en 1-2 líneas en las 6 lenguas al ancho mínimo
 ```
 
 **Pendiente recomendado (fuera del alcance de esta corrección):** hack de los dos espacios en la navegación (D5), fuente por plataforma (D6), `.desktop` instalable con `MimeType` (D7) y cota de versión de PyQt6 (B4, corregida).

@@ -244,7 +244,22 @@ class MainWindow(QMainWindow):
             btn.setProperty("page_index", page_idx)
             btn.setProperty("icon_name", icon_name)
             btn.setProperty("i18n_key", key)
-            btn.setIcon(Icons.get_icon(icon_name, size=18))
+            btn.setIcon(
+                Icons.get_icon(
+                    icon_name,
+                    normal_color=(
+                        Styles.NAV_IDLE_ICON_DARK
+                        if self.dark_mode
+                        else Styles.NAV_IDLE_ICON_LIGHT
+                    ),
+                    active_color=(
+                        Styles.NAV_ACTIVE_ICON_DARK
+                        if self.dark_mode
+                        else Styles.NAV_ACTIVE_ICON_LIGHT
+                    ),
+                    size=18,
+                )
+            )
             btn.setIconSize(QSize(18, 18))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked, idx=page_idx: self._switch_page(idx))
@@ -256,17 +271,27 @@ class MainWindow(QMainWindow):
 
     def _switch_page(self, page_index: int):
         self.stack.setCurrentIndex(page_index)
+        # Los iconos de la barra lateral también cambian con el tema: los colores
+        # por defecto de `Icons` están calibrados para el fondo oscuro.
+        active_color = (
+            Styles.NAV_ACTIVE_ICON_DARK
+            if self.dark_mode
+            else Styles.NAV_ACTIVE_ICON_LIGHT
+        )
+        idle_color = (
+            Styles.NAV_IDLE_ICON_DARK if self.dark_mode else Styles.NAV_IDLE_ICON_LIGHT
+        )
         for btn in self.nav_buttons:
             is_active = btn.property("page_index") == page_index
             btn.setProperty("active", "true" if is_active else "false")
             icon_name = btn.property("icon_name")
             if icon_name:
-                color = Icons.DEFAULT_ACTIVE if is_active else Icons.DEFAULT_MUTED
+                color = active_color if is_active else idle_color
                 btn.setIcon(
                     Icons.get_icon(
                         icon_name,
                         normal_color=color,
-                        active_color=Icons.DEFAULT_ACTIVE,
+                        active_color=active_color,
                         size=18,
                     )
                 )
@@ -917,6 +942,15 @@ class MainWindow(QMainWindow):
             self._on_settings_lang_changed
         )
         l_layout.addWidget(self.cb_settings_lang)
+
+        # Aclara qué idioma se aplicará realmente: con "Automático (Sistema)" no
+        # se veía si seguía al sistema o un idioma guardado de una sesión anterior.
+        self.lbl_lang_effective = QLabel()
+        self.lbl_lang_effective.setStyleSheet(
+            f"font-size: 12px; color: {Styles.TEXT_MUTED};"
+        )
+        self.lbl_lang_effective.setWordWrap(True)
+        l_layout.addWidget(self.lbl_lang_effective)
         layout.addWidget(lang_card)
 
         # 2. DeepL Card
@@ -1915,6 +1949,7 @@ class MainWindow(QMainWindow):
                 if s_idx >= 0:
                     self.cb_settings_lang.setCurrentIndex(s_idx)
                 self.cb_settings_lang.blockSignals(False)
+            self._refresh_effective_language()
 
     def _on_settings_lang_changed(self, index: int):
         code = self.cb_settings_lang.currentData()
@@ -1926,6 +1961,35 @@ class MainWindow(QMainWindow):
                 if t_idx >= 0:
                     self.cb_top_lang.setCurrentIndex(t_idx)
                 self.cb_top_lang.blockSignals(False)
+            self._refresh_effective_language()
+
+    def _refresh_effective_language(self):
+        """
+        Muestra qué idioma está en vigor realmente.
+
+        "Automático (Sistema)" es ambiguo: con él la app sigue al idioma del
+        sistema, pero si el usuario eligió antes un idioma concreto, ése es el
+        guardado en la configuración. Aquí se aclara la diferencia.
+        """
+        configured = self.i18n.get_configured_language()
+        if configured == "auto":
+            code = self.i18n.detect_system_language()
+            key = "settings.lang_effective_auto"
+        else:
+            code = configured if configured in self.i18n.SUPPORTED_LANGUAGES else "en"
+            key = "settings.lang_effective"
+        language = self.i18n.SUPPORTED_LANGUAGES.get(code, {}).get("native", code)
+
+        if hasattr(self, "lbl_lang_effective"):
+            self.lbl_lang_effective.setText(t(key, language=language))
+        if hasattr(self, "cb_top_lang"):
+            tooltip_key = (
+                "topbar.lang_tooltip_effective" if configured == "auto" else None
+            )
+            if tooltip_key:
+                self.cb_top_lang.setToolTip(t(tooltip_key, language=language))
+            else:
+                self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
 
     def retranslate_ui(self):
         # 0. Global chrome
@@ -1944,6 +2008,7 @@ class MainWindow(QMainWindow):
             self.cb_top_lang.setItemText(0, t("topbar.lang_auto"))
         if hasattr(self, "cb_settings_lang"):
             self.cb_settings_lang.setItemText(0, t("settings.lang_auto"))
+        self._refresh_effective_language()
 
         # 1. Sidebar Nav
         for btn in self.nav_buttons:

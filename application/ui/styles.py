@@ -72,6 +72,20 @@ class Styles:
     INLINE_SUCCESS_DARK = "#10B981"
     INLINE_SUCCESS_LIGHT = "#047857"
 
+    # Texto de la pestaña activa del menú lateral. El fondo activo es un tinte
+    # translúcido de PRIMARY sobre la barra lateral, así que el color del texto
+    # depende del tema: un lavanda claro sobre el lavanda del tema claro quedaba
+    # ilegible (contraste ~1.1).
+    NAV_ACTIVE_TEXT_DARK = "#C7D2FE"
+    NAV_ACTIVE_TEXT_LIGHT = "#4338CA"
+
+    # Iconos de la barra lateral. `Icons.DEFAULT_ACTIVE`/`DEFAULT_MUTED` están
+    # calibrados para el tema oscuro; en el claro quedaban por debajo de 3:1.
+    NAV_ACTIVE_ICON_DARK = "#818CF8"
+    NAV_ACTIVE_ICON_LIGHT = "#4F46E5"
+    NAV_IDLE_ICON_DARK = "#94A3B8"
+    NAV_IDLE_ICON_LIGHT = "#64748B"
+
     # Superficies de widgets deliberadamente oscuros (reproductor, tarjetas de vídeo)
     PERMANENT_DARK_SURFACES = ("#070B14", "#0B0F19")
 
@@ -442,6 +456,9 @@ class Styles:
         card_bg = cls.CARD_DARK if dark else cls.CARD_LIGHT
         border = cls.CARD_BORDER_DARK if dark else cls.CARD_BORDER_LIGHT
         border_hover = cls.CARD_BORDER_HOVER_DARK if dark else "#CBD5E1"
+        nav_active_text = (
+            cls.NAV_ACTIVE_TEXT_DARK if dark else cls.NAV_ACTIVE_TEXT_LIGHT
+        )
         text = cls.TEXT_MAIN_DARK if dark else cls.TEXT_MAIN_LIGHT
         muted = cls.TEXT_MUTED_DARK if dark else cls.TEXT_MUTED_LIGHT
         drop_bg = "rgba(15, 23, 42, 0.55)" if dark else "rgba(255, 255, 255, 0.6)"
@@ -480,7 +497,7 @@ class Styles:
         }}
         QPushButton.nav-btn[active="true"] {{
             background-color: {cls.PRIMARY_LIGHT};
-            color: #C7D2FE;
+            color: {nav_active_text};
             font-weight: 600;
             border: 1px solid {cls.PRIMARY};
         }}

@@ -51,6 +51,7 @@ class I18nService(QObject):
             # Top bar
             "topbar.theme_tooltip": "Toggle dark / light theme",
             "topbar.lang_tooltip": "Change interface language",
+            "topbar.lang_tooltip_effective": "Change interface language — now: {language}",
             "topbar.lang_auto": "Auto (System)",
             # Home Page
             "home.title": "Translate Subtitles",
@@ -119,6 +120,8 @@ class I18nService(QObject):
             "settings.lang_card_title": "Interface Language",
             "settings.lang_card_desc": "Select the language of the application interface or detect automatically.",
             "settings.lang_auto": "Automatic (System)",
+            "settings.lang_effective_auto": "Detected system language: {language}. The interface follows it automatically.",
+            "settings.lang_effective": 'Interface language: {language}. Choose "Automatic (System)" to follow the system.',
             "settings.deepl_title": "DeepL API",
             "settings.deepl_desc": "API key for high-fidelity translations.",
             "settings.deepl_placeholder": "DeepL API Key (e.g. 12345678-abcd...)",
@@ -294,6 +297,7 @@ class I18nService(QObject):
             # Top bar
             "topbar.theme_tooltip": "Alternar modo oscuro / claro",
             "topbar.lang_tooltip": "Cambiar idioma de la interfaz",
+            "topbar.lang_tooltip_effective": "Cambiar idioma de la interfaz — actual: {language}",
             "topbar.lang_auto": "Automático (Sistema)",
             # Home Page
             "home.title": "Traducir subtítulos",
@@ -362,6 +366,8 @@ class I18nService(QObject):
             "settings.lang_card_title": "Idioma de la interfaz",
             "settings.lang_card_desc": "Selecciona el idioma de la aplicación o detecta automáticamente.",
             "settings.lang_auto": "Automático (Sistema)",
+            "settings.lang_effective_auto": "Idioma del sistema detectado: {language}. La interfaz lo sigue automáticamente.",
+            "settings.lang_effective": 'Idioma de la interfaz: {language}. Elige "Automático (Sistema)" para seguir al sistema.',
             "settings.deepl_title": "DeepL API",
             "settings.deepl_desc": "Clave de API para traducciones de alta fidelidad.",
             "settings.deepl_placeholder": "Clave API de DeepL (ej. 12345678-abcd...)",
@@ -537,6 +543,7 @@ class I18nService(QObject):
             # Top bar
             "topbar.theme_tooltip": "Alternar modo claro / escuro",
             "topbar.lang_tooltip": "Alterar idioma da interface",
+            "topbar.lang_tooltip_effective": "Alterar idioma da interface — atual: {language}",
             "topbar.lang_auto": "Automático (Sistema)",
             # Home Page
             "home.title": "Traduzir Legendas",
@@ -605,6 +612,8 @@ class I18nService(QObject):
             "settings.lang_card_title": "Idioma da Interface",
             "settings.lang_card_desc": "Selecione o idioma da aplicação ou detecte automaticamente.",
             "settings.lang_auto": "Automático (Sistema)",
+            "settings.lang_effective_auto": "Idioma do sistema detetado: {language}. A interface segue-o automaticamente.",
+            "settings.lang_effective": 'Idioma da interface: {language}. Escolha "Automático (Sistema)" para seguir o sistema.',
             "settings.deepl_title": "DeepL API",
             "settings.deepl_desc": "Chave de API para traduções de alta fidelidade.",
             "settings.deepl_placeholder": "Chave API DeepL (ex: 12345678-abcd...)",
@@ -780,6 +789,7 @@ class I18nService(QObject):
             # Top bar
             "topbar.theme_tooltip": "Dunkel- / Hellmodus umschalten",
             "topbar.lang_tooltip": "Sprache der Benutzeroberfläche ändern",
+            "topbar.lang_tooltip_effective": "Sprache der Benutzeroberfläche ändern — aktuell: {language}",
             "topbar.lang_auto": "Automatisch (System)",
             # Home Page
             "home.title": "Untertitel Übersetzen",
@@ -848,6 +858,8 @@ class I18nService(QObject):
             "settings.lang_card_title": "Sprache der Benutzeroberfläche",
             "settings.lang_card_desc": "Wählen Sie die Anzeigesprache oder automatische Erkennung.",
             "settings.lang_auto": "Automatisch (System)",
+            "settings.lang_effective_auto": "Erkannte Systemsprache: {language}. Die Oberfläche folgt ihr automatisch.",
+            "settings.lang_effective": 'Oberflächensprache: {language}. Wählen Sie "Automatisch (System)", um dem System zu folgen.',
             "settings.deepl_title": "DeepL API",
             "settings.deepl_desc": "API-Schlüssel für hochpräzise Übersetzungen.",
             "settings.deepl_placeholder": "DeepL API-Schlüssel (z. B. 12345678-abcd...)",
@@ -1023,6 +1035,7 @@ class I18nService(QObject):
             # Top bar
             "topbar.theme_tooltip": "Alterna tema scuro / chiaro",
             "topbar.lang_tooltip": "Cambia lingua dell'interfaccia",
+            "topbar.lang_tooltip_effective": "Cambia lingua dell'interfaccia — attuale: {language}",
             "topbar.lang_auto": "Automatico (Sistema)",
             # Home Page
             "home.title": "Traduci Sottotitoli",
@@ -1091,6 +1104,8 @@ class I18nService(QObject):
             "settings.lang_card_title": "Lingua dell'Interfaccia",
             "settings.lang_card_desc": "Seleziona la lingua dell'applicazione o rileva automaticamente.",
             "settings.lang_auto": "Automatico (Sistema)",
+            "settings.lang_effective_auto": "Lingua di sistema rilevata: {language}. L'interfaccia la segue automaticamente.",
+            "settings.lang_effective": 'Lingua dell\'interfaccia: {language}. Scegli "Automatico (Sistema)" per seguire il sistema.',
             "settings.deepl_title": "DeepL API",
             "settings.deepl_desc": "Chiave API per traduzioni di alta fedeltà.",
             "settings.deepl_placeholder": "Chiave API DeepL (es: 12345678-abcd...)",
@@ -1266,6 +1281,7 @@ class I18nService(QObject):
             # Top bar
             "topbar.theme_tooltip": "切换深色 / 浅色主题",
             "topbar.lang_tooltip": "切换界面语言",
+            "topbar.lang_tooltip_effective": "切换界面语言 — 当前：{language}",
             "topbar.lang_auto": "自动检测 (系统)",
             # Home Page
             "home.title": "翻译字幕",
@@ -1334,6 +1350,8 @@ class I18nService(QObject):
             "settings.lang_card_title": "界面显示语言",
             "settings.lang_card_desc": "选择应用程序的语言，或设为自动根据系统语言切换。",
             "settings.lang_auto": "自动检测 (系统)",
+            "settings.lang_effective_auto": "检测到的系统语言：{language}。界面将自动跟随。",
+            "settings.lang_effective": '界面语言：{language}。选择"自动检测 (系统)"可跟随系统语言。',
             "settings.deepl_title": "DeepL API",
             "settings.deepl_desc": "用于高品质神经网络翻译的 API 密钥。",
             "settings.deepl_placeholder": "DeepL API 密钥 (例如：12345678-abcd...)",
