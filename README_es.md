@@ -89,13 +89,13 @@ pytest tests/ -v
 
 ### Generador de galería de capturas
 
-`tools/regenerate_screenshots.py` regenera la galería de verificación visual offscreen utilizada en la revisión de UI: páginas de la ventana principal (Inicio, Ajustes, Acerca de) × idiomas × temas oscuro/claro, más el diálogo de burn-in y los modales de progreso por idioma.
+`tools/regenerate_screenshots.py` regenera la galería de verificación visual offscreen utilizada en la revisión de UI: páginas de la ventana principal (Inicio, Ajustes, Acerca de) × idiomas × temas oscuro/claro, más el diálogo de burn-in, los modales de progreso, el diálogo de archivos tematizado (oscuro/claro) y un message box por idioma.
 
 ```bash
 QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
 ```
 
-- La salida va por defecto a `/tmp/srt4u-shots` (28 PNG); los PNG previos del directorio se sobrescriben.
+- La salida va por defecto a `/tmp/srt4u-shots` (46 PNG con los 6 idiomas de UI); los PNG previos del directorio se sobrescriben.
 - Usa la plataforma offscreen de Qt si no hay display disponible y neutraliza el worker de FFmpeg, por lo que puede ejecutarse headless sin riesgo.
 - Imprime el tamaño resultante y el mínimo declarado de cada diálogo como comprobación rápida de geometría (se espera `size == min`).
 - La utilidad está protegida contra degradación por el test de humo `tests/test_screenshot_tool.py`, que la ejecuta en un subproceso en cada job de tests de CI.

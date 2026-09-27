@@ -1,5 +1,6 @@
 import copy
 import os
+import sys
 import time
 from typing import Optional, List
 
@@ -102,7 +103,7 @@ class ProcessWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SRT4U - Subtitle Processor")
+        # El título de ventana lo fija `retranslate_ui()` según el idioma activo
         self.setMinimumSize(980, 640)
         self._apply_initial_geometry()
 
@@ -257,6 +258,9 @@ class MainWindow(QMainWindow):
         self._apply_theme()
 
     def _apply_theme(self):
+        # El tema activo se registra en Styles para que los diálogos del sistema
+        # (archivos, mensajes, tooltips) se pinten con los mismos colores.
+        Styles.set_dark(self.dark_mode)
         self.central_widget.setStyleSheet(Styles.get_main_style(self.dark_mode))
         Styles.retint_inline_text(self.central_widget, self.dark_mode)
         if hasattr(self, "btn_theme"):
@@ -269,6 +273,10 @@ class MainWindow(QMainWindow):
                 )
             )
             self.btn_theme.setIconSize(QSize(18, 18))
+        # Los tooltips se estilizan a nivel de aplicación: se reapuntan al tema activo
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(Styles.tooltip_qss(self.dark_mode))
         self._switch_page(self.stack.currentIndex())
 
     # ------------------ PÁGINA: INICIO ------------------
@@ -1544,19 +1552,32 @@ class MainWindow(QMainWindow):
             }
         """
 
-    def _open_license_file(self):
-        lic_path = os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            ),
-            "LICENSE",
+    def _license_file_candidates(self) -> List[str]:
+        """Rutas donde puede encontrarse el LICENSE (repo, bundle PyInstaller, cwd)."""
+        repo_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
-        if os.path.exists(lic_path):
-            open_path(lic_path)
-        else:
-            QDesktopServices.openUrl(
-                QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/")
+        candidates = [
+            os.path.join(repo_root, "LICENSE"),
+            os.path.join(os.getcwd(), "LICENSE"),
+        ]
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        if bundle_root:
+            candidates.insert(0, os.path.join(bundle_root, "LICENSE"))
+        if getattr(sys, "frozen", False):
+            candidates.insert(
+                0, os.path.join(os.path.dirname(sys.executable), "LICENSE")
             )
+        return candidates
+
+    def _open_license_file(self):
+        for lic_path in self._license_file_candidates():
+            if os.path.exists(lic_path):
+                open_path(lic_path)
+                return
+        QDesktopServices.openUrl(
+            QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/")
+        )
 
     def _build_about_page(self) -> QWidget:
         page = QWidget()

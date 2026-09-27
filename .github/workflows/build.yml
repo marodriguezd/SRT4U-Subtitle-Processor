@@ -38,10 +38,10 @@ jobs:
           pip install pytest ruff==0.16.9
 
       - name: "Lint with ruff (ruff.toml: F,E7,E9,B)"
-        run: ruff check application main.py conftest.py tests
+        run: ruff check application main.py conftest.py tests tools
 
       - name: Check formatting with ruff format
-        run: ruff format --check application main.py conftest.py tests
+        run: ruff format --check application main.py conftest.py tests tools
 
       - name: Run screenshot tool smoke test
         env:
@@ -86,6 +86,7 @@ jobs:
           pyinstaller --noconsole --onefile --name "SRT4U" `
             --add-data "application;application" `
             --add-data "assets;assets" `
+            --add-data "LICENSE;." `
             --add-binary "ffmpeg.exe;." `
             --icon "assets/icon.ico" `
             main.py
@@ -153,6 +154,7 @@ jobs:
           pyinstaller --noconsole --onefile --name "SRT4U" \
             --add-data "application:application" \
             --add-data "assets:assets" \
+            --add-data "LICENSE:." \
             --add-binary "ffmpeg:." \
             --icon "assets/icon.ico" \
             main.py
@@ -245,6 +247,7 @@ jobs:
           pyinstaller --windowed --name "SRT4U" \
             --add-data "application:application" \
             --add-data "assets:assets" \
+            --add-data "LICENSE:." \
             --add-binary "ffmpeg:." \
             --icon "assets/icon.icns" \
             main.py

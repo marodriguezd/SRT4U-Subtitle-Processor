@@ -2,7 +2,10 @@
 Estilos Glassmorphism con transparencias RGBA, iluminación ambiental y alto contraste.
 """
 
+from typing import Dict, Optional
+
 from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtWidgets import QDialog
 
 
@@ -72,54 +75,164 @@ class Styles:
     # Superficies de widgets deliberadamente oscuros (reproductor, tarjetas de vídeo)
     PERMANENT_DARK_SURFACES = ("#070B14", "#0B0F19")
 
+    # Tema activo de la aplicación. Lo mantiene `MainWindow._apply_theme()` para
+    # que los diálogos del sistema (archivos, mensajes) se pinten en el tema correcto.
+    _CURRENT_DARK = True
+
     @classmethod
-    def message_box_style(cls) -> str:
+    def set_dark(cls, dark: bool) -> None:
+        """Registra el tema activo de la aplicación."""
+        cls._CURRENT_DARK = bool(dark)
+
+    @classmethod
+    def is_dark(cls) -> bool:
+        """Devuelve True si el tema activo de la aplicación es el oscuro."""
+        return cls._CURRENT_DARK
+
+    @classmethod
+    def dialog_colors(cls, dark: Optional[bool] = None) -> Dict[str, str]:
+        """
+        Colores de superficie/texto/acento para los diálogos del sistema, en el
+        tema indicado (por defecto, el tema activo de la aplicación).
+        """
+        if dark is None:
+            dark = cls.is_dark()
+        if dark:
+            return {
+                "bg": cls.SURFACE_DEEP,
+                "surface": cls.SURFACE,
+                "surface_alt": cls.SURFACE_ALT,
+                "raised": cls.SURFACE_RAISED,
+                "border": cls.BORDER,
+                "border_subtle": cls.BORDER_SUBTLE,
+                "text": cls.TEXT,
+                "subtle": cls.TEXT_SUBTLE,
+                "muted": cls.TEXT_MUTED,
+                "faint": cls.TEXT_FAINT,
+                "accent": cls.ACCENT,
+                "accent_hover": cls.ACCENT_HOVER,
+                "primary": cls.PRIMARY,
+                "primary_hover": cls.PRIMARY_HOVER,
+                "selection": cls.PRIMARY,
+                "selection_text": "#FFFFFF",
+                "icon": cls.TEXT_SUBTLE,
+            }
+        return {
+            "bg": "#FFFFFF",
+            "surface": "#F8FAFC",
+            "surface_alt": "#F1F5F9",
+            "raised": "#EEF2FF",
+            "border": "#CBD5E1",
+            "border_subtle": "#E2E8F0",
+            "text": cls.TEXT_MAIN_LIGHT,
+            "subtle": cls.TEXT_SUBTLE_LIGHT,
+            "muted": cls.TEXT_MUTED_LIGHT,
+            "faint": "#94A3B8",
+            "accent": cls.PRIMARY,
+            "accent_hover": cls.PRIMARY_HOVER,
+            "primary": cls.PRIMARY,
+            "primary_hover": cls.PRIMARY_HOVER,
+            "selection": cls.PRIMARY,
+            "selection_text": "#FFFFFF",
+            "icon": cls.TEXT_SUBTLE_LIGHT,
+        }
+
+    @classmethod
+    def dialog_palette(cls, dark: Optional[bool] = None) -> QPalette:
+        """
+        Paleta explícita para diálogos top-level (QFileDialog/QMessageBox).
+
+        Aunque el QSS cubre la mayoría de widgets, hay elementos que se pintan
+        con la paleta (delegados de listas, iconos estándar del estilo, color de
+        selección); sin fijarla, esos elementos usan el azul por defecto de Qt
+        (`#308cc6`) y los colores del tema del escritorio.
+        """
+        c = cls.dialog_colors(dark)
+        palette = QPalette()
+        groups = (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive)
+        roles = {
+            QPalette.ColorRole.Window: c["bg"],
+            QPalette.ColorRole.WindowText: c["text"],
+            QPalette.ColorRole.Base: c["surface"],
+            QPalette.ColorRole.AlternateBase: c["raised"],
+            QPalette.ColorRole.Text: c["text"],
+            QPalette.ColorRole.Button: c["raised"],
+            QPalette.ColorRole.ButtonText: c["text"],
+            QPalette.ColorRole.BrightText: c["accent"],
+            QPalette.ColorRole.Highlight: c["selection"],
+            QPalette.ColorRole.HighlightedText: c["selection_text"],
+            QPalette.ColorRole.ToolTipBase: c["raised"],
+            QPalette.ColorRole.ToolTipText: c["text"],
+            QPalette.ColorRole.PlaceholderText: c["muted"],
+            QPalette.ColorRole.Link: c["primary"],
+        }
+        for group in groups:
+            for role, color in roles.items():
+                palette.setColor(group, role, QColor(color))
+        # Estado deshabilitado: texto atenuado pero legible sobre la superficie
+        for role in (
+            QPalette.ColorRole.Text,
+            QPalette.ColorRole.ButtonText,
+            QPalette.ColorRole.WindowText,
+        ):
+            palette.setColor(QPalette.ColorGroup.Disabled, role, QColor(c["muted"]))
+        return palette
+
+    @classmethod
+    def message_box_style(cls, dark: Optional[bool] = None) -> str:
         """QSS para los QMessageBox no nativos, coherente con la paleta glass."""
+        c = cls.dialog_colors(dark)
         return f"""
             QMessageBox {{
-                background-color: {cls.SURFACE_DEEP};
-                color: {cls.TEXT};
+                background-color: {c["bg"]};
+                color: {c["text"]};
             }}
             QMessageBox QLabel {{
-                color: {cls.TEXT_SUBTLE};
+                color: {c["subtle"]};
                 font-size: 13px;
                 background: transparent;
+                selection-background-color: {c["selection"]};
+                selection-color: {c["selection_text"]};
             }}
             QMessageBox QLabel#qt_msgbox_label {{
-                color: {cls.TEXT};
+                color: {c["text"]};
                 font-size: 14px;
                 font-weight: 600;
             }}
+            QMessageBox QLabel#qt_msgbox_informativelabel {{
+                color: {c["muted"]};
+            }}
             QMessageBox QPushButton {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT};
-                border: 1px solid {cls.BORDER};
+                background-color: {c["raised"]};
+                color: {c["text"]};
+                border: 1px solid {c["border"]};
                 border-radius: 6px;
                 padding: 7px 18px;
                 font-weight: 600;
                 min-width: 64px;
             }}
             QMessageBox QPushButton:hover {{
-                background-color: {cls.BORDER};
-                border-color: {cls.ACCENT_LIGHT};
+                background-color: {c["border"]};
+                border-color: {c["accent"]};
             }}
             QMessageBox QPushButton:default {{
-                background-color: {cls.ACCENT};
+                background-color: {c["accent"]};
                 color: #FFFFFF;
                 border: none;
                 font-weight: 700;
             }}
-            QMessageBox QPushButton:default:hover {{ background-color: {cls.ACCENT_HOVER}; }}
+            QMessageBox QPushButton:default:hover {{ background-color: {c["accent_hover"]}; }}
         """
 
     @classmethod
-    def tooltip_qss(cls) -> str:
+    def tooltip_qss(cls, dark: Optional[bool] = None) -> str:
         """QSS de nivel de aplicación para tooltips (no heredan estilos de widgets)."""
+        c = cls.dialog_colors(dark)
         return f"""
             QToolTip {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT};
-                border: 1px solid {cls.ACCENT_LIGHT};
+                background-color: {c["raised"]};
+                color: {c["text"]};
+                border: 1px solid {c["accent"]};
                 border-radius: 4px;
                 padding: 6px 8px;
                 font-size: 12px;
@@ -127,105 +240,142 @@ class Styles:
         """
 
     @classmethod
-    def file_dialog_style(cls) -> str:
-        """QSS para los QFileDialog no nativos, coherente con la paleta glass."""
+    def file_dialog_style(cls, dark: Optional[bool] = None) -> str:
+        """
+        QSS para los QFileDialog no nativos, coherente con el tema glass activo.
+
+        Las reglas se limitan al propio diálogo (`QFileDialog` y sus descendientes)
+        para no pintar indiscriminadamente widgets internos de Qt que gestionan su
+        fondo por sí mismos (viewports, splitters, grip).
+        """
+        c = cls.dialog_colors(dark)
         return f"""
-            QDialog, QWidget {{
-                background-color: {cls.SURFACE_DEEP};
-                color: {cls.TEXT};
+            QFileDialog {{
+                background-color: {c["bg"]};
+                color: {c["text"]};
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 font-size: 13px;
             }}
-            QComboBox, QLineEdit {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT};
-                border: 1px solid {cls.BORDER};
+            QFileDialog QLabel {{
+                color: {c["subtle"]};
+                background: transparent;
+            }}
+            QFileDialog QLineEdit, QFileDialog QComboBox {{
+                background-color: {c["surface_alt"]};
+                color: {c["text"]};
+                border: 1px solid {c["border"]};
                 border-radius: 6px;
                 padding: 6px 10px;
+                selection-background-color: {c["selection"]};
+                selection-color: {c["selection_text"]};
             }}
-            QComboBox:hover, QLineEdit:hover {{ border-color: {cls.ACCENT_LIGHT}; }}
-            QComboBox QAbstractItemView {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT};
-                border: 1px solid {cls.BORDER};
-                selection-background-color: {cls.PRIMARY};
-                selection-color: #FFFFFF;
+            QFileDialog QLineEdit:hover, QFileDialog QComboBox:hover {{
+                border-color: {c["accent"]};
             }}
-            QPushButton {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT};
-                border: 1px solid {cls.BORDER};
+            QFileDialog QLineEdit:focus, QFileDialog QComboBox:focus {{
+                border-color: {c["accent"]};
+            }}
+            QFileDialog QComboBox QAbstractItemView {{
+                background-color: {c["raised"]};
+                color: {c["text"]};
+                border: 1px solid {c["border"]};
+                selection-background-color: {c["selection"]};
+                selection-color: {c["selection_text"]};
+                outline: none;
+            }}
+            QFileDialog QPushButton {{
+                background-color: {c["raised"]};
+                color: {c["text"]};
+                border: 1px solid {c["border"]};
                 border-radius: 6px;
                 padding: 7px 16px;
                 font-weight: 600;
             }}
-            QPushButton:hover {{
-                background-color: {cls.BORDER};
-                border-color: {cls.ACCENT_LIGHT};
+            QFileDialog QPushButton:hover {{
+                background-color: {c["border"]};
+                border-color: {c["accent"]};
             }}
-            QPushButton:default {{
-                background-color: {cls.ACCENT};
+            QFileDialog QPushButton:default {{
+                background-color: {c["accent"]};
                 color: #FFFFFF;
                 border: none;
                 font-weight: 700;
             }}
-            QPushButton:default:hover {{ background-color: {cls.ACCENT_HOVER}; }}
-            QListView, QTreeView, QTableView {{
-                background-color: {cls.SURFACE};
-                color: {cls.TEXT};
-                border: 1px solid {cls.BORDER};
+            QFileDialog QPushButton:default:hover {{ background-color: {c["accent_hover"]}; }}
+            QFileDialog QToolButton {{
+                background-color: transparent;
+                color: {c["text"]};
+                border: 1px solid transparent;
                 border-radius: 6px;
-                alternate-background-color: {cls.SURFACE_ALT};
-                selection-background-color: {cls.PRIMARY};
-                selection-color: #FFFFFF;
+                padding: 3px;
+            }}
+            QFileDialog QToolButton:hover {{
+                background-color: {c["raised"]};
+                border-color: {c["border"]};
+            }}
+            QFileDialog QToolButton:pressed, QFileDialog QToolButton:checked {{
+                background-color: {c["border"]};
+                border-color: {c["accent"]};
+            }}
+            QFileDialog QToolButton::menu-indicator {{ image: none; }}
+            QFileDialog QListView, QFileDialog QTreeView, QFileDialog QTableView {{
+                background-color: {c["surface"]};
+                color: {c["text"]};
+                border: 1px solid {c["border"]};
+                border-radius: 6px;
+                alternate-background-color: {c["surface_alt"]};
+                selection-background-color: {c["selection"]};
+                selection-color: {c["selection_text"]};
                 outline: none;
             }}
-            QHeaderView::section {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT_SUBTLE};
+            QFileDialog QListView::item, QFileDialog QTreeView::item {{
+                color: {c["text"]};
+                padding: 3px 4px;
+            }}
+            QFileDialog QListView::item:selected, QFileDialog QTreeView::item:selected {{
+                background-color: {c["selection"]};
+                color: {c["selection_text"]};
+            }}
+            QFileDialog QHeaderView::section {{
+                background-color: {c["raised"]};
+                color: {c["subtle"]};
                 border: none;
-                border-bottom: 1px solid {cls.BORDER};
+                border-bottom: 1px solid {c["border"]};
                 padding: 6px;
             }}
-            QScrollBar:vertical {{
-                background: {cls.SURFACE_DEEP};
+            QFileDialog QSplitter::handle {{ background-color: {c["border_subtle"]}; }}
+            QFileDialog QScrollBar:vertical {{
+                background: {c["bg"]};
                 width: 10px;
                 margin: 0;
             }}
-            QScrollBar::handle:vertical {{
-                background: {cls.BORDER};
+            QFileDialog QScrollBar::handle:vertical {{
+                background: {c["border"]};
                 border-radius: 5px;
                 min-height: 30px;
             }}
-            QScrollBar::handle:vertical:hover {{ background: {cls.TEXT_FAINT}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-            QScrollBar:horizontal {{
-                background: {cls.SURFACE_DEEP};
+            QFileDialog QScrollBar::handle:vertical:hover {{ background: {c["muted"]}; }}
+            QFileDialog QScrollBar::add-line:vertical, QFileDialog QScrollBar::sub-line:vertical {{ height: 0; }}
+            QFileDialog QScrollBar:horizontal {{
+                background: {c["bg"]};
                 height: 10px;
                 margin: 0;
             }}
-            QScrollBar::handle:horizontal {{
-                background: {cls.BORDER};
+            QFileDialog QScrollBar::handle:horizontal {{
+                background: {c["border"]};
                 border-radius: 5px;
                 min-width: 30px;
             }}
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
-            QMenu {{
-                background-color: {cls.SURFACE_RAISED};
-                color: {cls.TEXT};
-                border: 1px solid {cls.BORDER};
+            QFileDialog QScrollBar::add-line:horizontal, QFileDialog QScrollBar::sub-line:horizontal {{ width: 0; }}
+            QFileDialog QMenu {{
+                background-color: {c["raised"]};
+                color: {c["text"]};
+                border: 1px solid {c["border"]};
             }}
-            QMenu::item:selected {{ background-color: {cls.PRIMARY}; color: #FFFFFF; }}
-            QToolButton {{
-                background-color: transparent;
-                color: {cls.TEXT};
-                border: 1px solid transparent;
-                border-radius: 6px;
-                padding: 4px;
+            QFileDialog QMenu::item:selected {{
+                background-color: {c["selection"]};
+                color: {c["selection_text"]};
             }}
-            QToolButton:hover {{ background-color: {cls.SURFACE_RAISED}; border-color: {cls.BORDER}; }}
-            QToolButton::menu-indicator {{ image: none; }}
-            QLabel {{ color: {cls.TEXT_SUBTLE}; background: transparent; }}
         """
 
     @classmethod

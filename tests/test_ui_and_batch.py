@@ -1,5 +1,6 @@
 import copy
 import os
+import shutil
 
 from application.ui.main_window import MainWindow
 from application.ui.widgets import (
@@ -41,8 +42,10 @@ def test_main_window_flow(qapp, tmp_path):
     win._switch_page(7)  # Acerca de
     assert win.stack.currentIndex() == 7
 
-    # Carga de archivo
-    sample_srt = os.path.join(FIXTURES_DIR, "sample.srt")
+    # La conversión escribe junto al archivo de origen: se trabaja sobre una copia
+    # temporal para no ensuciar tests/fixtures.
+    sample_srt = str(tmp_path / "sample.srt")
+    shutil.copyfile(os.path.join(FIXTURES_DIR, "sample.srt"), sample_srt)
     win._on_file_selected(sample_srt, "")
     assert win.current_subtitle_path == sample_srt
 
@@ -50,10 +53,9 @@ def test_main_window_flow(qapp, tmp_path):
     win.cb_convert_format.setCurrentText("VTT (.vtt)")
     win._run_format_conversion()
 
-    expected_converted = os.path.join(FIXTURES_DIR, "sample_converted.vtt")
+    expected_converted = str(tmp_path / "sample_converted.vtt")
     assert os.path.exists(expected_converted)
     assert os.path.getsize(expected_converted) > 0
-    os.remove(expected_converted)
 
 
 def test_batch_processing_logic(tmp_path):

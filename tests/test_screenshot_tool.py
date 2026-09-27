@@ -10,8 +10,9 @@ from pathlib import Path
 
 TOOL = Path(__file__).resolve().parent.parent / "tools" / "regenerate_screenshots.py"
 
-# 3 lenguas de ventana × 2 temas × 3 páginas + burn_en + progress_en + burnprogress_en
-MIN_EXPECTED_SHOTS = 21
+# 3 lenguas de ventana × 2 temas × 3 páginas (18) + burn_en + progress_en +
+# burnprogress_en + filedialog_en (dark/light) + messagebox_en
+MIN_EXPECTED_SHOTS = 24
 EXPECTED_SHOTS = [
     "home_en_dark.png",
     "home_de_light.png",
@@ -21,6 +22,9 @@ EXPECTED_SHOTS = [
     "burn_en.png",
     "progress_en.png",
     "burnprogress_en.png",
+    "filedialog_en_dark.png",
+    "filedialog_en_light.png",
+    "messagebox_en.png",
 ]
 
 

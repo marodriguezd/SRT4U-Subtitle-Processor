@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Centralized Multiplatform Helpers**: New `application/platform_utils.py` (`open_path`, `reveal_path`) replacing five duplicated platform-dispatch blocks.
 - **Screenshot Utility**: `tools/regenerate_screenshots.py` regenerates the offscreen visual-verification gallery (main window pages × languages × themes plus per-language dialogs) with a smoke test (`tests/test_screenshot_tool.py`) wired into CI.
 - **Shared Lint Configuration**: `ruff.toml` (pyflakes, pycodestyle statement/parse errors, flake8-bugbear) now drives both local and CI linting, complemented by a `ruff format --check` gate; CI test job runs lint → format → screenshot smoke test → full suite before any build.
+- **Themed System Dialogs**: `QFileDialog` and `QMessageBox` are now rendered non-natively with a deterministic Fusion style, an explicit palette, a scoped stylesheet, a themed SVG icon provider (file/folder/drive/monitor icons) and SVG toolbar icons, replacing the desktop-theme icons that clashed with the app (one of them invisible). Both follow the active dark/light theme via `Styles.set_dark()`.
+- **Themed Tooltips**: the application-level tooltip stylesheet is now theme-aware and re-applied whenever the theme changes.
+- **License Bundled in Binaries**: `LICENSE` is packaged into the Windows, Linux and macOS builds, so the About page "View license" button opens the local file instead of always falling back to the web page.
+- **System Dialog Regression Tests**: 18 new tests (`tests/test_system_dialogs.py`) assert dialog palette contrast, themed toolbar icons with a minimum contrast, the themed icon provider, and message-box theming in all 6 languages × 2 themes.
 - **Expanded i18n Catalog**: ~65 new translation keys across the burn-in dialog, progress modals, preview counters, and alerts; 212 consistent keys per language verified by invariant scripts.
 
 ### Changed
@@ -22,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Config Persistence**: Home-page choices (source/target language, engine, cleaning and format options) are now loaded from and saved to user configuration; the default engine respects `preferred_engine`.
 - **Light Theme Correctness**: inline text colors are now theme-aware via `Styles.retint_inline_text()`, fixing white-on-white labels in light mode while preserving permanent-dark surfaces.
 - **CI Quality Gates**: test job gained a ruff lint step (shared config, pinned version), a `ruff format --check` step, and an explicit screenshot-tool smoke test ahead of the full suite; builds run only after all gates pass.
+- **Lint/Format Scope**: `tools/` is now covered by the ruff lint and format gates, and the screenshot utility was reformatted accordingly.
+- **Hermetic Test Configuration**: the suite redirects `ConfigService` to a temporary directory, so tests no longer read or overwrite the real user `settings.json` (previously the UI language persisted by a test could change later results).
+- **Network-Dependent Tests Marked**: the free Google Translate tests are tagged `network` and skip gracefully when the engine returns untranslated text (no connectivity), instead of failing the run.
+- **Dependency Cleanup**: removed the unused `requests` dependency from `requirements.txt`.
 
 ### Fixed
 - **Light theme contrast**: labels rendered white-on-white (~1.0 contrast) in light mode; all inline text now retints to the active theme (WCAG ≥ 3.0 verified offscreen in 6 languages × 2 themes).
@@ -29,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Burn-in dialog minimum size**: its declared minimum (620 px) could fall below the content-driven `minimumSizeHint` (654 px in English); minimums are now content-derived, so the dialog can always be resized to fit.
 - **German license text truncation** on the About page (word wrap + flexible layout).
 - **Batch wording** in `README.md` (files, not folders) and `.desktop` alignment in CI packaging (added `GenericName`, `Categories`, `StartupWMClass`, `Keywords`).
-- **Test suite reliability**: generated FFmpeg fixture replaces a hardcoded personal path; offline-resilience and conversion tests now assert real outcomes; QMessageBox monkeypatching centralized.
+- **Test suite reliability**: generated FFmpeg fixture replaces a hardcoded personal path; offline-resilience and conversion tests now assert real outcomes; QMessageBox monkeypatching centralized; the conversion test works on a temporary copy instead of writing into `tests/fixtures/`.
+- **Invisible system-dialog controls**: the file dialog's "up one level" and "new folder" buttons rendered with the same color as the dialog background (contrast 1.00–1.02) and the sidebar used amber desktop-theme icons; all system dialog controls now use themed SVG icons (contrast ≥ 10.5).
 
 [1.1.0]: https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.1.0
 
