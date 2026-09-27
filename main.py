@@ -9,6 +9,7 @@ import ctypes
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFont, QIcon
 from application.ui import GlassMainWindow
+from application.ui.styles import Styles
 
 
 def get_resource_path(relative_path):
@@ -62,6 +63,9 @@ if __name__ == "__main__":
     font = QFont("Segoe UI", 10)
     font.setStyleHint(QFont.StyleHint.SansSerif)
     app.setFont(font)
+
+    # Tooltips no heredan QSS de widgets: se tematizan a nivel de aplicación
+    app.setStyleSheet(Styles.tooltip_qss())
 
     processor = GlassMainWindow()
     processor.setWindowIcon(app_icon)

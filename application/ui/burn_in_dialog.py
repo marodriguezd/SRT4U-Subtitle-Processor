@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QProgressBar,
     QFrame,
-    QMessageBox,
     QCheckBox,
 )
 
@@ -26,6 +25,7 @@ from ..services.video_burner_service import BurnInOptions, BurnInWorker
 from ..services.i18n_service import t
 from ..platform_utils import open_path, reveal_path
 from .file_dialogs import ask_open_file, ask_save_file
+from .message_boxes import ThemedMessageBox
 from .icons import Icons
 from .styles import Styles, sync_minimum_size
 
@@ -372,25 +372,25 @@ class BurnInDialog(QDialog):
         o_path = self.txt_output.text().strip()
 
         if not v_path or not os.path.exists(v_path):
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("burn.err_video_title"), t("burn.err_video_desc")
             )
             return
 
         if not o_path:
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("burn.err_output_title"), t("burn.err_output_desc")
             )
             return
 
         if os.path.abspath(v_path) == os.path.abspath(o_path):
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("burn.err_same_path_title"), t("burn.err_same_path_desc")
             )
             return
 
         if not self.subtitle_items:
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("burn.err_no_subs_title"), t("burn.err_no_subs_desc")
             )
             return
@@ -704,7 +704,7 @@ class BurnInProgressModal(QDialog):
         self.btn_cancel.setText(t("burn.btn_close"))
         self.btn_cancel.clicked.disconnect()
         self.btn_cancel.clicked.connect(self.reject)
-        QMessageBox.critical(self, t("burn.error_dialog_title"), error_msg)
+        ThemedMessageBox.critical(self, t("burn.error_dialog_title"), error_msg)
 
     def _on_cancelled(self):
         self.lbl_title.setText(t("burn.cancelled_title"))

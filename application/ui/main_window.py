@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
-    QMessageBox,
     QLineEdit,
     QRadioButton,
     QButtonGroup,
@@ -44,6 +43,7 @@ from .widgets import (
 from .burn_in_dialog import BurnInDialog, BurnInProgressModal, BurnInOptions
 from ..platform_utils import open_path, reveal_path
 from .file_dialogs import ask_open_file, ask_open_files, ask_save_file
+from .message_boxes import ThemedMessageBox
 from ..services.config_service import ConfigService
 from ..services.subtitle_service import SubtitleService, ProcessingResult
 from ..services.translation_service import TranslationService
@@ -1097,7 +1097,7 @@ class MainWindow(QMainWindow):
         if not self.current_subtitle_path or not os.path.exists(
             self.current_subtitle_path
         ):
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("alert.file_req_title"), t("alert.file_req_desc")
             )
             return
@@ -1183,7 +1183,7 @@ class MainWindow(QMainWindow):
                 f.write(result.output_content)
             self.saved_output_path = out_path
         except Exception as e:
-            QMessageBox.critical(
+            ThemedMessageBox.critical(
                 self, t("alert.save_error_title"), t("alert.save_error_desc", err=e)
             )
             return
@@ -1203,7 +1203,7 @@ class MainWindow(QMainWindow):
     def _on_processing_failed(self, error_msg: str):
         if hasattr(self, "modal") and self.modal.isVisible():
             self.modal.reject()
-        QMessageBox.critical(
+        ThemedMessageBox.critical(
             self,
             t("alert.process_error_title"),
             t("alert.process_error_desc", err=error_msg),
@@ -1211,7 +1211,7 @@ class MainWindow(QMainWindow):
 
     def _start_fast_clean(self):
         if not self.current_subtitle_path:
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("alert.file_req_title"), t("alert.file_req_desc")
             )
             return
@@ -1233,7 +1233,7 @@ class MainWindow(QMainWindow):
         if not self.current_subtitle_path or not os.path.exists(
             self.current_subtitle_path
         ):
-            QMessageBox.warning(
+            ThemedMessageBox.warning(
                 self, t("alert.file_req_title"), t("alert.file_req_convert_desc")
             )
             return
@@ -1264,13 +1264,13 @@ class MainWindow(QMainWindow):
                 out_f.write(out_content)
 
             self.saved_output_path = out_path
-            QMessageBox.information(
+            ThemedMessageBox.information(
                 self,
                 t("alert.conv_success_title"),
                 t("alert.conv_success_desc", path=out_path),
             )
         except Exception as e:
-            QMessageBox.critical(
+            ThemedMessageBox.critical(
                 self, t("alert.conv_error_title"), t("alert.conv_error_desc", err=e)
             )
 
@@ -1305,7 +1305,7 @@ class MainWindow(QMainWindow):
             items = self.last_result.processed_items
 
         if not items:
-            QMessageBox.information(
+            ThemedMessageBox.information(
                 self, t("alert.info_title"), t("alert.nothing_save_desc")
             )
             return
@@ -1329,7 +1329,7 @@ class MainWindow(QMainWindow):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             self.saved_output_path = path
-            QMessageBox.information(
+            ThemedMessageBox.information(
                 self,
                 t("alert.save_success_title"),
                 t("alert.save_success_desc", path=path),
@@ -1341,7 +1341,7 @@ class MainWindow(QMainWindow):
             items = self.last_result.processed_items
 
         if not items:
-            QMessageBox.information(
+            ThemedMessageBox.information(
                 self, t("alert.no_subs_title"), t("alert.no_subs_desc")
             )
             return
@@ -1392,7 +1392,7 @@ class MainWindow(QMainWindow):
                 if matching_vid:
                     self.video_player.load_video(matching_vid)
             except Exception as e:
-                QMessageBox.critical(
+                ThemedMessageBox.critical(
                     self, t("alert.load_error_title"), t("alert.load_error_desc", err=e)
                 )
 
@@ -1425,7 +1425,7 @@ class MainWindow(QMainWindow):
     def _run_batch_processing(self):
         rows = self.batch_table.rowCount()
         if rows == 0:
-            QMessageBox.information(
+            ThemedMessageBox.information(
                 self, t("alert.batch_empty_title"), t("alert.batch_empty_desc")
             )
             return
@@ -1464,7 +1464,7 @@ class MainWindow(QMainWindow):
                     row, 3, QTableWidgetItem(t("batch.status_error", err=e))
                 )
 
-        QMessageBox.information(
+        ThemedMessageBox.information(
             self, t("alert.batch_done_title"), t("alert.batch_done_desc")
         )
 
@@ -1521,7 +1521,7 @@ class MainWindow(QMainWindow):
         self.config_service.set("openai_api_key", self.txt_openai_key.text().strip())
         self.config_service.set("openai_base_url", self.txt_openai_url.text().strip())
         self.config_service.set("openai_model", self.txt_openai_model.text().strip())
-        QMessageBox.information(
+        ThemedMessageBox.information(
             self, t("settings.save_success_title"), t("settings.save_success")
         )
 

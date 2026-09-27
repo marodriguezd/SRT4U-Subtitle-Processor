@@ -73,6 +73,60 @@ class Styles:
     PERMANENT_DARK_SURFACES = ("#070B14", "#0B0F19")
 
     @classmethod
+    def message_box_style(cls) -> str:
+        """QSS para los QMessageBox no nativos, coherente con la paleta glass."""
+        return f"""
+            QMessageBox {{
+                background-color: {cls.SURFACE_DEEP};
+                color: {cls.TEXT};
+            }}
+            QMessageBox QLabel {{
+                color: {cls.TEXT_SUBTLE};
+                font-size: 13px;
+                background: transparent;
+            }}
+            QMessageBox QLabel#qt_msgbox_label {{
+                color: {cls.TEXT};
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QMessageBox QPushButton {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT};
+                border: 1px solid {cls.BORDER};
+                border-radius: 6px;
+                padding: 7px 18px;
+                font-weight: 600;
+                min-width: 64px;
+            }}
+            QMessageBox QPushButton:hover {{
+                background-color: {cls.BORDER};
+                border-color: {cls.ACCENT_LIGHT};
+            }}
+            QMessageBox QPushButton:default {{
+                background-color: {cls.ACCENT};
+                color: #FFFFFF;
+                border: none;
+                font-weight: 700;
+            }}
+            QMessageBox QPushButton:default:hover {{ background-color: {cls.ACCENT_HOVER}; }}
+        """
+
+    @classmethod
+    def tooltip_qss(cls) -> str:
+        """QSS de nivel de aplicación para tooltips (no heredan estilos de widgets)."""
+        return f"""
+            QToolTip {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT};
+                border: 1px solid {cls.ACCENT_LIGHT};
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-size: 12px;
+            }}
+        """
+
+    @classmethod
     def file_dialog_style(cls) -> str:
         """QSS para los QFileDialog no nativos, coherente con la paleta glass."""
         return f"""
