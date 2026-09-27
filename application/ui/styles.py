@@ -73,6 +73,108 @@ class Styles:
     PERMANENT_DARK_SURFACES = ("#070B14", "#0B0F19")
 
     @classmethod
+    def file_dialog_style(cls) -> str:
+        """QSS para los QFileDialog no nativos, coherente con la paleta glass."""
+        return f"""
+            QDialog, QWidget {{
+                background-color: {cls.SURFACE_DEEP};
+                color: {cls.TEXT};
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                font-size: 13px;
+            }}
+            QComboBox, QLineEdit {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT};
+                border: 1px solid {cls.BORDER};
+                border-radius: 6px;
+                padding: 6px 10px;
+            }}
+            QComboBox:hover, QLineEdit:hover {{ border-color: {cls.ACCENT_LIGHT}; }}
+            QComboBox QAbstractItemView {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT};
+                border: 1px solid {cls.BORDER};
+                selection-background-color: {cls.PRIMARY};
+                selection-color: #FFFFFF;
+            }}
+            QPushButton {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT};
+                border: 1px solid {cls.BORDER};
+                border-radius: 6px;
+                padding: 7px 16px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {cls.BORDER};
+                border-color: {cls.ACCENT_LIGHT};
+            }}
+            QPushButton:default {{
+                background-color: {cls.ACCENT};
+                color: #FFFFFF;
+                border: none;
+                font-weight: 700;
+            }}
+            QPushButton:default:hover {{ background-color: {cls.ACCENT_HOVER}; }}
+            QListView, QTreeView, QTableView {{
+                background-color: {cls.SURFACE};
+                color: {cls.TEXT};
+                border: 1px solid {cls.BORDER};
+                border-radius: 6px;
+                alternate-background-color: {cls.SURFACE_ALT};
+                selection-background-color: {cls.PRIMARY};
+                selection-color: #FFFFFF;
+                outline: none;
+            }}
+            QHeaderView::section {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT_SUBTLE};
+                border: none;
+                border-bottom: 1px solid {cls.BORDER};
+                padding: 6px;
+            }}
+            QScrollBar:vertical {{
+                background: {cls.SURFACE_DEEP};
+                width: 10px;
+                margin: 0;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {cls.BORDER};
+                border-radius: 5px;
+                min-height: 30px;
+            }}
+            QScrollBar::handle:vertical:hover {{ background: {cls.TEXT_FAINT}; }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar:horizontal {{
+                background: {cls.SURFACE_DEEP};
+                height: 10px;
+                margin: 0;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {cls.BORDER};
+                border-radius: 5px;
+                min-width: 30px;
+            }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
+            QMenu {{
+                background-color: {cls.SURFACE_RAISED};
+                color: {cls.TEXT};
+                border: 1px solid {cls.BORDER};
+            }}
+            QMenu::item:selected {{ background-color: {cls.PRIMARY}; color: #FFFFFF; }}
+            QToolButton {{
+                background-color: transparent;
+                color: {cls.TEXT};
+                border: 1px solid transparent;
+                border-radius: 6px;
+                padding: 4px;
+            }}
+            QToolButton:hover {{ background-color: {cls.SURFACE_RAISED}; border-color: {cls.BORDER}; }}
+            QToolButton::menu-indicator {{ image: none; }}
+            QLabel {{ color: {cls.TEXT_SUBTLE}; background: transparent; }}
+        """
+
+    @classmethod
     def retint_inline_text(cls, root, dark: bool) -> None:
         """
         Adapta los colores de texto definidos inline en las vistas al tema activo.

@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QPushButton,
-    QFileDialog,
     QAbstractButton,
     QScrollArea,
     QSlider,
@@ -25,6 +24,7 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from .icons import Icons
 from .styles import Styles, sync_minimum_size
+from .file_dialogs import ask_open_file
 from ..services.subtitle_service import SubtitleItem
 from ..services.i18n_service import t
 
@@ -343,8 +343,8 @@ class DropZone(QFrame):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            file_path, _ = QFileDialog.getOpenFileName(
-                self, t("dropzone.dialog_title"), "", t("dropzone.filter")
+            file_path = ask_open_file(
+                self, t("dropzone.dialog_title"), t("dropzone.filter")
             )
             if file_path:
                 self.set_file(file_path)
@@ -988,8 +988,8 @@ class VideoPreviewPlayer(QFrame):
         self._reposition_overlay()
 
     def _browse_video(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, t("preview.select_video_title"), "", t("preview.video_filter")
+        path = ask_open_file(
+            self, t("preview.select_video_title"), t("preview.video_filter")
         )
         if path:
             self.load_video(path)

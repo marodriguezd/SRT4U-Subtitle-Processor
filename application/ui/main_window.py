@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QComboBox,
-    QFileDialog,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -44,6 +43,7 @@ from .widgets import (
 )
 from .burn_in_dialog import BurnInDialog, BurnInProgressModal, BurnInOptions
 from ..platform_utils import open_path, reveal_path
+from .file_dialogs import ask_open_file, ask_open_files, ask_save_file
 from ..services.config_service import ConfigService
 from ..services.subtitle_service import SubtitleService, ProcessingResult
 from ..services.translation_service import TranslationService
@@ -1317,11 +1317,11 @@ class MainWindow(QMainWindow):
             base, ext = os.path.splitext(self.current_subtitle_path)
             suggested_name = f"{base}_editado{ext}"
 
-        path, _ = QFileDialog.getSaveFileName(
+        path = ask_save_file(
             self,
             t("preview.save_dialog_title"),
-            suggested_name,
             t("preview.save_filter"),
+            suggested_name,
         )
         if path:
             ext = os.path.splitext(path)[1].lstrip(".")
@@ -1356,8 +1356,8 @@ class MainWindow(QMainWindow):
                 video_path = matching
 
         if not video_path:
-            path, _ = QFileDialog.getOpenFileName(
-                self, t("burn.select_video_title"), "", t("preview.video_filter")
+            path = ask_open_file(
+                self, t("burn.select_video_title"), t("preview.video_filter")
             )
             if not path:
                 return
@@ -1375,8 +1375,8 @@ class MainWindow(QMainWindow):
         modal.exec()
 
     def _browse_preview_file(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, t("preview.select_subtitle_title"), "", t("preview.sub_filter")
+        path = ask_open_file(
+            self, t("preview.select_subtitle_title"), t("preview.sub_filter")
         )
         if path:
             self.current_subtitle_path = path
@@ -1406,9 +1406,7 @@ class MainWindow(QMainWindow):
 
     # ------------------ LOTE ------------------
     def _add_batch_files(self):
-        files, _ = QFileDialog.getOpenFileNames(
-            self, t("batch.title"), "", t("preview.sub_filter")
-        )
+        files = ask_open_files(self, t("batch.title"), t("preview.sub_filter"))
         for f in files:
             row = self.batch_table.rowCount()
             self.batch_table.insertRow(row)

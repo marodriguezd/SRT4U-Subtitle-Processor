@@ -16,7 +16,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QComboBox,
     QProgressBar,
-    QFileDialog,
     QFrame,
     QMessageBox,
     QCheckBox,
@@ -26,6 +25,7 @@ from ..services.subtitle_service import SubtitleItem
 from ..services.video_burner_service import BurnInOptions, BurnInWorker
 from ..services.i18n_service import t
 from ..platform_utils import open_path, reveal_path
+from .file_dialogs import ask_open_file, ask_save_file
 from .icons import Icons
 from .styles import Styles, sync_minimum_size
 
@@ -345,8 +345,8 @@ class BurnInDialog(QDialog):
         """)
 
     def _browse_video(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, t("burn.select_video_title"), "", t("preview.video_filter")
+        path = ask_open_file(
+            self, t("burn.select_video_title"), t("preview.video_filter")
         )
         if path:
             self.txt_video.setText(path)
@@ -356,11 +356,11 @@ class BurnInDialog(QDialog):
                 self.txt_output.setText(f"{base}_subtitulado.mp4")
 
     def _browse_output(self):
-        path, _ = QFileDialog.getSaveFileName(
+        path = ask_save_file(
             self,
             t("burn.save_video_title"),
-            self.txt_output.text() or "video_subtitulado.mp4",
             t("preview.video_filter"),
+            self.txt_output.text() or "video_subtitulado.mp4",
         )
         if path:
             if not path.lower().endswith(".mp4"):
