@@ -112,7 +112,7 @@ Los fallos se escriben en un archivo de log rotativo (512 KB × 3) en lugar de s
 | macOS | `~/Library/Application Support/SRT4U/srt4u.log` |
 | Linux | `~/.config/SRT4U/srt4u.log` (o `$XDG_CONFIG_HOME/SRT4U/srt4u.log`) |
 
-Registra fallos de lectura/escritura de la configuración, errores del motor de traducción por bloque, problemas de detección de FFmpeg (duración/dimensiones), excepciones inesperadas (con traza) y el código de salida final. Cuando el fallo afecta al usuario — ajustes no guardados, traducción incompleta, configuración ilegible, error inesperado — la app muestra un diálogo indicando ese archivo.
+Los mensajes propios de Qt también se enrutan ahí (`qWarning`/`qCritical`/`qFatal`, y `qDebug`/`qInfo` a nivel debug), de modo que los avisos de multimedia/códecs y los diagnósticos de los plugins de plataforma aparecen junto a las entradas de la app. Registra fallos de lectura/escritura de la configuración, errores del motor de traducción por bloque, problemas de detección de FFmpeg (duración/dimensiones), excepciones inesperadas (con traza) y el código de salida final. Cuando el fallo afecta al usuario — ajustes no guardados, traducción incompleta, configuración ilegible, error inesperado — la app muestra un diálogo indicando ese archivo.
 
 ---
 

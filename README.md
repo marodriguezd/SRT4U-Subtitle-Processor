@@ -112,7 +112,7 @@ Failures are written to a rotating log file (512 KB × 3) instead of being swall
 | macOS | `~/Library/Application Support/SRT4U/srt4u.log` |
 | Linux | `~/.config/SRT4U/srt4u.log` (or `$XDG_CONFIG_HOME/SRT4U/srt4u.log`) |
 
-It records configuration read/write failures, per-block translation engine errors, FFmpeg detection/duration/dimension problems, unexpected exceptions (with traceback) and the final exit code. When a failure is user-visible — settings not saved, incomplete translation, unreadable settings file, unhandled error — the app shows a dialog pointing to this file.
+It records configuration read/write failures, per-block translation engine errors, FFmpeg detection/duration/dimension problems, unexpected exceptions (with traceback) and the final exit code. Qt's own messages are routed there too (`qWarning`/`qCritical`/`qFatal`, and `qDebug`/`qInfo` at debug level), so multimedia/codec warnings and platform-plugin diagnostics show up alongside the app's own entries. When a failure is user-visible — settings not saved, incomplete translation, unreadable settings file, unhandled error — the app shows a dialog pointing to this file.
 
 ---
 

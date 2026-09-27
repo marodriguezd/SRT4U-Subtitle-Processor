@@ -8,7 +8,11 @@ import os
 import ctypes
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFont, QIcon
-from application.logging_setup import get_logger, setup_logging
+from application.logging_setup import (
+    get_logger,
+    install_qt_message_handler,
+    setup_logging,
+)
 from application.ui import GlassMainWindow
 from application.ui.styles import Styles
 
@@ -79,6 +83,8 @@ def install_excepthook(log_path: str) -> None:
 
 if __name__ == "__main__":
     log_path = setup_logging()
+    # Antes de crear la QApplication, para capturar también los mensajes del arranque
+    install_qt_message_handler()
     install_excepthook(log_path)
     logger.info("Iniciando SRT4U (log en %s)", log_path)
 

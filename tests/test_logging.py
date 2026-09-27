@@ -7,9 +7,15 @@ import json
 import logging
 
 import pytest
+from PyQt6.QtCore import qCritical, qWarning
 from PyQt6.QtWidgets import QMessageBox
 
-from application.logging_setup import get_logger, setup_logging
+from application.logging_setup import (
+    get_logger,
+    install_qt_message_handler,
+    setup_logging,
+    uninstall_qt_message_handler,
+)
 from application.services.config_service import ConfigService
 from application.services.i18n_service import get_i18n
 from application.services.subtitle_service import (
@@ -27,6 +33,7 @@ from application.ui.message_boxes import ThemedMessageBox
 def _clean_logging():
     """Deja el logger de la app sin handlers al terminar cada test de este módulo."""
     yield
+    uninstall_qt_message_handler()
     logger = logging.getLogger("srt4u")
     for handler in list(logger.handlers):
         logger.removeHandler(handler)
@@ -86,6 +93,54 @@ def test_config_service_saves_valid_json(tmp_path):
     assert service.save_error is None
     saved = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
     assert saved["openai_model"] == "gpt-4o"
+
+
+def _read_log(tmp_path) -> str:
+    for handler in logging.getLogger("srt4u").handlers:
+        handler.flush()
+    return (tmp_path / "srt4u.log").read_text(encoding="utf-8")
+
+
+def test_qt_warnings_are_routed_to_the_log(tmp_path):
+    """Los avisos de Qt (multimedia, plugins…) deben acabar en el mismo log que la app."""
+    setup_logging(config_dir=str(tmp_path), console=False, force=True)
+    install_qt_message_handler()
+
+    qWarning("QMediaPlayer: codec unavailable")
+    qCritical("QLibraryPrivate: symbol missing")
+
+    content = _read_log(tmp_path)
+    assert "QMediaPlayer: codec unavailable" in content
+    assert "QLibraryPrivate: symbol missing" in content
+    # El nivel se conserva: warning no debe rebajarse a debug ni a error
+    warning_line = next(line for line in content.splitlines() if "QMediaPlayer" in line)
+    critical_line = next(
+        line for line in content.splitlines() if "QLibraryPrivate" in line
+    )
+    assert "[WARNING] srt4u.qt:" in warning_line
+    assert "[ERROR] srt4u.qt:" in critical_line
+
+
+def test_qt_message_handler_is_idempotent_and_removable(tmp_path):
+    setup_logging(config_dir=str(tmp_path), console=False, force=True)
+    install_qt_message_handler()
+    install_qt_message_handler()  # segunda llamada: no debe duplicar el registro
+
+    qWarning("un solo registro")
+
+    assert _read_log(tmp_path).count("un solo registro") == 1
+
+    uninstall_qt_message_handler()
+    uninstall_qt_message_handler()  # no debe fallar si ya se restauró el manejador
+    qWarning("mensaje con el manejador por defecto")
+    assert "mensaje con el manejador por defecto" not in _read_log(tmp_path)
+
+
+def test_qt_handler_without_logging_configured_does_not_raise():
+    """Sin log configurado, el manejador sigue siendo seguro (no lanza)."""
+    logging.getLogger("srt4u").handlers.clear()
+    install_qt_message_handler()
+    qWarning("aviso sin destino")
 
 
 def _write_sample_srt(path) -> str:
