@@ -37,7 +37,7 @@ jobs:
           pip install -r requirements.txt
           pip install pytest ruff==0.16.9
 
-      - name: Lint with ruff (ruff.toml: F,E7,E9,B)
+      - name: "Lint with ruff (ruff.toml: F,E7,E9,B)"
         run: ruff check application main.py conftest.py tests
 
       - name: Check formatting with ruff format
