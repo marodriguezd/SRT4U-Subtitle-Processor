@@ -33,6 +33,7 @@ class ThemedMessageBox:
         box.setText(text)
         box.setStandardButtons(buttons)
         box.setDefaultButton(default_button)
+        # `QMessageBox.Option`/`setOption()` requieren PyQt6 >= 6.6.1 (cota mínima declarada)
         box.setOption(QMessageBox.Option.DontUseNativeDialog, True)
 
         fusion = QStyleFactory.create("Fusion")

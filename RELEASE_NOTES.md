@@ -10,7 +10,7 @@
 - **Dialogs That Always Fit**: burn-in and progress dialogs now derive their minimum size from their real content, so they can always be resized large enough in every language (620–684 px wide depending on locale).
 - **Emoji-Free Interface**: all emoji and bitmap glyph usage in the UI was replaced with crisp recolorable SVG icons, per the project's design rules.
 - **Coherent System Dialogs**: file open/save dialogs and message boxes now use the app's palette, fonts and SVG icons in both themes — previously they picked up desktop-theme icons (some invisible) and Qt's default blue selection color.
-- **Quality Gates in CI**: the test job now runs a pinned ruff lint (shared `ruff.toml`), a `ruff format --check`, a screenshot-tool smoke test, and the full 84-test suite before any platform build is produced.
+- **Quality Gates in CI**: the test job now runs a pinned ruff lint (shared `ruff.toml`), a `ruff format --check`, a screenshot-tool smoke test, and the full test suite before any platform build is produced. A separate compatibility job installs the minimum PyQt6 declared in `requirements.txt` (`6.6.1`) and runs the suite against it, and it must pass before a release is published.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete list of changes.
 

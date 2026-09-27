@@ -26,7 +26,7 @@
 5. El gate de lint/formato de CI **no cubría `tools/`**, y `tools/regenerate_screenshots.py` estaba sin formatear. **Corregido**.
 6. `requests` figuraba en `requirements.txt` **sin usarse** en el código. **Corregido**.
 
-**Cobertura de verificación final:** `104 passed`, `ruff check` limpio, `ruff format --check` limpio, invariante i18n OK (212 claves × 6 idiomas), 46 capturas offscreen regeneradas.
+**Cobertura de verificación final:** `104 passed` con PyQt6 6.11, `102 passed` con la mínima declarada (PyQt6 6.6.1), `ruff check` limpio, `ruff format --check` limpio, invariante i18n OK (212 claves × 6 idiomas), 46 capturas offscreen regeneradas.
 
 ---
 
@@ -91,8 +91,20 @@ El script local de Windows genera un `.exe` sin `ffmpeg` (el burn-in no funciona
 **B3 — Dependencia muerta `requests` · Mayor · CORREGIDO**
 Única dependencia de `requirements.txt` que no se importa en ningún módulo (la traducción usa `urllib` de la stdlib deliberadamente). Eliminada.
 
-**B4 — Cotas de versión laxas · Informativo · documentado**
-`PyQt6>=6.4.0` sin cota superior; el proyecto se verifica con 6.11 y CI instala la última publicada, así que una futura 6.x podría romper sin aviso local. Recomendado: fijar una cota o añadir un job de compatibilidad.
+**B4 — Cotas de versión laxas · Informativo · CORREGIDO**
+`PyQt6>=6.4.0` sin cota superior, mientras el proyecto se verifica con 6.11: una futura 6.x podía romper sin aviso y la cota declarada nunca se comprobaba. Al validarla se descubrió que **la cota era además falsa**: `QMessageBox.Option`/`setOption()` —de los que dependen los message boxes tematizados— no existen en PyQt6 6.4 ni 6.5.
+
+Verificación empírica (venv desechable, Python 3.14, cada versión con su runtime `PyQt6-Qt6` del mismo minor):
+
+| PyQt6 | Resultado |
+|---|---|
+| 6.4.0 | suite: 2 fallos (`QMessageBox` sin `Option`/`setOption`) |
+| 6.5.0 | `QMessageBox.Option` no existe |
+| 6.6.0 | ni siquiera importa `QtCore` con el runtime 6.6.x (símbolo privado ausente) |
+| **6.6.1** | **102 passed** (`-m "not network"`) — mínimo verificado |
+| 6.11.x | 104 passed (entorno de desarrollo) |
+
+**Solución:** `requirements.txt` pasa a `PyQt6>=6.6.1,<6.12` (cota inferior verificada + cota superior contra saltos de minor no probados) y el nuevo job `compat-min-pyqt6` de CI resuelve la cota mínima desde el propio `requirements.txt`, instala esa versión con el `PyQt6-Qt6` del mismo minor, **asserta que la versión instalada es exactamente la declarada** y ejecuta la suite; es prerrequisito de `release`, por lo que la cota no puede volver a desincronizarse en silencio.
 
 ---
 
@@ -158,8 +170,8 @@ Las fixtures de pytest se inyectan por nombre (su efecto es el valor) y `lambda 
 | `tests/test_ui_and_batch.py` | ✅ conversión sobre copia temporal |
 | `tests/test_screenshot_tool.py` | ✅ nuevas capturas esperadas (24) |
 | `tools/regenerate_screenshots.py` | ✅ capturas de diálogo de archivos (2 temas) y message box; formateado |
-| `.github/workflows/build.yml` | ✅ `tools` en lint/formato, `LICENSE` en las 3 builds |
-| `requirements.txt` | ✅ `requests` eliminado |
+| `.github/workflows/build.yml` | ✅ `tools` en lint/formato, `LICENSE` en las 3 builds, job `compat-min-pyqt6` (prerrequisito de `release`) |
+| `requirements.txt` | ✅ `requests` eliminado; cota `PyQt6>=6.6.1,<6.12` verificada |
 | `README.md` / `README_es.md` | ✅ galería actualizada (46 PNG, diálogos de archivos/mensajes) |
 | `CHANGELOG.md` / `RELEASE_NOTES.md` | ✅ entradas de esta pasada |
 | `AUDIT_REPORT_FULL.md` | ✅ este informe |
@@ -179,6 +191,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python tools/regenerate_screenshots.py -> 46
 contraste paleta diálogos: texto/superficie 17.06 · atenuado/fondo 7.47 (dark) · 4.76 (light)
 iconos de barra de herramientas del QFileDialog: 12.94–13.26 (dark) · 10.54–10.80 (light)
 píxeles ámbar (iconos del escritorio sin tematizar): 25 -> 0
+venv temporal con la cota mínima (PyQt6 6.6.1 + PyQt6-Qt6 6.6.x): 102 passed
 ```
 
 **Pendiente recomendado (fuera del alcance de esta corrección):** logging en lugar de `print()`/`pass` en los fallos silenciosos (D3/D4), hack de los dos espacios en la navegación (D5), fuente por plataforma (D6), `.desktop` instalable con `MimeType` (D7) y cota de versión de PyQt6 (B4).

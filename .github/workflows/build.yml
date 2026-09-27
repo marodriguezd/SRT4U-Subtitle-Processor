@@ -53,6 +53,71 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/ -q
 
+  # Verifica que la cota mínima declarada en requirements.txt sigue funcionando.
+  # La versión mínima y el runtime de Qt se resuelven desde requirements.txt,
+  # así que sólo hay que actualizar ese archivo al subir la cota.
+  compat-min-pyqt6:
+    name: Compatibility (minimum PyQt6)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 ffmpeg
+
+      - name: Resolve the PyQt6 lower bound from requirements.txt
+        id: min
+        run: |
+          MIN=$(grep -oP 'PyQt6>=\K[0-9]+\.[0-9]+\.[0-9]+' requirements.txt)
+          if [ -z "$MIN" ]; then
+            echo "No se encontró la cota mínima de PyQt6 en requirements.txt"
+            exit 1
+          fi
+          MINOR="${MIN%.*}"
+          MAJOR="${MINOR%%.*}"
+          NEXT_MINOR="${MAJOR}.$(( ${MINOR##*.} + 1 ))"
+          echo "version=$MIN" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "next_minor=$NEXT_MINOR" >> "$GITHUB_OUTPUT"
+          echo "Mínimo declarado PyQt6 $MIN (runtime Qt $MINOR.x)"
+          sed "s/^PyQt6.*/PyQt6==${MIN}/" requirements.txt > /tmp/requirements-min.txt
+          cat /tmp/requirements-min.txt
+
+      - name: Install the declared minimum stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r /tmp/requirements-min.txt "PyQt6-Qt6>=${{ steps.min.outputs.minor }},<${{ steps.min.outputs.next_minor }}" pytest
+
+      - name: Verify that the pinned minimum is really installed
+        env:
+          MIN_PYQT6: ${{ steps.min.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+
+          from PyQt6.QtCore import PYQT_VERSION_STR, QT_VERSION_STR
+
+          expected = os.environ["MIN_PYQT6"]
+          print(f"PyQt6 {PYQT_VERSION_STR} / Qt {QT_VERSION_STR} (mínimo declarado {expected})")
+          if PYQT_VERSION_STR != expected:
+              sys.exit(f"ERROR: se esperaba PyQt6 {expected} y se instaló {PYQT_VERSION_STR}")
+          PY
+
+      - name: Run the test suite against the minimum PyQt6
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/ -q -m "not network"
+
   build-windows:
     name: Build Windows (.exe)
     needs: test
@@ -265,7 +330,7 @@ jobs:
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-macos, compat-min-pyqt6]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
