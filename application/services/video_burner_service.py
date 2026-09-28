@@ -1,5 +1,5 @@
 """
-Servicio de quemado de subtítulos en vídeo (Hardsub / Burn-In) mediante FFmpeg.
+Servicio de incrustación de subtítulos en vídeo (Hardsub / Burn-In) mediante FFmpeg.
 Soporta detección multiplataforma de binarios, generación de estilos ASS avanzados
 y cálculo de progreso/ETA en tiempo real.
 """

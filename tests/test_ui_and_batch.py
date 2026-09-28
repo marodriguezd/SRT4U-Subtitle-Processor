@@ -32,7 +32,7 @@ def test_ui_components(qapp):
 
 def test_main_window_flow(qapp, tmp_path):
     win = MainWindow()
-    assert win.stack.count() == 8
+    assert win.stack.count() == 11
 
     # Prueba de cambio de páginas
     win._switch_page(0)
@@ -41,6 +41,12 @@ def test_main_window_flow(qapp, tmp_path):
     assert win.stack.currentIndex() == 3
     win._switch_page(7)  # Acerca de
     assert win.stack.currentIndex() == 7
+    win._switch_page(8)  # Historial
+    assert win.stack.currentIndex() == 8
+    win._switch_page(9)  # Transcribir
+    assert win.stack.currentIndex() == 9
+    win._switch_page(10)  # Pipeline
+    assert win.stack.currentIndex() == 10
 
     # La conversión escribe junto al archivo de origen: se trabaja sobre una copia
     # temporal para no ensuciar tests/fixtures.

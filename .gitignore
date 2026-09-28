@@ -18,6 +18,8 @@ dist/
 build/
 *.manifest
 *.spec
+*.egg-info/
+srt4u_subtitle_processor.egg-info/
 
 # Testing & Coverage
 .pytest_cache/
@@ -43,3 +45,12 @@ settings.json
 tests/fixtures/*_converted.*
 tests/fixtures/*_processed.*
 release_backup/
+
+# Agent-only workspace (private, never committed)
+.agents/
+
+# Agent tooling session state
+.opencode/
+
+# Caches
+.ruff_cache/

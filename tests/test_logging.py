@@ -169,7 +169,7 @@ def test_translation_failures_are_counted_and_logged(tmp_path, monkeypatch, capl
     caplog.set_level(logging.WARNING, logger="srt4u")
     service.translate_subtitles(items, target_language="es")
     assert service.last_translation_failures == 2
-    assert "no pudo traducir el bloque" in caplog.text
+    assert "no pudo traducir el cue" in caplog.text
 
     # El contador también llega a las estadísticas del procesamiento completo
     srt_path = _write_sample_srt(tmp_path / "sample.srt")

@@ -32,7 +32,7 @@ from .styles import Styles, sync_minimum_size
 
 class BurnInDialog(QDialog):
     """
-    Modal de configuración de opciones de quemado visual y selección de rutas.
+    Modal de configuración de opciones de incrustación visual y selección de rutas.
     """
 
     burn_requested = pyqtSignal(str, str, list, BurnInOptions)
@@ -481,7 +481,7 @@ class BurnInDialog(QDialog):
 
 class BurnInProgressModal(QDialog):
     """
-    Modal de progreso en tiempo real durante el quemado de vídeo por FFmpeg.
+    Modal de progreso en tiempo real durante la incrustación de vídeo por FFmpeg.
     """
 
     def __init__(

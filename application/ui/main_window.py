@@ -1,6 +1,7 @@
 import copy
 import os
 import sys
+import threading
 import time
 from typing import Optional, List
 
@@ -48,6 +49,17 @@ from .message_boxes import ThemedMessageBox
 from ..services.config_service import ConfigService
 from ..services.subtitle_service import SubtitleService, ProcessingResult
 from ..services.translation_service import TranslationService
+from ..services.transcription_providers import (
+    TranscriptionCancelledError,
+    TranscriptionError,
+)
+from ..services.media_pipeline import (
+    MediaPipeline,
+    PipelineConfig,
+    PipelineConfigError,
+    record_pipeline_result,
+)
+from ..services.transcription_service import MEDIA_EXTENSIONS, TranscriptionService
 from ..services.i18n_service import t, get_i18n
 from ..logging_setup import get_logger
 
@@ -104,6 +116,96 @@ class ProcessWorker(QThread):
             self.failed.emit(str(e))
 
 
+class TranscribeWorker(QThread):
+    """Whisper transcription off the UI thread with graceful cancellation."""
+
+    step_updated = pyqtSignal(str, object)
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        service: TranscriptionService,
+        media_path: str,
+        model: str,
+        language: str,
+        device: str,
+    ):
+        super().__init__()
+        self.service = service
+        self.media_path = media_path
+        self.model = model
+        self.language = language
+        self.device = device
+        self.cancel_event = threading.Event()
+
+    def cancel(self):
+        self.cancel_event.set()
+
+    def run(self):
+        def callback(event_name: str, payload: object):
+            self.step_updated.emit(event_name, payload)
+
+        try:
+            result = self.service.transcribe_file(
+                self.media_path,
+                provider_name="whisper",
+                model=self.model,
+                language=self.language,
+                device=self.device,
+                progress_callback=callback,
+                cancel_event=self.cancel_event,
+            )
+            if self.cancel_event.is_set():
+                self.failed.emit(t("transcribe.cancelled", "Transcripción cancelada"))
+                return
+            self.completed.emit(result)
+        except TranscriptionCancelledError as e:
+            self.failed.emit(str(e))
+        except TranscriptionError as e:
+            logger.exception("Fallo al transcribir %s", self.media_path)
+            self.failed.emit(str(e))
+        except Exception as e:
+            logger.exception("Fallo inesperado al transcribir %s", self.media_path)
+            self.failed.emit(str(e))
+
+
+class PipelineWorker(QThread):
+    """Full media pipeline off the UI thread; cooperative cancellation."""
+
+    step_updated = pyqtSignal(str, object)
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(self, config: PipelineConfig):
+        super().__init__()
+        self.config = config
+        self.cancel_event = threading.Event()
+
+    def cancel(self):
+        self.cancel_event.set()
+
+    def run(self):
+        def callback(event_name: str, payload: object):
+            self.step_updated.emit(event_name, payload)
+
+        try:
+            result = MediaPipeline().run(
+                self.config,
+                progress_callback=callback,
+                cancel_event=self.cancel_event,
+            )
+            if self.cancel_event.is_set() or result.cancelled:
+                self.failed.emit(t("pipeline.cancelled", "Pipeline cancelada"))
+                return
+            self.completed.emit(result)
+        except PipelineConfigError as e:
+            self.failed.emit(str(e))
+        except Exception as e:
+            logger.exception("Fallo inesperado en la pipeline")
+            self.failed.emit(str(e))
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -116,6 +218,17 @@ class MainWindow(QMainWindow):
         self.i18n = get_i18n(self.config_service)
         self.translation_service = TranslationService(self.config_service)
         self.subtitle_service = SubtitleService(self.translation_service)
+        self.transcription_service = TranscriptionService(
+            self.config_service, self.subtitle_service
+        )
+
+        self.current_subtitle_path: Optional[str] = None
+        self.current_video_path: Optional[str] = None
+        self.current_media_path: Optional[str] = None
+        self.transcribe_cancelled = False
+        self.pipeline_input_path: Optional[str] = None
+        self.pipeline_video_output: Optional[str] = None
+        self.pipeline_cancelled = False
 
         self.current_subtitle_path: Optional[str] = None
         self.current_video_path: Optional[str] = None
@@ -178,6 +291,9 @@ class MainWindow(QMainWindow):
         self.page_settings = self._build_settings_page()
         self.page_completed = self._build_completed_page()
         self.page_about = self._build_about_page()
+        self.page_history = self._build_history_page()
+        self.page_transcribe = self._build_transcribe_page()
+        self.page_pipeline = self._build_pipeline_page()
 
         self.stack.addWidget(self.page_home)  # 0
         self.stack.addWidget(self.page_preview)  # 1
@@ -187,6 +303,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.page_settings)  # 5
         self.stack.addWidget(self.page_completed)  # 6
         self.stack.addWidget(self.page_about)  # 7
+        self.stack.addWidget(self.page_history)  # 8
+        self.stack.addWidget(self.page_transcribe)  # 9
+        self.stack.addWidget(self.page_pipeline)  # 10
 
         root_layout.addWidget(self.stack)
         self._switch_page(0)
@@ -234,6 +353,9 @@ class MainWindow(QMainWindow):
             ("clean", "nav.clean", 2),
             ("convert", "nav.convert", 3),
             ("batch", "nav.batch", 4),
+            ("play", "nav.transcribe", 9),
+            ("zap", "nav.pipeline", 10),
+            ("clock", "nav.history", 8),
             ("settings", "nav.settings", 5),
             ("about", "nav.about", 7),
         ]
@@ -812,7 +934,642 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: PROCESAMIENTO POR LOTE ------------------
+    # ------------------ PÁGINA: TRANSCRIPCIÓN ------------------
+    def _build_transcribe_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
+
+        self.lbl_transcribe_title = QLabel(
+            t("transcribe.title", "Transcribir multimedia")
+        )
+        self.lbl_transcribe_title.setStyleSheet(
+            f"font-size: 24px; font-weight: 800; color: {Styles.TEXT};"
+        )
+        self.lbl_transcribe_sub = QLabel(
+            t(
+                "transcribe.subtitle",
+                "Convierte audio o vídeo en subtítulos con Whisper local. "
+                "El resultado alimenta Analytics, QA, limpieza y traducción.",
+            )
+        )
+        self.lbl_transcribe_sub.setStyleSheet(
+            f"font-size: 13px; color: {Styles.TEXT_MUTED};"
+        )
+        self.lbl_transcribe_sub.setWordWrap(True)
+        layout.addWidget(self.lbl_transcribe_title)
+        layout.addWidget(self.lbl_transcribe_sub)
+
+        self.lbl_transcribe_avail = QLabel()
+        self.lbl_transcribe_avail.setWordWrap(True)
+        layout.addWidget(self.lbl_transcribe_avail)
+
+        file_card = QFrame()
+        file_card.setObjectName("CardContainer")
+        f_layout = QHBoxLayout(file_card)
+        f_layout.setContentsMargins(18, 14, 18, 14)
+        self.lbl_transcribe_file = QLabel(
+            t("transcribe.no_file", "Ningún archivo seleccionado")
+        )
+        self.lbl_transcribe_file.setStyleSheet(
+            f"font-size: 13px; color: {Styles.TEXT_MUTED};"
+        )
+        f_layout.addWidget(self.lbl_transcribe_file, stretch=1)
+        self.btn_choose_media = QPushButton(
+            t("transcribe.btn_choose", "Elegir archivo")
+        )
+        self.btn_choose_media.setProperty("class", "secondary-btn")
+        self.btn_choose_media.setIcon(
+            Icons.get_icon(
+                "folder",
+                normal_color=Icons.DEFAULT_MUTED,
+                active_color="#FFFFFF",
+                size=16,
+            )
+        )
+        self.btn_choose_media.clicked.connect(self._choose_transcribe_file)
+        f_layout.addWidget(self.btn_choose_media)
+        layout.addWidget(file_card)
+
+        opts_card = QFrame()
+        opts_card.setObjectName("CardContainer")
+        o_layout = QGridLayout(opts_card)
+        o_layout.setContentsMargins(18, 14, 18, 14)
+        o_layout.setHorizontalSpacing(12)
+        o_layout.setVerticalSpacing(10)
+        self.lbl_transcribe_model = QLabel(t("transcribe.model", "Modelo Whisper"))
+        self.cb_transcribe_model = QComboBox()
+        self.cb_transcribe_model.addItems(
+            ["tiny", "base", "small", "medium", "large-v3", "turbo"]
+        )
+        self.cb_transcribe_model.setCurrentText("small")
+        self.lbl_transcribe_lang = QLabel(
+            t("transcribe.language", "Idioma de origen (auto)")
+        )
+        self.le_transcribe_lang = QLineEdit("auto")
+        self.le_transcribe_lang.setMaximumWidth(140)
+        self.lbl_transcribe_format = QLabel(t("transcribe.format", "Formato"))
+        self.cb_transcribe_format = QComboBox()
+        self.cb_transcribe_format.addItems(["SRT (.srt)", "VTT (.vtt)"])
+        self.lbl_transcribe_device = QLabel(t("transcribe.device", "Dispositivo"))
+        self.cb_transcribe_device = QComboBox()
+        self.cb_transcribe_device.addItems(["auto", "cpu", "cuda"])
+        o_layout.addWidget(self.lbl_transcribe_model, 0, 0)
+        o_layout.addWidget(self.cb_transcribe_model, 0, 1)
+        o_layout.addWidget(self.lbl_transcribe_lang, 0, 2)
+        o_layout.addWidget(self.le_transcribe_lang, 0, 3)
+        o_layout.addWidget(self.lbl_transcribe_format, 1, 0)
+        o_layout.addWidget(self.cb_transcribe_format, 1, 1)
+        o_layout.addWidget(self.lbl_transcribe_device, 1, 2)
+        o_layout.addWidget(self.cb_transcribe_device, 1, 3)
+        layout.addWidget(opts_card)
+
+        self.btn_start_transcribe = QPushButton(
+            t("transcribe.btn_start", "Transcribir")
+        )
+        self.btn_start_transcribe.setObjectName("PrimaryBtn")
+        self.btn_start_transcribe.setIcon(
+            Icons.get_icon(
+                "play", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
+            )
+        )
+        self.btn_start_transcribe.setMinimumHeight(46)
+        self.btn_start_transcribe.clicked.connect(self._start_transcription)
+        layout.addWidget(self.btn_start_transcribe)
+
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        self._refresh_transcribe_availability()
+        return page
+
+    def _refresh_transcribe_availability(self):
+        try:
+            from ..services.transcription_whisper import WHISPER_MODELS
+
+            models = ", ".join(WHISPER_MODELS)
+        except Exception:
+            models = "tiny, base, small, medium, large-v3, turbo"
+        try:
+            self.transcription_service.check_available("whisper")
+            available = True
+        except Exception:
+            available = False
+        if available:
+            self.lbl_transcribe_avail.setText(
+                t(
+                    "transcribe.avail_ok",
+                    "Whisper disponible localmente. Modelos: {models}. "
+                    "El modelo se descarga una vez si no está en caché.",
+                    models=models,
+                )
+            )
+            self.btn_start_transcribe.setEnabled(True)
+        else:
+            self.lbl_transcribe_avail.setText(
+                t(
+                    "transcribe.avail_missing",
+                    "Whisper no instalado: python -m pip install '.[transcription]'. "
+                    "La transcripción es 100% local.",
+                )
+            )
+            self.btn_start_transcribe.setEnabled(False)
+
+    def _transcribe_media_filter(self) -> str:
+        patterns = " ".join(f"*{ext}" for ext in sorted(MEDIA_EXTENSIONS))
+        return f"{t('transcribe.media_filter', patterns=patterns)};;{t('dialog.all_files')}"
+
+    def _choose_transcribe_file(self):
+        chosen = ask_open_file(
+            self,
+            t("transcribe.choose_title", "Elegir audio o vídeo"),
+            self._transcribe_media_filter(),
+        )
+        if chosen:
+            self.current_media_path = chosen
+            self.lbl_transcribe_file.setText(os.path.basename(chosen))
+
+    def _start_transcription(self):
+        if not self.current_media_path or not os.path.exists(self.current_media_path):
+            ThemedMessageBox.warning(
+                self,
+                t("transcribe.file_req_title", "Falta el archivo"),
+                t(
+                    "transcribe.file_req_desc",
+                    "Elige un archivo de audio o vídeo para transcribir.",
+                ),
+            )
+            return
+        try:
+            self.transcription_service.check_available("whisper")
+        except TranscriptionError as exc:
+            self._refresh_transcribe_availability()
+            ThemedMessageBox.warning(
+                self,
+                t("transcribe.unavailable_title", "Transcripción no disponible"),
+                str(exc),
+            )
+            return
+        model = self.cb_transcribe_model.currentText()
+        language = self.le_transcribe_lang.text().strip() or "auto"
+        device = self.cb_transcribe_device.currentText()
+
+        self.transcribe_cancelled = False
+        self.transcribe_modal = ProgressModal(self)
+        self.transcribe_modal.cancelled.connect(self._cancel_transcription)
+        self.transcribe_modal.show()
+
+        self.transcribe_worker = TranscribeWorker(
+            service=self.transcription_service,
+            media_path=self.current_media_path,
+            model=model,
+            language=language,
+            device=device,
+        )
+        self.transcribe_worker.step_updated.connect(self._on_transcribe_step)
+        self.transcribe_worker.completed.connect(self._on_transcribe_completed)
+        self.transcribe_worker.failed.connect(self._on_transcribe_failed)
+        self.transcribe_start_time = time.time()
+        self.transcribe_worker.start()
+
+    def _cancel_transcription(self):
+        self.transcribe_cancelled = True
+        worker = getattr(self, "transcribe_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+
+    def _on_transcribe_step(self, step_name: str, payload: object):
+        modal = getattr(self, "transcribe_modal", None)
+        if modal is None or not modal.isVisible():
+            return
+        if step_name == "transcribing" and isinstance(payload, dict):
+            count = payload.get("segments", 0)
+            ratio = payload.get("ratio")
+            if isinstance(ratio, float):
+                modal.update_step(
+                    0,
+                    done=False,
+                    text_override=t(
+                        "transcribe.progress_pct",
+                        "Transcribiendo… {count} segmentos ({pct}%)",
+                        count=count,
+                        pct=int(ratio * 100),
+                    ),
+                )
+                modal.set_progress(ratio)
+            else:
+                elapsed = time.time() - getattr(
+                    self, "transcribe_start_time", time.time()
+                )
+                modal.update_step(
+                    0,
+                    done=False,
+                    text_override=t(
+                        "transcribe.progress_count",
+                        "Transcribiendo… {count} segmentos ({secs}s)",
+                        count=count,
+                        secs=int(elapsed),
+                    ),
+                )
+                modal.set_progress(0.5)
+
+    def _on_transcribe_completed(self, result):
+        modal = getattr(self, "transcribe_modal", None)
+        if modal is not None and modal.isVisible():
+            modal.accept()
+        if self.transcribe_cancelled:
+            return
+        output_format = (
+            "vtt" if self.cb_transcribe_format.currentIndex() == 1 else "srt"
+        )
+        try:
+            content = self.transcription_service.render(result, output_format)
+        except TranscriptionError as exc:
+            ThemedMessageBox.critical(
+                self,
+                t("transcribe.render_error_title", "Error al generar subtítulos"),
+                str(exc),
+            )
+            return
+        base, _ = os.path.splitext(self.current_media_path or "transcription")
+        out_path = f"{base}_transcribed.{output_format}"
+        try:
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            self.saved_output_path = out_path
+        except Exception as e:
+            ThemedMessageBox.critical(
+                self, t("alert.save_error_title"), t("alert.save_error_desc", err=e)
+            )
+            return
+        self.last_result = None
+        items = self.transcription_service.to_subtitle_items(result)
+        self.video_player.set_subtitles(items)
+        self.card_lines.set_value(str(len(items)))
+        self.card_deleted.set_value(result.language or "auto")
+        elapsed = time.time() - getattr(self, "transcribe_start_time", time.time())
+        m, s = int(elapsed // 60), int(elapsed % 60)
+        self.card_time.set_value(f"{m:02d}:{s:02d}")
+        self.lbl_sum3.setText(t("completed.saved_as", name=os.path.basename(out_path)))
+        self._switch_page(6)
+        try:
+            from application.services.history_store import HistoryStore
+
+            with HistoryStore() as store:
+                store.record_transcription_result(
+                    result,
+                    file_path=self.current_media_path,
+                    file_format=output_format,
+                )
+        except Exception as exc:
+            logger.warning("No se pudo registrar la transcripción: %s", exc)
+
+    def _on_transcribe_failed(self, error_msg: str):
+        logger.error("Transcripción fallida: %s", error_msg)
+        modal = getattr(self, "transcribe_modal", None)
+        if modal is not None and modal.isVisible():
+            modal.reject()
+        if self.transcribe_cancelled:
+            return
+        ThemedMessageBox.critical(
+            self,
+            t("transcribe.error_title", "Error de transcripción"),
+            t("transcribe.error_desc", "No se pudo transcribir: {err}", err=error_msg),
+        )
+
+    # ------------------ PÁGINA: PIPELINE ------------------
+    def _build_pipeline_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        container = QWidget()
+        container.setMaximumWidth(1020)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(36, 28, 36, 28)
+        layout.setSpacing(16)
+
+        self.lbl_pipeline_title = QLabel(t("pipeline.title", "Pipeline audiovisual"))
+        self.lbl_pipeline_title.setStyleSheet(
+            f"font-size: 24px; font-weight: 800; color: {Styles.TEXT};"
+        )
+        self.lbl_pipeline_sub = QLabel(
+            t(
+                "pipeline.subtitle",
+                "Transcripción → limpieza → analytics → QA → traducción "
+                "opcional → QA final → exportación → burn-in opcional.",
+            )
+        )
+        self.lbl_pipeline_sub.setStyleSheet(
+            f"font-size: 13px; color: {Styles.TEXT_MUTED};"
+        )
+        self.lbl_pipeline_sub.setWordWrap(True)
+        layout.addWidget(self.lbl_pipeline_title)
+        layout.addWidget(self.lbl_pipeline_sub)
+
+        file_card = QFrame()
+        file_card.setObjectName("CardContainer")
+        f_layout = QHBoxLayout(file_card)
+        f_layout.setContentsMargins(18, 14, 18, 14)
+        self.lbl_pipeline_file = QLabel(
+            t("pipeline.no_file", "Ningún archivo seleccionado")
+        )
+        self.lbl_pipeline_file.setStyleSheet(
+            f"font-size: 13px; color: {Styles.TEXT_MUTED};"
+        )
+        f_layout.addWidget(self.lbl_pipeline_file, stretch=1)
+        self.btn_choose_pipeline = QPushButton(
+            t("pipeline.btn_choose", "Elegir archivo")
+        )
+        self.btn_choose_pipeline.setProperty("class", "secondary-btn")
+        self.btn_choose_pipeline.setIcon(
+            Icons.get_icon(
+                "folder",
+                normal_color=Icons.DEFAULT_MUTED,
+                active_color="#FFFFFF",
+                size=16,
+            )
+        )
+        self.btn_choose_pipeline.clicked.connect(self._choose_pipeline_file)
+        f_layout.addWidget(self.btn_choose_pipeline)
+        layout.addWidget(file_card)
+
+        opts_card = QFrame()
+        opts_card.setObjectName("CardContainer")
+        o_layout = QGridLayout(opts_card)
+        o_layout.setContentsMargins(18, 14, 18, 14)
+        o_layout.setHorizontalSpacing(12)
+        o_layout.setVerticalSpacing(10)
+        self.lbl_pipeline_model = QLabel(t("pipeline.model", "Modelo Whisper"))
+        self.cb_pipeline_model = QComboBox()
+        self.cb_pipeline_model.addItems(
+            ["tiny", "base", "small", "medium", "large-v3", "turbo"]
+        )
+        self.cb_pipeline_model.setCurrentText("small")
+        self.lbl_pipeline_lang = QLabel(
+            t("pipeline.language", "Idioma de origen (auto)")
+        )
+        self.le_pipeline_lang = QLineEdit("auto")
+        self.le_pipeline_lang.setMaximumWidth(120)
+        self.lbl_pipeline_target = QLabel(t("pipeline.target", "Idioma de destino"))
+        self.le_pipeline_target = QLineEdit("en")
+        self.le_pipeline_target.setMaximumWidth(120)
+        self.lbl_pipeline_provider = QLabel(t("pipeline.provider", "Provider"))
+        self.cb_pipeline_provider = QComboBox()
+        self.cb_pipeline_provider.addItems(
+            ["google", "deepl", "openai", "ollama", "llm"]
+        )
+        self.lbl_pipeline_format = QLabel(t("pipeline.format", "Formato"))
+        self.cb_pipeline_format = QComboBox()
+        self.cb_pipeline_format.addItems(["SRT (.srt)", "VTT (.vtt)"])
+        o_layout.addWidget(self.lbl_pipeline_model, 0, 0)
+        o_layout.addWidget(self.cb_pipeline_model, 0, 1)
+        o_layout.addWidget(self.lbl_pipeline_lang, 0, 2)
+        o_layout.addWidget(self.le_pipeline_lang, 0, 3)
+        o_layout.addWidget(self.lbl_pipeline_target, 1, 0)
+        o_layout.addWidget(self.le_pipeline_target, 1, 1)
+        o_layout.addWidget(self.lbl_pipeline_provider, 1, 2)
+        o_layout.addWidget(self.cb_pipeline_provider, 1, 3)
+        o_layout.addWidget(self.lbl_pipeline_format, 2, 0)
+        o_layout.addWidget(self.cb_pipeline_format, 2, 1)
+        layout.addWidget(opts_card)
+
+        stages_card = QFrame()
+        stages_card.setObjectName("CardContainer")
+        s_layout = QGridLayout(stages_card)
+        s_layout.setContentsMargins(18, 14, 18, 14)
+        s_layout.setHorizontalSpacing(12)
+        s_layout.setVerticalSpacing(10)
+        self.lbl_pipeline_clean = QLabel(t("pipeline.clean", "Limpieza"))
+        self.toggle_pipeline_clean = ModernToggle(checked=True)
+        self.lbl_pipeline_translate = QLabel(t("pipeline.translate", "Traducción"))
+        self.toggle_pipeline_translate = ModernToggle(checked=False)
+        self.lbl_pipeline_qa = QLabel(t("pipeline.qa", "QA"))
+        self.toggle_pipeline_qa = ModernToggle(checked=True)
+        self.lbl_pipeline_strict = QLabel(t("pipeline.strict", "QA estricto"))
+        self.toggle_pipeline_strict = ModernToggle(checked=False)
+        self.lbl_pipeline_burn = QLabel(t("pipeline.burn", "Burn-in"))
+        self.toggle_pipeline_burn = ModernToggle(checked=False)
+        s_layout.addWidget(self.lbl_pipeline_clean, 0, 0)
+        s_layout.addWidget(self.toggle_pipeline_clean, 0, 1)
+        s_layout.addWidget(self.lbl_pipeline_translate, 0, 2)
+        s_layout.addWidget(self.toggle_pipeline_translate, 0, 3)
+        s_layout.addWidget(self.lbl_pipeline_qa, 1, 0)
+        s_layout.addWidget(self.toggle_pipeline_qa, 1, 1)
+        s_layout.addWidget(self.lbl_pipeline_strict, 1, 2)
+        s_layout.addWidget(self.toggle_pipeline_strict, 1, 3)
+        s_layout.addWidget(self.lbl_pipeline_burn, 2, 0)
+        s_layout.addWidget(self.toggle_pipeline_burn, 2, 1)
+        self.btn_choose_video_out = QPushButton(
+            t("pipeline.btn_video_out", "Vídeo salida…")
+        )
+        self.btn_choose_video_out.setProperty("class", "secondary-btn")
+        self.btn_choose_video_out.clicked.connect(self._choose_pipeline_video_out)
+        s_layout.addWidget(self.btn_choose_video_out, 2, 2, 1, 2)
+        layout.addWidget(stages_card)
+
+        self.btn_start_pipeline = QPushButton(
+            t("pipeline.btn_start", "Ejecutar pipeline")
+        )
+        self.btn_start_pipeline.setObjectName("PrimaryBtn")
+        self.btn_start_pipeline.setIcon(
+            Icons.get_icon(
+                "zap", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
+            )
+        )
+        self.btn_start_pipeline.setMinimumHeight(46)
+        self.btn_start_pipeline.clicked.connect(self._start_pipeline)
+        layout.addWidget(self.btn_start_pipeline)
+
+        layout.addStretch()
+        page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
+        return page
+
+    def _choose_pipeline_file(self):
+        chosen = ask_open_file(
+            self,
+            t("pipeline.choose_title", "Elegir audio, vídeo o subtítulo"),
+            self._pipeline_media_filter(),
+        )
+        if chosen:
+            self.pipeline_input_path = chosen
+            self.lbl_pipeline_file.setText(os.path.basename(chosen))
+
+    def _pipeline_media_filter(self) -> str:
+        from ..services.media_pipeline import MEDIA_EXTENSIONS, SUBTITLE_EXTENSIONS
+
+        patterns = " ".join(
+            f"*{ext}" for ext in sorted(MEDIA_EXTENSIONS | SUBTITLE_EXTENSIONS)
+        )
+        return (
+            f"{t('pipeline.media_filter', patterns=patterns)};;{t('dialog.all_files')}"
+        )
+
+    def _choose_pipeline_video_out(self):
+        chosen = ask_save_file(
+            self,
+            t("pipeline.video_out_title", "Vídeo de salida"),
+            f"{t('pipeline.video_out_filter')};;{t('dialog.all_files')}",
+        )
+        if chosen:
+            self.pipeline_video_output = chosen
+
+    def _start_pipeline(self):
+        if not self.pipeline_input_path or not os.path.exists(self.pipeline_input_path):
+            ThemedMessageBox.warning(
+                self,
+                t("pipeline.file_req_title", "Falta el archivo"),
+                t(
+                    "pipeline.file_req_desc",
+                    "Elige un archivo de audio, vídeo o subtítulo.",
+                ),
+            )
+            return
+        do_translate = self.toggle_pipeline_translate.isChecked()
+        target = self.le_pipeline_target.text().strip()
+        if do_translate and not target:
+            ThemedMessageBox.warning(
+                self,
+                t("pipeline.target_req_title", "Falta el destino"),
+                t(
+                    "pipeline.target_req_desc",
+                    "Indica el idioma de destino para traducir.",
+                ),
+            )
+            return
+        do_burn = self.toggle_pipeline_burn.isChecked()
+        if do_burn and not self.pipeline_video_output:
+            ThemedMessageBox.warning(
+                self,
+                t("pipeline.video_req_title", "Falta el vídeo de salida"),
+                t(
+                    "pipeline.video_req_desc",
+                    "Elige el archivo de vídeo de salida para el burn-in.",
+                ),
+            )
+            return
+        output_format = "vtt" if self.cb_pipeline_format.currentIndex() == 1 else "srt"
+        try:
+            config = PipelineConfig(
+                input_media=self.pipeline_input_path,
+                transcription_model=self.cb_pipeline_model.currentText(),
+                transcription_language=self.le_pipeline_lang.text().strip() or "auto",
+                clean_enabled=self.toggle_pipeline_clean.isChecked(),
+                qa_enabled=self.toggle_pipeline_qa.isChecked(),
+                qa_strict=self.toggle_pipeline_strict.isChecked(),
+                translation_enabled=do_translate,
+                target_language=target,
+                provider=self.cb_pipeline_provider.currentText(),
+                output_format=output_format,
+                burn_in_enabled=do_burn,
+                output_video=self.pipeline_video_output,
+            ).validate()
+        except PipelineConfigError as exc:
+            ThemedMessageBox.warning(
+                self,
+                t("pipeline.config_title", "Configuración inválida"),
+                str(exc),
+            )
+            return
+
+        self.pipeline_cancelled = False
+        self.pipeline_modal = ProgressModal(self)
+        self.pipeline_modal.cancelled.connect(self._cancel_pipeline)
+        self.pipeline_modal.show()
+
+        self.pipeline_worker = PipelineWorker(config)
+        self.pipeline_worker.step_updated.connect(self._on_pipeline_step)
+        self.pipeline_worker.completed.connect(self._on_pipeline_completed)
+        self.pipeline_worker.failed.connect(self._on_pipeline_failed)
+        self.pipeline_start_time = time.time()
+        self.pipeline_worker.start()
+
+    def _cancel_pipeline(self):
+        self.pipeline_cancelled = True
+        worker = getattr(self, "pipeline_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+
+    def _on_pipeline_step(self, stage_name: str, payload: object):
+        from ..services.media_pipeline import STAGE_ORDER
+
+        modal = getattr(self, "pipeline_modal", None)
+        if modal is None or not modal.isVisible():
+            return
+        total = len(STAGE_ORDER)
+        try:
+            position = STAGE_ORDER.index(stage_name)
+        except ValueError:
+            return
+        intra = 0.0
+        text = stage_name
+        if isinstance(payload, dict):
+            state = payload.get("state")
+            if state == "ok":
+                intra = 1.0
+                text = f"{stage_name} ✓"
+            elif state == "skipped":
+                intra = 1.0
+                text = f"{stage_name} (omitida)"
+            else:
+                ratio = payload.get("ratio")
+                if isinstance(ratio, float):
+                    intra = max(0.0, min(1.0, ratio))
+                    text = f"{stage_name} ({int(intra * 100)}%)"
+                elif isinstance(payload.get("segments"), int):
+                    text = f"{stage_name} ({payload['segments']} seg.)"
+        overall = min(1.0, (position + intra) / total)
+        modal.update_step(position % 6, done=(intra == 1.0), text_override=text)
+        modal.set_progress(overall)
+
+    def _on_pipeline_completed(self, result):
+        modal = getattr(self, "pipeline_modal", None)
+        if modal is not None and modal.isVisible():
+            modal.accept()
+        if self.pipeline_cancelled:
+            return
+        if not result.success:
+            errors = "; ".join(f"[{e['stage']}] {e['message']}" for e in result.errors)
+            ThemedMessageBox.critical(
+                self,
+                t("pipeline.error_title", "Pipeline fallida"),
+                errors or t("pipeline.error_unknown", "Error desconocido"),
+            )
+            return
+        self.saved_output_path = result.output_subtitle
+        cues = (
+            (result.analytics_after or {}).get("content", {}).get("subtitle_count", 0)
+        )
+        self.card_lines.set_value(str(cues))
+        self.card_deleted.set_value(str(result.cleaning.get("lines_removed", 0)))
+        elapsed = result.total_duration_ms / 1000.0
+        m, s = int(elapsed // 60), int(elapsed % 60)
+        self.card_time.set_value(f"{m:02d}:{s:02d}")
+        name = os.path.basename(result.output_subtitle or "")
+        self.lbl_sum3.setText(t("completed.saved_as", name=name))
+        self._switch_page(6)
+        try:
+            record_pipeline_result(
+                result,
+                self.pipeline_worker.config,
+            )
+        except Exception as exc:
+            logger.warning("No se pudo registrar la pipeline: %s", exc)
+
+    def _on_pipeline_failed(self, error_msg: str):
+        logger.error("Pipeline fallida: %s", error_msg)
+        modal = getattr(self, "pipeline_modal", None)
+        if modal is not None and modal.isVisible():
+            modal.reject()
+        if self.pipeline_cancelled:
+            return
+        ThemedMessageBox.critical(
+            self,
+            t("pipeline.error_title", "Pipeline fallida"),
+            t("pipeline.error_desc", "La pipeline no completó: {err}", err=error_msg),
+        )
+
     def _build_batch_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1262,6 +2019,19 @@ class MainWindow(QMainWindow):
 
         self._switch_page(6)
 
+        from application.services.history_store import record_result_safely
+
+        worker = getattr(self, "worker", None)
+        record_result_safely(
+            result,
+            operation="process",
+            file_path=getattr(worker, "file_path", self.current_subtitle_path),
+            file_format=getattr(worker, "target_format", None),
+            source_language=getattr(worker, "source_lang", None),
+            target_language=getattr(worker, "target_lang", None),
+            engine=getattr(worker, "engine", None),
+        )
+
         failures = result.stats.translation_failures
         if failures:
             logger.warning(
@@ -1539,6 +2309,16 @@ class MainWindow(QMainWindow):
                 self.batch_table.setItem(
                     row, 3, QTableWidgetItem(t("batch.status_completed"))
                 )
+                from application.services.history_store import record_result_safely
+
+                record_result_safely(
+                    result,
+                    operation="process",
+                    file_path=file_path,
+                    source_language=source_lang,
+                    target_language=target_lang,
+                    engine=engine,
+                )
             except Exception as e:
                 logger.exception("Fallo al procesar el archivo del lote %s", file_path)
                 self.batch_table.setItem(
@@ -1685,6 +2465,109 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(
             QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/")
         )
+
+    def _build_history_page(self) -> QWidget:
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(24, 18, 24, 18)
+        page_layout.setSpacing(10)
+
+        self.lbl_history_title = QLabel(t("history.title"))
+        self.lbl_history_title.setStyleSheet(
+            f"font-size: 20px; font-weight: 800; color: {Styles.TEXT};"
+        )
+        self.lbl_history_title.setWordWrap(True)
+        self.lbl_history_sub = QLabel(t("history.subtitle"))
+        self.lbl_history_sub.setStyleSheet(
+            f"font-size: 12px; color: {Styles.TEXT_MUTED};"
+        )
+        self.lbl_history_sub.setWordWrap(True)
+        page_layout.addWidget(self.lbl_history_title)
+        page_layout.addWidget(self.lbl_history_sub)
+
+        self.btn_history_refresh = QPushButton(t("history.refresh"))
+        self.btn_history_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_history_refresh.clicked.connect(self._refresh_history)
+        page_layout.addWidget(
+            self.btn_history_refresh, alignment=Qt.AlignmentFlag.AlignLeft
+        )
+
+        self.history_table = QTableWidget()
+        self.history_table.setColumnCount(7)
+        self.history_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.history_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Stretch
+        )
+        self.history_table.verticalHeader().setVisible(False)
+        page_layout.addWidget(self.history_table, stretch=1)
+
+        self.lbl_history_empty = QLabel(t("history.empty"))
+        self.lbl_history_empty.setStyleSheet(
+            f"font-size: 12px; color: {Styles.TEXT_MUTED};"
+        )
+        self.lbl_history_empty.setWordWrap(True)
+        page_layout.addWidget(self.lbl_history_empty)
+        self._refresh_history()
+        return page
+
+    def _refresh_history(self) -> None:
+        from application.services.history_store import HistoryError, HistoryStore
+
+        headers = [
+            t("history.col_time"),
+            t("history.col_file"),
+            t("history.col_operation"),
+            t("history.col_provider"),
+            t("history.col_duration"),
+            t("history.col_status"),
+            t("history.col_fallback"),
+        ]
+        self.history_table.setHorizontalHeaderLabels(headers)
+        try:
+            with HistoryStore() as store:
+                rows = store.recent_runs(limit=100)
+        except HistoryError:
+            rows = []
+            logger.warning("Historial no disponible en la página History")
+        self.history_table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            timestamp = str(row.get("timestamp") or "")[:19].replace("T", " ")
+            file_path = str(row.get("file_path") or row.get("benchmark_id") or "")
+            duration = row.get("duration_ms")
+            self.history_table.setItem(index, 0, QTableWidgetItem(timestamp))
+            self.history_table.setItem(
+                index, 1, QTableWidgetItem(os.path.basename(file_path) or file_path)
+            )
+            self.history_table.setItem(
+                index, 2, QTableWidgetItem(str(row.get("operation") or ""))
+            )
+            self.history_table.setItem(
+                index,
+                3,
+                QTableWidgetItem(
+                    str(row.get("requested_provider") or row.get("provider") or "")
+                ),
+            )
+            self.history_table.setItem(
+                index,
+                4,
+                QTableWidgetItem(f"{duration} ms" if duration is not None else ""),
+            )
+            self.history_table.setItem(
+                index,
+                5,
+                QTableWidgetItem(
+                    "ok"
+                    if row.get("success")
+                    else str(row.get("error_type") or "error")
+                ),
+            )
+            self.history_table.setItem(
+                index,
+                6,
+                QTableWidgetItem("fallback" if row.get("fallback_used") else ""),
+            )
+        self.lbl_history_empty.setVisible(not rows)
 
     def _build_about_page(self) -> QWidget:
         page = QWidget()
@@ -2061,6 +2944,66 @@ class MainWindow(QMainWindow):
             self.btn_run_convert.setText(t("convert.btn_convert"))
             self.convert_drop_zone.retranslate()
 
+        # 5b. Transcribe Page
+        if hasattr(self, "lbl_transcribe_title"):
+            self.lbl_transcribe_title.setText(
+                t("transcribe.title", "Transcribir multimedia")
+            )
+            self.lbl_transcribe_sub.setText(
+                t(
+                    "transcribe.subtitle",
+                    "Convierte audio o vídeo en subtítulos con Whisper local. "
+                    "El resultado alimenta Analytics, QA, limpieza y traducción.",
+                )
+            )
+            if not getattr(self, "current_media_path", None):
+                self.lbl_transcribe_file.setText(
+                    t("transcribe.no_file", "Ningún archivo seleccionado")
+                )
+            self.lbl_transcribe_model.setText(t("transcribe.model", "Modelo Whisper"))
+            self.lbl_transcribe_lang.setText(
+                t("transcribe.language", "Idioma de origen (auto)")
+            )
+            self.lbl_transcribe_format.setText(t("transcribe.format", "Formato"))
+            self.lbl_transcribe_device.setText(t("transcribe.device", "Dispositivo"))
+            self.btn_choose_media.setText(t("transcribe.btn_choose", "Elegir archivo"))
+            self.btn_start_transcribe.setText(t("transcribe.btn_start", "Transcribir"))
+            self._refresh_transcribe_availability()
+
+        # 5c. Pipeline Page
+        if hasattr(self, "lbl_pipeline_title"):
+            self.lbl_pipeline_title.setText(t("pipeline.title", "Pipeline audiovisual"))
+            self.lbl_pipeline_sub.setText(
+                t(
+                    "pipeline.subtitle",
+                    "Transcripción → limpieza → analytics → QA → traducción "
+                    "opcional → QA final → exportación → burn-in opcional.",
+                )
+            )
+            if not getattr(self, "pipeline_input_path", None):
+                self.lbl_pipeline_file.setText(
+                    t("pipeline.no_file", "Ningún archivo seleccionado")
+                )
+            self.lbl_pipeline_model.setText(t("pipeline.model", "Modelo Whisper"))
+            self.lbl_pipeline_lang.setText(
+                t("pipeline.language", "Idioma de origen (auto)")
+            )
+            self.lbl_pipeline_target.setText(t("pipeline.target", "Idioma de destino"))
+            self.lbl_pipeline_provider.setText(t("pipeline.provider", "Provider"))
+            self.lbl_pipeline_format.setText(t("pipeline.format", "Formato"))
+            self.lbl_pipeline_clean.setText(t("pipeline.clean", "Limpieza"))
+            self.lbl_pipeline_translate.setText(t("pipeline.translate", "Traducción"))
+            self.lbl_pipeline_qa.setText(t("pipeline.qa", "QA"))
+            self.lbl_pipeline_strict.setText(t("pipeline.strict", "QA estricto"))
+            self.lbl_pipeline_burn.setText(t("pipeline.burn", "Burn-in"))
+            self.btn_choose_pipeline.setText(t("pipeline.btn_choose", "Elegir archivo"))
+            self.btn_choose_video_out.setText(
+                t("pipeline.btn_video_out", "Vídeo de salida…")
+            )
+            self.btn_start_pipeline.setText(
+                t("pipeline.btn_start", "Ejecutar pipeline")
+            )
+
         # 6. Batch Page
         if hasattr(self, "lbl_batch_title"):
             self.lbl_batch_title.setText(t("batch.title"))
@@ -2129,6 +3072,14 @@ class MainWindow(QMainWindow):
             self.lbl_lic_desc.setText(self._build_license_terms())
             self.btn_open_license.setText(t("about.btn_open_license"))
             self.btn_web_deed.setText(t("about.btn_web_deed"))
+
+        # 10. History Page
+        if hasattr(self, "lbl_history_title"):
+            self.lbl_history_title.setText(t("history.title"))
+            self.lbl_history_sub.setText(t("history.subtitle"))
+            self.btn_history_refresh.setText(t("history.refresh"))
+            self.lbl_history_empty.setText(t("history.empty"))
+            self._refresh_history()
 
         # Reaplica el tinte de tema por si alguna vista redefinió colores inline al retraducir
         Styles.retint_inline_text(self.central_widget, self.dark_mode)

@@ -358,7 +358,7 @@ jobs:
         with:
           name: "SRT4U ${{ github.ref_name }} — Subtitle Processor & Translator"
           body_path: RELEASE_NOTES.md
-          prerelease: false  # v1.1.0 ships as stable release
+          prerelease: false  # releases ship as stable
           files: |
             release-dist/SRT4U-Windows-x64.exe
             release-dist/SRT4U-Linux-x86_64.AppImage
