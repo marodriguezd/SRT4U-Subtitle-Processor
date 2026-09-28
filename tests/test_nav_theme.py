@@ -172,3 +172,21 @@ def test_nav_icons_are_not_hardcoded_to_the_dark_defaults():
     assert (
         active.icon().pixmap(18, 18).toImage() != idle.icon().pixmap(18, 18).toImage()
     )
+
+
+@pytest.mark.parametrize("dark", [True, False])
+def test_nav_labels_have_no_layout_whitespace(qapp, dark):
+    """El gap icono/texto lo da el QSS `nav-btn`, nunca espacios literales."""
+    from application.services.i18n_service import get_i18n
+
+    window = MainWindow()
+    window.dark_mode = dark
+    window._apply_theme()
+    i18n = get_i18n(window.config_service)
+    for lang in ("en", "de"):
+        i18n.set_language(lang)
+        for btn in window.nav_buttons:
+            assert btn.text() == btn.text().strip(), (
+                f"nav label with layout whitespace ({lang}): {btn.text()!r}"
+            )
+            assert not btn.icon().isNull()

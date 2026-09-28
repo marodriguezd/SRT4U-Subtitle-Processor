@@ -7,7 +7,7 @@ import sys
 import os
 import ctypes
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtGui import QIcon
 from application.logging_setup import (
     get_logger,
     install_qt_message_handler,
@@ -108,10 +108,8 @@ if __name__ == "__main__":
     app_icon = load_app_icon()
     app.setWindowIcon(app_icon)
 
-    # Optional: Set application-wide font
-    font = QFont("Segoe UI", 10)
-    font.setStyleHint(QFont.StyleHint.SansSerif)
-    app.setFont(font)
+    # Optional: Set application-wide font (platform-native family, same size)
+    app.setFont(Styles.ui_font(10))
 
     # Tooltips no heredan QSS de widgets: se tematizan a nivel de aplicación
     app.setStyleSheet(Styles.tooltip_qss())

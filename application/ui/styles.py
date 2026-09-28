@@ -2,10 +2,11 @@
 Estilos Glassmorphism con transparencias RGBA, iluminación ambiental y alto contraste.
 """
 
+import sys
 from typing import Dict, Optional
 
 from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtGui import QColor, QFont, QFontDatabase, QPalette
 from PyQt6.QtWidgets import QDialog
 
 
@@ -92,6 +93,24 @@ class Styles:
     # Tema activo de la aplicación. Lo mantiene `MainWindow._apply_theme()` para
     # que los diálogos del sistema (archivos, mensajes) se pinten en el tema correcto.
     _CURRENT_DARK = True
+
+    @staticmethod
+    def ui_font(size: int, weight: "QFont.Weight" = QFont.Weight.Normal) -> QFont:
+        """Fuente de la aplicación sin asumir nada instalado.
+
+        Windows conserva "Segoe UI" (aspecto verificado); en Linux/macOS se
+        usa la fuente general del sistema Qt, que siempre existe. No se
+        empaqueta ni se descarga ninguna fuente.
+        """
+        if sys.platform == "win32":
+            family = "Segoe UI"
+        else:
+            family = QFontDatabase.systemFont(
+                QFontDatabase.SystemFont.GeneralFont
+            ).family()
+        font = QFont(family, size, weight)
+        font.setStyleHint(QFont.StyleHint.SansSerif)
+        return font
 
     @classmethod
     def set_dark(cls, dark: bool) -> None:

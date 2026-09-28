@@ -129,6 +129,25 @@ class FakeFailTranslation(TranslationProvider):
         raise ProviderResponseError("boom")
 
 
+class FakePartialTranslation(TranslationProvider):
+    """Fails exactly one cue so failure counts stay distinguishable."""
+
+    name = "fake-partial"
+    model = "fake-model"
+
+    def translate(self, text, source_language, target_language, *, context=None):
+        if "prueba" in text:
+            raise ProviderResponseError("partial-boom")
+        return f"{text} [en]"
+
+    def translate_detailed(
+        self, text, source_language, target_language, *, context=None
+    ):
+        if "prueba" in text:
+            raise ProviderResponseError("partial-boom")
+        return ProviderResponse(f"{text} [en]", model=self.model)
+
+
 @pytest.fixture
 def fakes(monkeypatch):
     FakeTranscription.fail_with = None
@@ -138,7 +157,11 @@ def fakes(monkeypatch):
         "get",
         lambda name, config_service=None: FakeTranscription(),
     )
-    providers = {"fake-ok": FakeOkTranslation(), "google": FakeOkTranslation()}
+    providers = {
+        "fake-ok": FakeOkTranslation(),
+        "fake-partial": FakePartialTranslation(),
+        "google": FakeOkTranslation(),
+    }
 
     def _get(name, config_service=None):
         normalized = str(name).casefold()
@@ -486,6 +509,26 @@ def test_history_failure_record(fakes, media_file, tmp_path):
         rows = store.recent_runs(operation="pipeline")
     assert rows[0]["success"] == 0
     assert rows[0]["error_type"] == "model_unavailable"
+
+
+def test_history_partial_translation_failure_count(fakes, media_file, tmp_path):
+    """1 failed cue of 3 must record translation_failures=1, not 3."""
+    db = str(tmp_path / "history.db")
+    config = PipelineConfig(
+        input_media=media_file,
+        output_subtitle=str(tmp_path / "h.srt"),
+        clean_enabled=False,
+        translation_enabled=True,
+        target_language="en",
+        provider="fake-partial",
+    )
+    result = MediaPipeline().run(config)
+    assert result.failed_stage == "translation"
+    assert result.translation_failures == 1
+    record_pipeline_result(result, config, db)
+    with HistoryStore(db) as store:
+        rows = store.recent_runs(operation="pipeline")
+    assert rows[0]["translation_failures"] == 1
 
 
 # 12. JSON serialization ----------------------------------------------

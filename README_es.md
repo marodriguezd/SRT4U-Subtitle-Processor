@@ -67,7 +67,7 @@ cd SRT4U-Subtitle-Processor
 python -m venv .venv
 source .venv/bin/activate  # En Windows: .venv\Scripts\activate
 
-# Instalar dependencias
+# Instalar dependencias (vía checkout: misma base que `pip install .`)
 pip install -r requirements.txt
 
 # Iniciar la aplicación de escritorio
@@ -86,7 +86,8 @@ pip install ".[dev]"            # pytest + ruff para contribuir
 ```
 
 La base (GUI + CLI + analytics + QA + traducción + historial + pipeline sobre
-subtítulos) no necesita extras. Los modelos Whisper nunca se empaquetan: se
+subtítulos) viene con la instalación base — tanto `pip install .` como
+`pip install -r requirements.txt` la proporcionan, sin extras. Los modelos Whisper nunca se empaquetan: se
 descargan una vez con aviso previo (`SRT4U_WHISPER_MODEL_DIR` reubica la caché).
 
 ### Quickstart en 60 segundos

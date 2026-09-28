@@ -15,6 +15,15 @@ Sevilla, España, versión única 1.4.9 en package/CLI/API/GUI, terminología
 burn-in coherente en CLI/API/GUI/documentación). No publicada en PyPI ni en
 GitHub Releases.
 
+Hardening final post-auditoría (sin funcionalidades nuevas): corregido
+`translation_failures` del historial de pipeline (registraba `number_of_cues`
+en vez de fallos reales); contrato de instalación oficial (`pip install .`
+provee la base GUI+CLI, `requirements.txt` vía checkout con los mismos pines,
+`desktop` como alias, `api`/`transcription`/`dev` opcionales); navegación sin
+hack de espacios; fuente multiplataforma (`Styles.ui_font()`); icono
+play/pause sincronizado con el reproductor; accesibilidad básica en controles
+icon-only; normalización selectiva de QSS a constantes `Styles`.
+
 ## [Unreleased]
 
 ### Added

@@ -50,9 +50,9 @@ class ModernToggle(QAbstractButton):
         radius = h / 2
 
         if self.isChecked():
-            bg_color = QColor("#6366F1")
+            bg_color = QColor(Styles.PRIMARY)
         else:
-            bg_color = QColor("#334155")
+            bg_color = QColor(Styles.BORDER)
 
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(bg_color))
@@ -85,11 +85,11 @@ class LogoBadge(QWidget):
 
         rect = QRectF(0, 0, self.width(), self.height())
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(QColor("#6366F1")))
+        p.setBrush(QBrush(QColor(Styles.PRIMARY)))
         p.drawRoundedRect(rect, 10, 10)
 
         p.setPen(QColor("#FFFFFF"))
-        p.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        p.setFont(Styles.ui_font(12, QFont.Weight.Bold))
         p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "SRT")
         p.end()
 
@@ -115,12 +115,12 @@ class CircularProgress(QWidget):
         rect = QRectF(12, 12, self.width() - 24, self.height() - 24)
         pen_width = 8
 
-        bg_pen = QPen(QColor("#1E293B"), pen_width)
+        bg_pen = QPen(QColor(Styles.SURFACE_RAISED), pen_width)
         bg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(bg_pen)
         p.drawEllipse(rect)
 
-        fg_pen = QPen(QColor("#6366F1"), pen_width)
+        fg_pen = QPen(QColor(Styles.PRIMARY), pen_width)
         fg_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(fg_pen)
 
@@ -128,8 +128,8 @@ class CircularProgress(QWidget):
         span_angle = -int(self.progress * 360 * 16)
         p.drawArc(rect, start_angle, span_angle)
 
-        p.setPen(QColor("#F8FAFC"))
-        p.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        p.setPen(QColor(Styles.TEXT))
+        p.setFont(Styles.ui_font(18, QFont.Weight.Bold))
         text = f"{int(self.progress * 100)}%"
         p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, text)
         p.end()
@@ -146,12 +146,12 @@ class ProgressModal(QDialog):
         super().__init__(parent)
         self.setWindowTitle(t("progress.window_title"))
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
-        self.setStyleSheet("""
-            QDialog {
+        self.setStyleSheet(f"""
+            QDialog {{
                 background-color: #0E1526;
-                border: 2px solid #6366F1;
+                border: 2px solid {Styles.PRIMARY};
                 border-radius: 16px;
-            }
+            }}
         """)
 
         layout = QVBoxLayout(self)
@@ -200,16 +200,16 @@ class ProgressModal(QDialog):
         layout.addLayout(body_layout)
 
         btn_cancel = QPushButton(t("progress.cancel"))
-        btn_cancel.setStyleSheet("""
-            QPushButton {
-                background: #1E293B;
-                color: #CBD5E1;
-                border: 1px solid #334155;
+        btn_cancel.setStyleSheet(f"""
+            QPushButton {{
+                background: {Styles.SURFACE_RAISED};
+                color: {Styles.TEXT_SUBTLE};
+                border: 1px solid {Styles.BORDER};
                 border-radius: 8px;
                 padding: 8px 18px;
                 font-weight: 600;
-            }
-            QPushButton:hover { background: #334155; color: #FFFFFF; }
+            }}
+            QPushButton:hover {{ background: {Styles.BORDER}; color: #FFFFFF; }}
         """)
         btn_cancel.clicked.connect(self._on_cancel)
         layout.addWidget(btn_cancel, alignment=Qt.AlignmentFlag.AlignRight)
@@ -221,7 +221,9 @@ class ProgressModal(QDialog):
             lbl = self.step_labels[step_idx]
             lbl.setText(text_override or self._step_texts[step_idx])
             if done:
-                lbl.setStyleSheet("font-size: 13px; color: #10B981; font-weight: 600;")
+                lbl.setStyleSheet(
+                    f"font-size: 13px; color: {Styles.SUCCESS}; font-weight: 600;"
+                )
             else:
                 lbl.setStyleSheet("font-size: 13px; color: #818CF8; font-weight: 600;")
 
@@ -321,7 +323,7 @@ class DropZone(QFrame):
                 )
             self.sub_label.setText(status_text)
             self.sub_label.setStyleSheet(
-                "font-size: 12px; color: #38BDF8; font-weight: 500;"
+                f"font-size: 12px; color: {Styles.INFO}; font-weight: 500;"
             )
             self.formats_label.setText(t("dropzone.replace_hint"))
 
@@ -472,24 +474,24 @@ class SubtitleCard(QFrame):
 
     def _apply_style(self, active: bool):
         if active:
-            self.setStyleSheet("""
-                QFrame#SubtitleCard {
+            self.setStyleSheet(f"""
+                QFrame#SubtitleCard {{
                     background-color: #1A1C38;
-                    border: 2px solid #8B5CF6;
+                    border: 2px solid {Styles.ACCENT};
                     border-radius: 8px;
-                }
+                }}
             """)
         else:
-            self.setStyleSheet("""
-                QFrame#SubtitleCard {
-                    background-color: #111827;
-                    border: 1px solid #1F2937;
+            self.setStyleSheet(f"""
+                QFrame#SubtitleCard {{
+                    background-color: {Styles.SURFACE_ALT};
+                    border: 1px solid {Styles.BORDER_SUBTLE};
                     border-radius: 8px;
-                }
-                QFrame#SubtitleCard:hover {
-                    border-color: #38BDF8;
+                }}
+                QFrame#SubtitleCard:hover {{
+                    border-color: {Styles.INFO};
                     background-color: #141E33;
-                }
+                }}
             """)
 
     def set_active(self, active: bool):
@@ -510,16 +512,16 @@ class SubtitleCard(QFrame):
 
         # Index badge
         idx_lbl = QLabel(f"#{self.edited_item.index}")
-        idx_lbl.setStyleSheet("""
-            QLabel {
+        idx_lbl.setStyleSheet(f"""
+            QLabel {{
                 background: #1E1B4B;
-                color: #A78BFA;
+                color: {Styles.ACCENT_LIGHT};
                 font-weight: 800;
                 font-size: 11px;
                 padding: 2px 7px;
                 border-radius: 5px;
                 border: 1px solid #3B3878;
-            }
+            }}
         """)
         meta_layout.addWidget(idx_lbl)
 
@@ -534,7 +536,7 @@ class SubtitleCard(QFrame):
         # Duration
         dur_s = max(0.0, (self.edited_item.end_ms - self.edited_item.start_ms) / 1000.0)
         dur_lbl = QLabel(f"({dur_s:.1f}s)")
-        dur_lbl.setStyleSheet("font-size: 11px; color: #64748B;")
+        dur_lbl.setStyleSheet(f"font-size: 11px; color: {Styles.TEXT_FAINT};")
         meta_layout.addWidget(dur_lbl)
 
         meta_layout.addStretch()
@@ -542,8 +544,8 @@ class SubtitleCard(QFrame):
         # Jump button
         self.btn_jump = QPushButton(t("preview.btn_jump"))
         self.btn_jump.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_jump.setStyleSheet("""
-            QPushButton {
+        self.btn_jump.setStyleSheet(f"""
+            QPushButton {{
                 background: rgba(99, 102, 241, 0.15);
                 color: #A5B4FC;
                 border: 1px solid rgba(99, 102, 241, 0.35);
@@ -551,12 +553,12 @@ class SubtitleCard(QFrame):
                 padding: 3px 10px;
                 font-size: 11px;
                 font-weight: 600;
-            }
-            QPushButton:hover {
-                background: #6366F1;
+            }}
+            QPushButton:hover {{
+                background: {Styles.PRIMARY};
                 color: #FFFFFF;
-                border-color: #6366F1;
-            }
+                border-color: {Styles.PRIMARY};
+            }}
         """)
         self.btn_jump.clicked.connect(
             lambda: self.jump_clicked.emit(self.edited_item.start_ms)
@@ -575,7 +577,7 @@ class SubtitleCard(QFrame):
         left_col.setSpacing(3)
         self.lbl_orig_tag = QLabel(t("preview.tag_orig"))
         self.lbl_orig_tag.setStyleSheet(
-            "font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;"
+            f"font-size: 10px; font-weight: 700; color: {Styles.TEXT_FAINT}; letter-spacing: 0.5px;"
         )
         left_col.addWidget(self.lbl_orig_tag)
 
@@ -585,16 +587,16 @@ class SubtitleCard(QFrame):
         self.lbl_orig.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        self.lbl_orig.setStyleSheet("""
-            QLabel {
-                background: #0B0F19;
-                border: 1px solid #1E293B;
+        self.lbl_orig.setStyleSheet(f"""
+            QLabel {{
+                background: {Styles.SURFACE_DEEP};
+                border: 1px solid {Styles.SURFACE_RAISED};
                 border-radius: 6px;
                 padding: 6px 8px;
-                color: #94A3B8;
+                color: {Styles.TEXT_MUTED};
                 font-size: 13px;
                 line-height: 1.4;
-            }
+            }}
         """)
         left_col.addWidget(self.lbl_orig, stretch=1)
         body_layout.addLayout(left_col, stretch=1)
@@ -604,7 +606,7 @@ class SubtitleCard(QFrame):
         right_col.setSpacing(3)
         self.lbl_edit_tag = QLabel(t("preview.tag_edit"))
         self.lbl_edit_tag.setStyleSheet(
-            "font-size: 10px; font-weight: 700; color: #10B981; letter-spacing: 0.5px;"
+            f"font-size: 10px; font-weight: 700; color: {Styles.SUCCESS}; letter-spacing: 0.5px;"
         )
         right_col.addWidget(self.lbl_edit_tag)
 
@@ -613,19 +615,19 @@ class SubtitleCard(QFrame):
         self.edit_text.setTabChangesFocus(True)
         line_count = max(1, self.edited_item.text.count("\n") + 1)
         self.edit_text.setFixedHeight(max(40, min(140, line_count * 22 + 18)))
-        self.edit_text.setStyleSheet("""
-            QPlainTextEdit {
+        self.edit_text.setStyleSheet(f"""
+            QPlainTextEdit {{
                 background: #080D1A;
-                border: 1px solid #334155;
+                border: 1px solid {Styles.BORDER};
                 border-radius: 6px;
-                color: #F8FAFC;
+                color: {Styles.TEXT};
                 font-size: 13px;
                 padding: 5px 7px;
-            }
-            QPlainTextEdit:focus {
-                border-color: #8B5CF6;
+            }}
+            QPlainTextEdit:focus {{
+                border-color: {Styles.ACCENT};
                 background: #0E1528;
-            }
+            }}
         """)
         self.edit_text.textChanged.connect(self._on_text_changed)
         right_col.addWidget(self.edit_text, stretch=1)
@@ -676,12 +678,12 @@ class SubtitleDiffViewer(QWidget):
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("""
-            QScrollArea {
-                border: 1px solid #1E293B;
+        self.scroll_area.setStyleSheet(f"""
+            QScrollArea {{
+                border: 1px solid {Styles.SURFACE_RAISED};
                 border-radius: 10px;
                 background-color: #070B14;
-            }
+            }}
         """)
 
         self.cards_container = QWidget()
@@ -837,29 +839,27 @@ class VideoPreviewPlayer(QFrame):
         ctrl_layout.setSpacing(10)
 
         self.play_btn = QPushButton()
-        self.play_btn.setIcon(
-            Icons.get_icon(
-                "play", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
-            )
-        )
         self.play_btn.setFixedSize(32, 32)
-        self.play_btn.setStyleSheet("""
-            QPushButton {
-                background: #6366F1;
+        self.play_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Styles.PRIMARY};
                 color: white;
                 border: none;
                 border-radius: 16px;
                 font-size: 13px;
                 font-weight: bold;
-            }
-            QPushButton:hover { background: #4F46E5; }
+            }}
+            QPushButton:hover {{ background: {Styles.PRIMARY_HOVER}; }}
         """)
+        self._sync_play_icon()
 
         self.time_slider = QSlider(Qt.Orientation.Horizontal)
-        self.time_slider.setStyleSheet("""
-            QSlider::groove:horizontal { height: 4px; background: #1E293B; border-radius: 2px; }
-            QSlider::sub-page:horizontal { background: #6366F1; border-radius: 2px; }
-            QSlider::handle:horizontal { width: 12px; height: 12px; margin: -4px 0; border-radius: 6px; background: #FFFFFF; }
+        self.time_slider.setAccessibleName(t("preview.seek_tooltip"))
+        self.time_slider.setToolTip(t("preview.seek_tooltip"))
+        self.time_slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{ height: 4px; background: {Styles.SURFACE_RAISED}; border-radius: 2px; }}
+            QSlider::sub-page:horizontal {{ background: {Styles.PRIMARY}; border-radius: 2px; }}
+            QSlider::handle:horizontal {{ width: 12px; height: 12px; margin: -4px 0; border-radius: 6px; background: #FFFFFF; }}
         """)
 
         self.time_lbl = QLabel("00:00:00 / 00:00:00")
@@ -868,11 +868,6 @@ class VideoPreviewPlayer(QFrame):
         )
 
         self.btn_mute = QPushButton()
-        self.btn_mute.setIcon(
-            Icons.get_icon(
-                "volume", normal_color="#94A3B8", active_color="#FFFFFF", size=16
-            )
-        )
         self.btn_mute.setFixedSize(28, 28)
         self.btn_mute.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mute.setStyleSheet("""
@@ -892,12 +887,15 @@ class VideoPreviewPlayer(QFrame):
         self.vol_slider.setRange(0, 100)
         self.vol_slider.setValue(100)
         self.vol_slider.setFixedWidth(70)
-        self.vol_slider.setStyleSheet("""
-            QSlider::groove:horizontal { height: 4px; background: #1E293B; border-radius: 2px; }
-            QSlider::sub-page:horizontal { background: #10B981; border-radius: 2px; }
-            QSlider::handle:horizontal { width: 10px; height: 10px; margin: -3px 0; border-radius: 5px; background: #FFFFFF; }
+        self.vol_slider.setAccessibleName(t("preview.volume_tooltip"))
+        self.vol_slider.setToolTip(t("preview.volume_tooltip"))
+        self.vol_slider.setStyleSheet(f"""
+            QSlider::groove:horizontal {{ height: 4px; background: {Styles.SURFACE_RAISED}; border-radius: 2px; }}
+            QSlider::sub-page:horizontal {{ background: {Styles.SUCCESS}; border-radius: 2px; }}
+            QSlider::handle:horizontal {{ width: 10px; height: 10px; margin: -3px 0; border-radius: 5px; background: #FFFFFF; }}
         """)
         self.vol_slider.valueChanged.connect(self._on_volume_changed)
+        self._update_mute_icon(self.vol_slider.value())
 
         self.btn_load_video = QPushButton(t("preview.btn_load_video"))
         self.btn_load_video.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -929,7 +927,14 @@ class VideoPreviewPlayer(QFrame):
 
     def retranslate(self):
         self.btn_load_video.setText(t("preview.btn_load_video"))
+        self.btn_load_video.setAccessibleName(t("preview.btn_load_video"))
         self.sub_overlay.setText(t("preview.overlay_hint"))
+        self.time_slider.setAccessibleName(t("preview.seek_tooltip"))
+        self.time_slider.setToolTip(t("preview.seek_tooltip"))
+        self.vol_slider.setAccessibleName(t("preview.volume_tooltip"))
+        self.vol_slider.setToolTip(t("preview.volume_tooltip"))
+        self._sync_play_icon()
+        self._update_mute_icon(self.vol_slider.value())
 
     def _on_tracks_changed(self):
         if len(self.player.audioTracks()) > 0 and self.player.activeAudioTrack() == -1:
@@ -938,6 +943,10 @@ class VideoPreviewPlayer(QFrame):
     def _on_volume_changed(self, val: int):
         vol = val / 100.0
         self.audio_output.setVolume(vol)
+        # Arrastrar el volumen implica intención de escuchar: salir de mute,
+        # salvo que el nuevo valor siga siendo silencio total.
+        if val > 0 and self.audio_output.isMuted():
+            self.audio_output.setMuted(False)
         self._update_mute_icon(val)
 
     def _toggle_mute(self):
@@ -951,15 +960,23 @@ class VideoPreviewPlayer(QFrame):
     def _update_mute_icon(self, volume: int):
         if self.audio_output.isMuted() or volume == 0:
             icon_name = "volume_mute"
+            tip = t("preview.unmute_tooltip")
         elif volume < 50:
             icon_name = "volume_low"
+            tip = t("preview.mute_tooltip")
         else:
             icon_name = "volume"
+            tip = t("preview.mute_tooltip")
         self.btn_mute.setIcon(
             Icons.get_icon(
-                icon_name, normal_color="#94A3B8", active_color="#FFFFFF", size=16
+                icon_name,
+                normal_color=Styles.TEXT_MUTED,
+                active_color="#FFFFFF",
+                size=16,
             )
         )
+        self.btn_mute.setToolTip(tip)
+        self.btn_mute.setAccessibleName(tip)
 
     def eventFilter(self, watched, event):
         if (
@@ -1016,6 +1033,7 @@ class VideoPreviewPlayer(QFrame):
 
     def _connect_signals(self):
         self.play_btn.clicked.connect(self._toggle_playback)
+        self.player.playbackStateChanged.connect(self._sync_play_icon)
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
         self.time_slider.sliderMoved.connect(self._set_position)
@@ -1027,6 +1045,11 @@ class VideoPreviewPlayer(QFrame):
             self._reposition_overlay()
             self.sub_overlay.show()
             self.sub_overlay.raise_()
+            # Nuevo medio: el estado visual vuelve a reposo.
+            self.time_slider.setRange(0, 0)
+            self.time_slider.setValue(0)
+            self._update_time_label(0, 0)
+            self._sync_play_icon()
 
     def set_subtitles(self, subtitles: List[SubtitleItem]):
         self.current_subtitles = subtitles
@@ -1043,21 +1066,27 @@ class VideoPreviewPlayer(QFrame):
         if was_playing:
             self.player.play()
 
+    def _sync_play_icon(self, _state=None):
+        """El icono play/pause siempre refleja `playbackState` (incl. EOS/error)."""
+        playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        self.play_btn.setIcon(
+            Icons.get_icon(
+                "pause" if playing else "play",
+                normal_color="#FFFFFF",
+                active_color="#FFFFFF",
+                size=16,
+            )
+        )
+        tip = t("preview.pause_tooltip") if playing else t("preview.play_tooltip")
+        self.play_btn.setToolTip(tip)
+        self.play_btn.setAccessibleName(tip)
+
     def _toggle_playback(self):
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self.player.pause()
-            self.play_btn.setIcon(
-                Icons.get_icon(
-                    "play", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
-                )
-            )
         else:
             self.player.play()
-            self.play_btn.setIcon(
-                Icons.get_icon(
-                    "pause", normal_color="#FFFFFF", active_color="#FFFFFF", size=16
-                )
-            )
+        self._sync_play_icon()
 
     def _on_duration_changed(self, duration: int):
         self.time_slider.setRange(0, duration)

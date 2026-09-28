@@ -1,3 +1,8 @@
+# Source-checkout launcher: run from the repository root (`python3 main.py`).
+# It is NOT a system-installed entry (relative Exec/Icon paths only resolve
+# inside a checkout). Installed distributions ship their own launcher:
+# the AppImage embeds an equivalent file with `Exec=SRT4U` / `Icon=srt4u`
+# (see .github/workflows/build.yml, "Package AppImage" step).
 [Desktop Entry]
 Name=SRT4U
 GenericName=Subtitle Processor

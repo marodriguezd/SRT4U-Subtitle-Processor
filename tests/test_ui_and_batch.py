@@ -14,6 +14,26 @@ from application.services.subtitle_service import SubtitleService, SubtitleItem
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
 
+def test_player_icon_only_controls_are_named(qapp):
+    """Play/mute/sliders must expose tooltip + accessibleName (a11y)."""
+    from application.services.i18n_service import t
+    from application.ui.widgets import VideoPreviewPlayer
+
+    player = VideoPreviewPlayer()
+    for control in (
+        player.play_btn,
+        player.btn_mute,
+        player.time_slider,
+        player.vol_slider,
+    ):
+        assert control.toolTip().strip(), control
+        assert control.accessibleName().strip(), control
+    # Icon always mirrors the real playback state (starts stopped -> play).
+    player._sync_play_icon()
+    assert player.play_btn.toolTip() == t("preview.play_tooltip")
+    assert player.play_btn.accessibleName() == t("preview.play_tooltip")
+
+
 def test_ui_components(qapp):
     toggle = ModernToggle(checked=False)
     assert not toggle.isChecked()

@@ -7,9 +7,18 @@ name = "srt4u-subtitle-processor"
 version = "1.4.9"
 description = "Desktop and headless subtitle processing tool"
 requires-python = ">=3.10"
-dependencies = []
+# Base install is a functional desktop GUI + CLI: PyQt6 renders the interface
+# and deep-translator powers the keyless Google free tier. The same pins live
+# in requirements.txt, which remains the source-checkout/CI quick path
+# (the compat-min-pyqt6 job resolves the minimum from there).
+dependencies = [
+    "PyQt6>=6.6.1,<6.12",
+    "deep-translator>=1.11.4",
+]
 
 [project.optional-dependencies]
+# Alias of the base desktop stack; kept so `pip install ".[desktop]"` keeps
+# working for existing scripts and docs.
 desktop = ["PyQt6>=6.6.1,<6.12", "deep-translator>=1.11.4"]
 api = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.18", "httpx>=0.27"]
 transcription = ["faster-whisper>=1.0"]

@@ -147,3 +147,32 @@ def test_format_placeholders_survive_translation(lang):
         translated = catalogs[lang][key]
         for placeholder in re.findall(r"\{[a-z_]+\}", source):
             assert placeholder in translated, f"{key} loses {placeholder} in {lang}"
+
+
+def _pyproject():
+    import tomllib
+
+    with open(ROOT / "pyproject.toml", "rb") as fh:
+        return tomllib.load(fh)
+
+
+def test_install_contract_base_has_desktop_stack():
+    """`pip install .` must yield a functional desktop GUI + CLI base."""
+    project = _pyproject()["project"]
+    base = project["dependencies"]
+    assert any(dep.startswith("PyQt6") for dep in base)
+    assert any(dep.startswith("deep-translator") for dep in base)
+
+    req_text = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    for dep in base:
+        name = re.split(r"[<>=!~ ]", dep, maxsplit=1)[0]
+        assert name in req_text, f"base dep {name} missing from requirements.txt"
+
+    extras = project["optional-dependencies"]
+    assert "PyQt6" not in " ".join(extras["api"])
+    assert "faster-whisper" not in " ".join(base)
+    assert "fastapi" not in " ".join(base)
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_es = (ROOT / "README_es.md").read_text(encoding="utf-8")
+    assert "pip install ." in readme and "pip install ." in readme_es

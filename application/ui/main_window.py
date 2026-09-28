@@ -66,6 +66,15 @@ from ..logging_setup import get_logger
 logger = get_logger("ui")
 
 
+def _nav_label(key: str) -> str:
+    """Sidebar label text.
+
+    The icon/text gap is owned by the ``nav-btn`` QSS padding and the style,
+    never by literal leading spaces in the label (layout hack removed).
+    """
+    return t(key)
+
+
 class ProcessWorker(QThread):
     step_updated = pyqtSignal(str, object)
     completed = pyqtSignal(object)
@@ -229,9 +238,6 @@ class MainWindow(QMainWindow):
         self.pipeline_input_path: Optional[str] = None
         self.pipeline_video_output: Optional[str] = None
         self.pipeline_cancelled = False
-
-        self.current_subtitle_path: Optional[str] = None
-        self.current_video_path: Optional[str] = None
         self.last_result: Optional[ProcessingResult] = None
         self.saved_output_path: Optional[str] = None
 
@@ -361,7 +367,7 @@ class MainWindow(QMainWindow):
         ]
 
         for icon_name, key, page_idx in nav_items:
-            btn = QPushButton(f"  {t(key)}")
+            btn = QPushButton(_nav_label(key))
             btn.setProperty("class", "nav-btn")
             btn.setProperty("page_index", page_idx)
             btn.setProperty("icon_name", icon_name)
@@ -477,28 +483,28 @@ class MainWindow(QMainWindow):
         self.cb_top_lang = QComboBox()
         self.cb_top_lang.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
-        self.cb_top_lang.setStyleSheet("""
-            QComboBox {
-                background: #1E293B;
-                border: 1px solid #334155;
+        self.cb_top_lang.setStyleSheet(f"""
+            QComboBox {{
+                background: {Styles.SURFACE_RAISED};
+                border: 1px solid {Styles.BORDER};
                 border-radius: 8px;
-                color: #F8FAFC;
+                color: {Styles.TEXT};
                 padding: 4px 10px;
                 font-size: 12px;
                 font-weight: 600;
                 min-width: 140px;
-            }
-            QComboBox:hover {
-                border-color: #6366F1;
-            }
-            QComboBox::drop-down { border: none; }
-            QComboBox QAbstractItemView {
-                background-color: #0F172A;
-                color: #F8FAFC;
-                selection-background-color: #6366F1;
-                border: 1px solid #334155;
+            }}
+            QComboBox:hover {{
+                border-color: {Styles.PRIMARY};
+            }}
+            QComboBox::drop-down {{ border: none; }}
+            QComboBox QAbstractItemView {{
+                background-color: {Styles.SURFACE};
+                color: {Styles.TEXT};
+                selection-background-color: {Styles.PRIMARY};
+                border: 1px solid {Styles.BORDER};
                 padding: 4px;
-            }
+            }}
         """)
         self.cb_top_lang.addItem(t("topbar.lang_auto"), "auto")
         for code, meta in self.i18n.SUPPORTED_LANGUAGES.items():
@@ -512,6 +518,7 @@ class MainWindow(QMainWindow):
 
         self.btn_theme = QPushButton()
         self.btn_theme.setToolTip(t("topbar.theme_tooltip"))
+        self.btn_theme.setAccessibleName(t("topbar.theme_tooltip"))
         self.btn_theme.setIcon(
             Icons.get_icon(
                 "sun" if self.dark_mode else "moon",
@@ -523,18 +530,18 @@ class MainWindow(QMainWindow):
         self.btn_theme.setIconSize(QSize(18, 18))
         self.btn_theme.setFixedSize(38, 38)
         self.btn_theme.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_theme.setStyleSheet("""
-            QPushButton {
-                background: #1E293B;
-                border: 1px solid #334155;
+        self.btn_theme.setStyleSheet(f"""
+            QPushButton {{
+                background: {Styles.SURFACE_RAISED};
+                border: 1px solid {Styles.BORDER};
                 border-radius: 19px;
                 font-size: 16px;
-                color: #F8FAFC;
-            }
-            QPushButton:hover {
-                background: #334155;
-                border-color: #6366F1;
-            }
+                color: {Styles.TEXT};
+            }}
+            QPushButton:hover {{
+                background: {Styles.BORDER};
+                border-color: {Styles.PRIMARY};
+            }}
         """)
         self.btn_theme.clicked.connect(self._toggle_theme)
 
@@ -702,19 +709,19 @@ class MainWindow(QMainWindow):
             )
         )
         self.btn_burn_in.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_burn_in.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #8B5CF6, stop:1 #EC4899);
+        self.btn_burn_in.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {Styles.ACCENT}, stop:1 #EC4899);
                 color: #FFFFFF;
                 border: none;
                 border-radius: 6px;
                 padding: 6px 14px;
                 font-weight: 700;
                 font-size: 12px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7C3AED, stop:1 #DB2777);
-            }
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {Styles.ACCENT_HOVER}, stop:1 #DB2777);
+            }}
         """)
         self.btn_burn_in.clicked.connect(self._open_burn_in_dialog)
 
@@ -725,12 +732,12 @@ class MainWindow(QMainWindow):
 
         # 2. Control & Search Toolbar
         toolbar = QFrame()
-        toolbar.setStyleSheet("""
-            QFrame {
-                background: #0F172A;
-                border: 1px solid #1E293B;
+        toolbar.setStyleSheet(f"""
+            QFrame {{
+                background: {Styles.SURFACE};
+                border: 1px solid {Styles.SURFACE_RAISED};
                 border-radius: 8px;
-            }
+            }}
         """)
         tb_layout = QHBoxLayout(toolbar)
         tb_layout.setContentsMargins(10, 6, 10, 6)
@@ -740,35 +747,35 @@ class MainWindow(QMainWindow):
         self.preview_search_input = QLineEdit()
         self.preview_search_input.setPlaceholderText(t("preview.search_placeholder"))
         self.preview_search_input.setClearButtonEnabled(True)
-        self.preview_search_input.setStyleSheet("""
-            QLineEdit {
-                background: #1E293B;
-                border: 1px solid #334155;
+        self.preview_search_input.setStyleSheet(f"""
+            QLineEdit {{
+                background: {Styles.SURFACE_RAISED};
+                border: 1px solid {Styles.BORDER};
                 border-radius: 6px;
-                color: #F8FAFC;
+                color: {Styles.TEXT};
                 padding: 6px 12px;
                 font-size: 12px;
-            }
-            QLineEdit:focus {
-                border-color: #8B5CF6;
+            }}
+            QLineEdit:focus {{
+                border-color: {Styles.ACCENT};
                 background: #1A2234;
-            }
+            }}
         """)
         self.preview_search_input.textChanged.connect(self._on_preview_search_changed)
         tb_layout.addWidget(self.preview_search_input, stretch=2)
 
         # Counter badge
         self.lbl_preview_sub_counter = QLabel(t("preview.sub_count_zero"))
-        self.lbl_preview_sub_counter.setStyleSheet("""
-            QLabel {
-                background: #1E293B;
-                color: #94A3B8;
+        self.lbl_preview_sub_counter.setStyleSheet(f"""
+            QLabel {{
+                background: {Styles.SURFACE_RAISED};
+                color: {Styles.TEXT_MUTED};
                 font-size: 11px;
                 font-weight: 600;
                 padding: 4px 10px;
                 border-radius: 6px;
-                border: 1px solid #334155;
-            }
+                border: 1px solid {Styles.BORDER};
+            }}
         """)
         tb_layout.addWidget(self.lbl_preview_sub_counter)
 
@@ -776,24 +783,24 @@ class MainWindow(QMainWindow):
         self.chk_autoscroll = QCheckBox(t("preview.autoscroll"))
         self.chk_autoscroll.setChecked(True)
         self.chk_autoscroll.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.chk_autoscroll.setStyleSheet("""
-            QCheckBox {
-                color: #CBD5E1;
+        self.chk_autoscroll.setStyleSheet(f"""
+            QCheckBox {{
+                color: {Styles.TEXT_SUBTLE};
                 font-size: 12px;
                 font-weight: 600;
                 spacing: 6px;
-            }
-            QCheckBox::indicator {
+            }}
+            QCheckBox::indicator {{
                 width: 16px;
                 height: 16px;
                 border-radius: 4px;
                 border: 1px solid #475569;
-                background: #1E293B;
-            }
-            QCheckBox::indicator:checked {
-                background: #8B5CF6;
-                border-color: #8B5CF6;
-            }
+                background: {Styles.SURFACE_RAISED};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {Styles.ACCENT};
+                border-color: {Styles.ACCENT};
+            }}
         """)
         tb_layout.addWidget(self.chk_autoscroll)
 
@@ -802,16 +809,16 @@ class MainWindow(QMainWindow):
         # 3. Cinema Splitter (Video Player on TOP, Subtitle Diff Viewer on BOTTOM)
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setHandleWidth(8)
-        splitter.setStyleSheet("""
-            QSplitter::handle:vertical {
-                background-color: #1E293B;
+        splitter.setStyleSheet(f"""
+            QSplitter::handle:vertical {{
+                background-color: {Styles.SURFACE_RAISED};
                 height: 6px;
                 margin: 2px 20px;
                 border-radius: 3px;
-            }
-            QSplitter::handle:vertical:hover {
-                background-color: #8B5CF6;
-            }
+            }}
+            QSplitter::handle:vertical:hover {{
+                background-color: {Styles.ACCENT};
+            }}
         """)
 
         self.video_player = VideoPreviewPlayer()
@@ -1896,7 +1903,9 @@ class MainWindow(QMainWindow):
         self.lbl_sum2 = QLabel(t("completed.sum2"))
         self.lbl_sum3 = QLabel(t("completed.sum3"))
         for lbl in [self.lbl_sum1, self.lbl_sum2, self.lbl_sum3]:
-            lbl.setStyleSheet("font-size: 13px; color: #10B981; font-weight: 500;")
+            lbl.setStyleSheet(
+                f"font-size: 13px; color: {Styles.SUCCESS}; font-weight: 500;"
+            )
             s_layout.addWidget(lbl)
 
         layout.addWidget(summary_card)
@@ -2608,9 +2617,9 @@ class MainWindow(QMainWindow):
         tag_row.setSpacing(8)
         self.lbl_version_badge = QLabel(t("about.version_pill"))
         v_badge = self.lbl_version_badge
-        v_badge.setStyleSheet("""
+        v_badge.setStyleSheet(f"""
             background: #1E1B4B;
-            color: #A78BFA;
+            color: {Styles.ACCENT_LIGHT};
             font-size: 11px;
             font-weight: 700;
             padding: 3px 8px;
@@ -2625,7 +2634,9 @@ class MainWindow(QMainWindow):
         tag_row.addStretch()
 
         app_desc = QLabel(t("about.desc"))
-        app_desc.setStyleSheet("font-size: 12px; color: #CBD5E1; line-height: 1.4;")
+        app_desc.setStyleSheet(
+            f"font-size: 12px; color: {Styles.TEXT_SUBTLE}; line-height: 1.4;"
+        )
         app_desc.setWordWrap(True)
         self.lbl_about_desc = app_desc
 
@@ -2751,13 +2762,15 @@ class MainWindow(QMainWindow):
 
         self.lbl_lic_para = QLabel(t("about.license_desc"))
         self.lbl_lic_para.setStyleSheet(
-            "font-size: 12px; color: #CBD5E1; line-height: 1.5;"
+            f"font-size: 12px; color: {Styles.TEXT_SUBTLE}; line-height: 1.5;"
         )
         self.lbl_lic_para.setWordWrap(True)
         l_layout.addWidget(self.lbl_lic_para)
 
         lic_terms = QLabel(self._build_license_terms())
-        lic_terms.setStyleSheet("font-size: 12px; color: #CBD5E1; line-height: 1.6;")
+        lic_terms.setStyleSheet(
+            f"font-size: 12px; color: {Styles.TEXT_SUBTLE}; line-height: 1.6;"
+        )
         lic_terms.setTextFormat(Qt.TextFormat.RichText)
         lic_terms.setWordWrap(True)
         self.lbl_lic_desc = lic_terms
@@ -2881,6 +2894,7 @@ class MainWindow(QMainWindow):
             self.lbl_app_sub.setText(t("app.subtitle"))
         if hasattr(self, "btn_theme"):
             self.btn_theme.setToolTip(t("topbar.theme_tooltip"))
+            self.btn_theme.setAccessibleName(t("topbar.theme_tooltip"))
         if hasattr(self, "cb_source_lang"):
             self.cb_source_lang.setItemText(0, t("home.lang_auto"))
         if hasattr(self, "cb_engine"):
@@ -2897,7 +2911,7 @@ class MainWindow(QMainWindow):
         for btn in self.nav_buttons:
             key = btn.property("i18n_key")
             if key:
-                btn.setText(f"  {t(key)}")
+                btn.setText(_nav_label(key))
 
         # 2. Home Page
         if hasattr(self, "lbl_home_title"):

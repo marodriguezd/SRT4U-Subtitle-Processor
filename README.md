@@ -67,7 +67,7 @@ cd SRT4U-Subtitle-Processor
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (source-checkout path: same base stack as `pip install .`)
 pip install -r requirements.txt
 
 # Run the desktop application
@@ -86,7 +86,8 @@ pip install ".[dev]"            # pytest + ruff for contributors
 ```
 
 Base (GUI + CLI + analytics + QA + translation + history + pipeline over
-subtitle inputs) needs no extra. Whisper models are never bundled: they
+subtitle inputs) ships with the base install — `pip install .` and
+`pip install -r requirements.txt` both provide it, no extra needed. Whisper models are never bundled: they
 download once with prior notice (`SRT4U_WHISPER_MODEL_DIR` relocates the cache).
 
 ### 60-second quickstart

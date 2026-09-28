@@ -1,4 +1,4 @@
-# Deuda técnica y veredictos de auditoría (Fase 11)
+# Deuda técnica y veredictos (hardening final)
 
 Aceptado conscientemente para la release candidate. Nada de aquí bloquea;
 cada punto indica por qué no se toca.
@@ -28,6 +28,35 @@ cada punto indica por qué no se toca.
     Semántica verificada en tests, no un bug.
 11. **`build_exe.bat` cubre la variante BASE**: FULL documentado con flags en
     el propio `.bat` (modelos nunca empaquetados).
+12. **Hex restantes sin constante**: tras la normalización selectiva quedan
+    literales con semántica propia (blancos puros de pintura, colores de
+    previsualización elegibles, superficies permanentes oscuras, hover
+    `#059669`). Sin equivalencia exacta en `Styles`; no se inventan
+    constantes de un solo uso.
+
+## Decisiones del hardening final (comprobado, no se toca)
+
+- **Contrato de instalación**: `pip install .` instala la base funcional
+  (GUI + CLI: PyQt6 + deep-translator); `requirements.txt` es la vía rápida
+  del checkout/CI con los mismos pines; `desktop` se conserva como alias;
+  `api`/`transcription`/`dev` siguen opcionales. Veredicto anterior de
+  "base con cero dependencias" queda sustituido por este (test
+  `test_install_contract_base_has_desktop_stack`).
+- **`translation_failures` del pipeline** registra fallos reales
+  (`PipelineResult.translation_failures`), nunca `number_of_cues`.
+  Regresión cubierta en `test_history_partial_translation_failure_count`.
+- **Gap icono/texto de la navegación** lo define el QSS `nav-btn`, sin
+  espacios literales (`test_nav_labels_have_no_layout_whitespace`).
+- **`srt4u.desktop` del repo** es launcher del checkout (rutas relativas);
+  las distribuciones instalan su propio launcher (AppImage: `Exec=SRT4U`).
+- **Fuente multiplataforma**: `Styles.ui_font()` (Segoe UI solo en Windows,
+  fuente general del sistema en Linux/macOS); sin fuentes empaquetadas.
+- **Reproductor**: el icono play/pause se sincroniza con `playbackState`
+  (cubre fin/error); arrastrar volumen sale de mute; reset visual al cargar
+  vídeo nuevo.
+- **Flujos de error UI verificados sin cambios**: completado / cancelado /
+  fallo se distinguen; cancelar es silencioso; los fallos muestran diálogos
+  sanitizados; el historial nunca rompe la ejecución.
 
 ## Veredictos (comprobado, no se toca)
 
@@ -43,5 +72,6 @@ cada punto indica por qué no se toca.
   transcript/audio/vídeo/claves (tests lo afirman para transcription y
   pipeline), GUI/CLI/API aíslan errores con `HistoryError`.
 - OpenAPI con 13 paths; jobs con 404/409 y proyección sin campos internos.
-- Wheel construido e importado sin PyQt6 ni extras: base con cero
-  dependencias runtime.
+- Wheel/base importan sin extras opcionales: CLI/API/servicios/historial/
+  pipeline funcionan sin Qt (transcripción y burn-in con import perezoso y
+  error claro).

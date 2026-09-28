@@ -107,6 +107,9 @@ class BurnInDialog(QDialog):
         self.txt_video.setPlaceholderText("...")
         self.txt_video.setStyleSheet(self._input_style())
         btn_browse_vid = QPushButton(t("burn.btn_browse"))
+        btn_browse_vid.setAccessibleName(
+            f"{t('burn.btn_browse')} ({t('burn.lbl_video_source')})"
+        )
         btn_browse_vid.setStyleSheet(self._btn_secondary_style())
         btn_browse_vid.setIcon(
             Icons.get_icon(
@@ -120,6 +123,7 @@ class BurnInDialog(QDialog):
         btn_browse_vid.clicked.connect(self._browse_video)
         v_row.addWidget(self.txt_video, stretch=1)
         v_row.addWidget(btn_browse_vid)
+        lbl_v.setBuddy(self.txt_video)
         v_box.addWidget(lbl_v)
         v_box.addLayout(v_row)
         f_layout.addLayout(v_box)
@@ -142,6 +146,9 @@ class BurnInDialog(QDialog):
         self.txt_output.setPlaceholderText("...")
         self.txt_output.setStyleSheet(self._input_style())
         btn_browse_out = QPushButton(t("burn.btn_browse"))
+        btn_browse_out.setAccessibleName(
+            f"{t('burn.btn_browse')} ({t('burn.lbl_output_file')})"
+        )
         btn_browse_out.setStyleSheet(self._btn_secondary_style())
         btn_browse_out.setIcon(
             Icons.get_icon(
@@ -155,6 +162,7 @@ class BurnInDialog(QDialog):
         btn_browse_out.clicked.connect(self._browse_output)
         o_row.addWidget(self.txt_output, stretch=1)
         o_row.addWidget(btn_browse_out)
+        lbl_o.setBuddy(self.txt_output)
         o_box.addWidget(lbl_o)
         o_box.addLayout(o_row)
         f_layout.addLayout(o_box)
@@ -234,24 +242,24 @@ class BurnInDialog(QDialog):
         # Sincronización / Corrección de tiempos
         self.chk_fix_overlaps = QCheckBox(t("burn.chk_fix_overlaps"))
         self.chk_fix_overlaps.setChecked(True)
-        self.chk_fix_overlaps.setStyleSheet("""
-            QCheckBox {
-                color: #CBD5E1;
+        self.chk_fix_overlaps.setStyleSheet(f"""
+            QCheckBox {{
+                color: {Styles.TEXT_SUBTLE};
                 font-size: 11px;
                 font-weight: 500;
                 spacing: 6px;
-            }
-            QCheckBox::indicator {
+            }}
+            QCheckBox::indicator {{
                 width: 15px;
                 height: 15px;
                 border-radius: 4px;
                 border: 1px solid #475569;
-                background: #0F172A;
-            }
-            QCheckBox::indicator:checked {
-                background: #8B5CF6;
-                border-color: #A78BFA;
-            }
+                background: {Styles.SURFACE};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {Styles.ACCENT};
+                border-color: {Styles.ACCENT_LIGHT};
+            }}
         """)
         opt_layout.addWidget(self.chk_fix_overlaps, 2, 0, 1, 4)
 

@@ -170,6 +170,10 @@ class PipelineResult:
     stages: List[PipelineStage] = field(default_factory=list)
     transcription_result: Optional[TranscriptionResult] = None
     translation_metrics: Optional[Any] = None
+    # Fallos reales de traducción (cues que mantienen el texto original).
+    # Nunca debe confundirse con ``translation_metrics.number_of_cues``,
+    # que cuenta los cues procesados, no los fallidos.
+    translation_failures: int = 0
     analytics_before: Optional[Dict[str, Any]] = None
     qa_before: Optional[Dict[str, Any]] = None
     analytics_after: Optional[Dict[str, Any]] = None
@@ -202,6 +206,7 @@ class PipelineResult:
                 else None
             ),
             "translation_metrics": (metrics.to_dict() if metrics is not None else None),
+            "translation_failures": self.translation_failures,
             "analytics_before": self.analytics_before,
             "qa_before": self.qa_before,
             "analytics_after": self.analytics_after,
@@ -520,6 +525,7 @@ class MediaPipeline:
         metrics = worker.last_translation_metrics
         result.translation_metrics = metrics
         failures = worker.last_translation_failures
+        result.translation_failures = failures or 0
         if metrics is not None and not metrics.success:
             raise PipelineStageError(
                 STAGE_TRANSLATE,
@@ -795,7 +801,5 @@ def record_pipeline_result(
         fallback_used=(bool(metrics.fallback_used) if metrics is not None else False),
         qa_errors=qa_after.get("error_count", 0),
         qa_warnings=qa_after.get("warning_count", 0),
-        translation_failures=(
-            metrics.number_of_cues if metrics is not None and not metrics.success else 0
-        ),
+        translation_failures=result.translation_failures,
     )
