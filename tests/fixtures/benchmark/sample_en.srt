@@ -1,0 +1,32 @@
+1
+00:00:01,000 --> 00:00:02,500
+Hello.
+
+2
+00:00:03,000 --> 00:00:05,000
+Good morning, how are you today?
+
+3
+00:00:06,000 --> 00:00:09,000
+The train leaves platform nine at half past seven in the morning.
+
+4
+00:00:10,000 --> 00:00:12,500
+Wait for me!
+I will be right back.
+
+5
+00:00:13,000 --> 00:00:15,500
+<i>Be careful,</i> the floor is wet.
+
+6
+00:00:16,000 --> 00:00:18,000
+Really? You did that... yesterday?
+
+7
+00:00:19,000 --> 00:00:22,000
+Ms. Alvarez and Dr. Chen met in Lisbon last spring.
+
+8
+00:00:23,000 --> 00:00:27,000
+Please turn off the lights, close the door, and lock it behind you.

@@ -20,6 +20,16 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_history(monkeypatch, tmp_path):
+    """
+    Aísla el historial SQLite: los tests escriben en una BD temporal en
+    lugar de `~/.config/SRT4U/history.db`, evitando que la suite modifique
+    el historial real del usuario.
+    """
+    monkeypatch.setenv("SRT4U_HISTORY_DB", str(tmp_path / "history.db"))
+
+
+@pytest.fixture(autouse=True)
 def _isolated_config(monkeypatch, tmp_path):
     """
     Aísla la configuración de usuario: los tests escriben en un directorio temporal

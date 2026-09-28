@@ -4,7 +4,7 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-156%20superados-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-360+%20superados-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -38,6 +38,13 @@ Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de
 - **Limpiador automático**: Elimina enlaces de Telegram (`t.me`), URLs, marcas de agua de fansubs, publicidad y notas musicales (`♪`), respetando las etiquetas de formato (`<i>`, `<b>`, estilos ASS).
 - **Conversor entre formatos**: Conversión bidireccional entre `.srt`, `.vtt`, `.ass` y texto plano `.txt`.
 - **Procesamiento por lote**: Cola de archivos con seguimiento de estado individual por archivo.
+- **Analytics y QA determinista**: métricas agrupadas de contenido/tiempos/calidad más validación por reglas (`analyze`/`qa`, JSON/CSV).
+- **Benchmarks de traducción**: comparación reproducible de providers con informes JSON/CSV y notebook de análisis.
+- **Historial local SQLite**: cada ejecución registrada con métricas agregadas; sin textos, claves ni multimedia.
+- **API REST local** (extra `[api]`): `/api/v1` con analyze, QA, jobs, historial, benchmarks y OpenAPI.
+- **Transcripción local Whisper** (extra `[transcription]`): audio/vídeo → subtítulos.
+- **Pipeline audiovisual**: `srt4u pipeline` / página Pipeline / `POST /api/v1/pipeline` (transcripción → limpieza → analytics → QA → traducción opcional → QA final → exportación → burn-in opcional).
+- **CLI headless**: Limpieza, traducción y conversión por lotes; incluye análisis de métricas y QA determinista con exportación JSON/CSV, sin iniciar PyQt6.
 - **Ejecución multihilo**: Traducción simultánea de bloques de subtítulos para acelerar el procesamiento.
 - **Tema Dark / Light Glassmorphism**: Alternancia instantánea entre modo oscuro y claro con estética moderna translúcida.
 
@@ -63,9 +70,40 @@ source .venv/bin/activate  # En Windows: .venv\Scripts\activate
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Iniciar la aplicación
+# Iniciar la aplicación de escritorio
 python main.py
+
+# Procesar sin abrir la interfaz
+python -m application.cli process input.srt --output output.srt --clean
 ```
+
+### Extras opcionales
+
+```bash
+pip install ".[api]"            # API REST local: srt4u serve (/api/v1, OpenAPI)
+pip install ".[transcription]"  # Whisper local: srt4u transcribe / pipeline
+pip install ".[dev]"            # pytest + ruff para contribuir
+```
+
+La base (GUI + CLI + analytics + QA + traducción + historial + pipeline sobre
+subtítulos) no necesita extras. Los modelos Whisper nunca se empaquetan: se
+descargan una vez con aviso previo (`SRT4U_WHISPER_MODEL_DIR` reubica la caché).
+
+### Quickstart en 60 segundos
+
+```bash
+python -m application.cli analyze input.srt --json
+python -m application.cli qa input.srt --strict
+python -m application.cli process input.srt --clean --translate --target en
+python -m application.cli transcribe clip.mp4 --model small --language auto
+python -m application.cli pipeline clip.mp4 --translate --target en -o out.srt --stats-json
+python -m application.cli serve  # docs en http://127.0.0.1:8000/docs
+```
+
+Arquitectura (GUI/CLI/API → servicios → providers/SQLite/FFmpeg) y guías:
+[docs/cli.md](docs/cli.md), [docs/api.md](docs/api.md),
+[docs/transcription.md](docs/transcription.md), [docs/pipeline.md](docs/pipeline.md),
+[docs/database.md](docs/database.md), [docs/tech-debt.md](docs/tech-debt.md).
 
 ### Ejecutables autónomos precompilados
 GitHub Actions compila automáticamente binarios portables en cada tag de versión. **Vienen con un binario estático de FFmpeg integrado, por lo que funcionan de forma 100% autónoma sin instalar librerías externas**:
@@ -75,12 +113,24 @@ GitHub Actions compila automáticamente binarios portables en cada tag de versi�
 
 ---
 
+## CLI headless
+
+La CLI reutiliza `SubtitleService` y permite limpiar, traducir, convertir formatos y procesar directorios por lotes sin crear una aplicación Qt. Tras instalar el paquete, usa `srt4u process`; desde el repositorio puedes ejecutar `python -m application.cli process`. También admite presets JSON y opciones como `--translate --source auto --target es --engine ollama`. Consulta [docs/cli.md](docs/cli.md) para ejemplos, claves del preset y detalles de salida.
+
+## Analytics y QA
+
+`analyze` calcula métricas agrupadas de contenido, tiempos, calidad y procesamiento. `qa` detecta problemas deterministas con límites configurables. Ambos comandos admiten JSON; analytics también se puede exportar a CSV. Detalles, reglas y ejemplos de exportación en [docs/analytics.md](docs/analytics.md).
+
+## Proveedores de traducción y métricas
+
+`TranslationService` delega mediante `ProviderRegistry` en `Google`, `DeepL` o el endpoint OpenAI-compatible (`openai`, `llm` y `ollama` comparten implementación; el nombre solicitado se conserva en las métricas). Los errores están normalizados (`error_type`), los reintentos son opt-in y el fallback histórico DeepL/OpenAI→Google es explícito y configurable. `translate_with_metrics()` devuelve `TranslationResult` con `TranslationMetrics` serializable a JSON (provider, modelo, idiomas, cues/caracteres/palabras, duración wall-time, reintentos, fallback, tokens cuando existen, `estimated_cost` en `null`); la CLI los muestra con `--stats` o `--stats-json`. `benchmark` ejecuta un dataset fijo contra varios providers durante N repeticiones y exporta JSON/CSV para análisis offline; `notebooks/benchmark_analysis.ipynb` + `analysis/benchmark_analysis.py` calculan descriptivos, variabilidad, errores/fallback y gráficos en `reports/benchmark/`. Las ejecuciones se registran en un historial local SQLite (CLI `history`, página History, `--store` para benchmarks). Una API REST local (`srt4u serve`, extra `[api]` de FastAPI) expone analyze, QA, jobs de traducción/procesado, historial y benchmarks en `/api/v1` con docs OpenAPI. Transcripción local opcional con Whisper (`srt4u transcribe`, página Transcribir, jobs `POST /api/v1/transcribe`; extra `[transcription]` de `faster-whisper`) que convierte audio/vídeo en subtítulos para Analytics, QA, limpieza, traducción y burn-in. Un orquestador `MediaPipeline` (`srt4u pipeline`, página Pipeline, jobs `POST /api/v1/pipeline`) encadena transcripción/parse → limpieza → analytics → QA → traducción opcional → QA final → exportación SRT/VTT → burn-in opcional, con errores por etapa, cancelación cooperativa y un registro principal en historial. Ver [docs/providers.md](docs/providers.md), [docs/benchmarking.md](docs/benchmarking.md), [docs/benchmark_analysis.md](docs/benchmark_analysis.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), [docs/transcription.md](docs/transcription.md) y [docs/pipeline.md](docs/pipeline.md).
+
 ## Pruebas automatizadas
 
 La flota de tests evalúa parseo, limpieza, conversiones entre formatos, traducción gratuita, flujos de interfaz, regresión de layout (detección de texto recortado en 6 idiomas × 2 temas) e invariantes de geometría de diálogos:
 
 ```bash
-pytest tests/ -v
+pytest tests/ -m "not network"  # sin red, claves ni modelos Whisper
 ```
 
 ---

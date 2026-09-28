@@ -56,15 +56,23 @@ def test_parallel_vs_sequential_subtitles_translation(sub_service):
 
 
 def test_translation_fallback_offline_resilience(trans_service, monkeypatch):
-    # Un error de red no debe romper la ejecución: el servicio devuelve el texto base
-    import application.services.translation_service as ts
+    # Un error de red no debe romper la ejecución: el servicio devuelve el texto base.
+    from application.services.translation_providers import (
+        ProviderNetworkError,
+        ProviderRegistry,
+        TranslationProvider,
+    )
 
-    monkeypatch.setattr(ts, "HAS_DEEP_TRANSLATOR", False)
+    class OfflineProvider(TranslationProvider):
+        name = "google"
+        model = None
 
-    def _raise_offline(*args, **kwargs):
-        raise ConnectionError("Simulated offline network")
+        def translate(self, *args, **kwargs):
+            raise ProviderNetworkError("sin conexión")
 
-    monkeypatch.setattr(ts.urllib.request, "urlopen", _raise_offline)
-
+    monkeypatch.setattr(
+        ProviderRegistry, "get", lambda *args, **kwargs: OfflineProvider()
+    )
     result = trans_service.translate_text("Safe text", "es", "auto", "google")
     assert result == "Safe text"
+    assert trans_service.last_result.metrics.error_type == "network"

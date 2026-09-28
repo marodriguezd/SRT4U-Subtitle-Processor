@@ -7,6 +7,9 @@ from typing import Optional, Callable, List, Tuple
 
 from ..logging_setup import get_logger
 from .translation_service import TranslationService
+from .subtitle_analytics import SubtitleAnalytics, SubtitleAnalyticsService
+from .subtitle_qa import QAReport, QARules, SubtitleQA
+from .translation_models import TranslationMetrics
 
 logger = get_logger("subtitles")
 
@@ -98,6 +101,9 @@ class ProcessingResult:
     original_items: List[SubtitleItem] = field(default_factory=list)
     processed_items: List[SubtitleItem] = field(default_factory=list)
     output_content: str = ""
+    analytics: Optional[SubtitleAnalytics] = None
+    qa_report: Optional[QAReport] = None
+    translation_metrics: Optional[TranslationMetrics] = None
 
 
 class SubtitleService:
@@ -130,10 +136,14 @@ class SubtitleService:
         self,
         translation_service: Optional[TranslationService] = None,
         batch_size: int = 50,
+        qa_rules: Optional[QARules] = None,
     ):
         self.translation_service = translation_service or TranslationService()
         self.batch_size = batch_size
-        # Resultado de la última llamada a `translate_subtitles`
+        self.qa_service = SubtitleQA(qa_rules)
+        self.analytics_service = SubtitleAnalyticsService(qa_rules)
+        self.last_translation_metrics: Optional[TranslationMetrics] = None
+        self._last_translation_started_at: Optional[float] = None
         self.last_translation_failures = 0
         self.spam_patterns = [re.compile(p) for p in self.DEFAULT_SPAM_PATTERNS]
         cpu_threads = os.cpu_count() or 4
@@ -309,6 +319,63 @@ class SubtitleService:
             curr_idx += 1
         return items
 
+    def analyze_subtitles(
+        self,
+        items: List[SubtitleItem],
+        *,
+        file_format: Optional[str] = None,
+        source_content: Optional[str] = None,
+        processing_time_seconds: float = 0.0,
+        lines_removed: int = 0,
+        translation_failures: int = 0,
+        reference_items: Optional[List[SubtitleItem]] = None,
+    ) -> Tuple[SubtitleAnalytics, QAReport]:
+        """Return reusable analytics and deterministic QA for already-parsed cues."""
+        report = self.qa_service.validate(
+            items, file_format, source_content, reference_items
+        )
+        analytics = self.analytics_service.analyze(
+            items,
+            file_format=file_format,
+            source_content=source_content,
+            processing_time_seconds=processing_time_seconds,
+            lines_removed=lines_removed,
+            translation_failures=translation_failures,
+            qa_report=report,
+        )
+        return analytics, report
+
+    def qa_subtitles(
+        self,
+        items: List[SubtitleItem],
+        *,
+        file_format: Optional[str] = None,
+        source_content: Optional[str] = None,
+        reference_items: Optional[List[SubtitleItem]] = None,
+    ) -> QAReport:
+        """Run only QA on parsed cues, independently of analytics and presentation."""
+        return self.qa_service.validate(
+            items, file_format, source_content, reference_items
+        )
+
+    def qa_file(self, file_path: str) -> QAReport:
+        """Read and parse one subtitle file, returning its standalone QA report."""
+        with open(file_path, "r", encoding="utf-8", errors="replace") as source_file:
+            content = source_file.read()
+        file_format = self.detect_format(content, file_path)
+        items = self.parse_subtitles(content, file_format)
+        return self.qa_subtitles(items, file_format=file_format, source_content=content)
+
+    def analyze_file(self, file_path: str) -> Tuple[SubtitleAnalytics, QAReport]:
+        """Read, detect, and parse a subtitle file once before returning analytics and QA."""
+        with open(file_path, "r", encoding="utf-8", errors="replace") as source_file:
+            content = source_file.read()
+        file_format = self.detect_format(content, file_path)
+        items = self.parse_subtitles(content, file_format)
+        return self.analyze_subtitles(
+            items, file_format=file_format, source_content=content
+        )
+
     def clean_subtitles(
         self, items: List[SubtitleItem]
     ) -> Tuple[List[SubtitleItem], int, int]:
@@ -353,15 +420,30 @@ class SubtitleService:
         progress_callback: Optional[Callable[[str, object], None]] = None,
     ) -> List[SubtitleItem]:
         total_items = len(items)
+        self._last_translation_started_at = time.perf_counter()
         self.last_translation_failures = 0
+        self.last_translation_metrics = None
         if total_items == 0:
+            self.last_translation_metrics = TranslationMetrics.aggregate(
+                [],
+                source_language=source_language,
+                target_language=target_language,
+                number_of_cues=0,
+                characters_input=0,
+                characters_output=0,
+                words_input=0,
+                words_output=0,
+                duration_ms=0,
+                success=True,
+                requested_provider=engine,
+            )
             return []
 
         results: List[Optional[SubtitleItem]] = [None] * total_items
-        # `list.append` es atómico bajo el GIL, así que los workers pueden registrar
-        # sus fallos sin bloqueos adicionales.
         failed_indices: List[int] = []
-        failed_notes: List[str] = []
+        translation_metrics: List[TranslationMetrics] = []
+        metric_failures: List[str] = []
+        translation_errors: List[str] = []
 
         def translate_single_item(
             idx: int, item: SubtitleItem
@@ -371,21 +453,57 @@ class SubtitleService:
                 return idx, item
 
             try:
+                if hasattr(self.translation_service, "clear_last_result"):
+                    self.translation_service.clear_last_result()
                 translated_text = self.translation_service.translate_text(
                     text=original_text,
                     target_language=target_language,
                     source_language=source_language,
                     engine=engine,
                 )
+                last_result = getattr(self.translation_service, "last_result", None)
                 engine_error = getattr(self.translation_service, "last_error", None)
+                if last_result is not None:
+                    translation_metrics.append(last_result.metrics)
+                else:
+                    translation_metrics.append(
+                        TranslationMetrics.for_text(
+                            provider=engine,
+                            model=None,
+                            source_language=source_language,
+                            target_language=target_language,
+                            source_text=original_text,
+                            translated_text=translated_text,
+                            duration_ms=0,
+                            success=engine_error is None,
+                            error_type="unknown" if engine_error else None,
+                            requested_provider=engine,
+                            providers_used=[engine],
+                            error_message="unknown" if engine_error else None,
+                        )
+                    )
                 if engine_error:
                     failed_indices.append(item.index)
-                    failed_notes.append(engine_error)
+                    metric_failures.append(engine_error)
+                    translation_metrics[-1].success = False
+                    if last_result is None:
+                        translation_metrics[-1].error_type = "unknown"
+                    translation_errors.append(
+                        getattr(
+                            getattr(last_result, "metrics", None),
+                            "error_type",
+                            "unknown",
+                        )
+                    )
                     logger.warning(
-                        "El motor '%s' no pudo traducir el bloque %s: %s",
+                        "El provider '%s' no pudo traducir el cue %s: error_type=%s",
                         engine,
                         item.index,
-                        engine_error,
+                        getattr(
+                            getattr(last_result, "metrics", None),
+                            "error_type",
+                            "unknown",
+                        ),
                     )
                 new_item = SubtitleItem(
                     index=item.index,
@@ -398,9 +516,26 @@ class SubtitleService:
                 return idx, new_item
             except Exception as exc:
                 failed_indices.append(item.index)
-                failed_notes.append(str(exc))
+                metric_failures.append(type(exc).__name__)
+                translation_errors.append("unknown")
+                translation_metrics.append(
+                    TranslationMetrics.for_text(
+                        provider=engine,
+                        model=None,
+                        source_language=source_language,
+                        target_language=target_language,
+                        source_text=original_text,
+                        translated_text=original_text,
+                        duration_ms=0,
+                        success=False,
+                        error_type="unknown",
+                        requested_provider=engine,
+                        providers_used=[engine],
+                        error_message=type(exc).__name__,
+                    )
+                )
                 logger.exception(
-                    "Excepción al traducir el bloque %s con el motor '%s'",
+                    "Excepción al traducir el bloque %s con el provider '%s'",
                     item.index,
                     engine,
                 )
@@ -415,7 +550,6 @@ class SubtitleService:
                     executor.submit(translate_single_item, i, item): i
                     for i, item in enumerate(items)
                 }
-
                 for future in concurrent.futures.as_completed(future_to_idx):
                     idx, res_item = future.result()
                     results[idx] = res_item
@@ -431,12 +565,58 @@ class SubtitleService:
                     progress_callback("step_translating", (completed, total_items))
 
         self.last_translation_failures = len(failed_indices)
+        if translation_metrics:
+            providers_used = list(
+                dict.fromkeys(
+                    provider
+                    for metric in translation_metrics
+                    for provider in (metric.providers_used or [metric.provider])
+                )
+            )
+        else:
+            providers_used = []
+        input_texts = [item.text.strip() for item in items if item.text.strip()]
+        output_texts = [
+            item.text.strip() for item in results if item and item.text.strip()
+        ]
+        failed = bool(failed_indices)
+        self.last_translation_metrics = TranslationMetrics.aggregate(
+            translation_metrics,
+            source_language=source_language,
+            target_language=target_language,
+            number_of_cues=len(input_texts),
+            characters_input=sum(len(text) for text in input_texts),
+            characters_output=sum(len(text) for text in output_texts),
+            words_input=sum(len(text.split()) for text in input_texts),
+            words_output=sum(len(text.split()) for text in output_texts),
+            duration_ms=(
+                int((time.perf_counter() - self._last_translation_started_at) * 1000)
+                if self._last_translation_started_at is not None
+                else None
+            ),
+            success=not failed,
+            requested_provider=engine,
+            providers_used=providers_used,
+            error_type=translation_errors[0] if translation_errors else None,
+            error_message=None,
+            fallback_error_type=next(
+                (
+                    metric.fallback_error_type
+                    for metric in translation_metrics
+                    if metric.fallback_error_type
+                ),
+                None,
+            ),
+        )
+        if metric_failures and self.last_translation_metrics.success is False:
+            # Do not retain raw exception messages that could contain sensitive data.
+            self.last_translation_metrics.error_message = translation_errors[0]
         if failed_indices:
             logger.warning(
-                "Traducción incompleta: %s de %s bloques mantienen el texto original (%s)",
+                "Traducción incompleta: %s de %s cues mantienen el texto original (error_type=%s)",
                 self.last_translation_failures,
                 total_items,
-                failed_notes[0] if failed_notes else "motor no disponible",
+                translation_errors[0] if translation_errors else "unknown",
             )
 
         return [it for it in results if it is not None]
@@ -524,18 +704,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             progress_callback("step_analyzing", True)
 
         original_items = self.parse_subtitles(content, source_format)
-        total_original_lines = sum(len(it.text.split("\n")) for it in original_items)
         current_items = list(original_items)
+        total_original_lines = sum(len(it.text.split("\n")) for it in original_items)
         deleted_lines_count = 0
 
         # Paso 3: Limpieza
         if do_clean:
             if progress_callback:
                 progress_callback("step_cleaning", True)
-            current_items, tot_lines, deleted_lines_count = self.clean_subtitles(
-                current_items
+            current_items, total_original_lines, deleted_lines_count = (
+                self.clean_subtitles(current_items)
             )
-            total_original_lines = tot_lines
 
         # Paso 4: Traducción
         translation_failures = 0
@@ -562,6 +741,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if progress_callback:
             progress_callback("step_saving", True)
 
+        analytics, qa_report = self.analyze_subtitles(
+            current_items,
+            file_format=out_format,
+            source_content=output_content,
+            lines_removed=deleted_lines_count,
+            translation_failures=translation_failures,
+            reference_items=original_items if do_translate else None,
+        )
         elapsed = time.time() - start_time
         stats = ProcessingStats(
             total_lines=total_original_lines,
@@ -570,10 +757,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             elapsed_time=round(elapsed, 2),
             translation_failures=translation_failures,
         )
+        analytics.processing.processing_time_seconds = round(elapsed, 3)
 
         return ProcessingResult(
             stats=stats,
             original_items=original_items,
             processed_items=current_items,
             output_content=output_content,
+            analytics=analytics,
+            qa_report=qa_report,
+            translation_metrics=self.last_translation_metrics if do_translate else None,
         )

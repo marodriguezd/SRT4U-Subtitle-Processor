@@ -1,31 +1,26 @@
-"""
-Servicio unificado de traducción con soporte para Google Translate, DeepL y LLMs (OpenAI / Ollama).
-Incluye fallback autónomo con urllib estándar sin depender obligatoriamente de librerías externas.
-"""
+"""Provider-neutral translation coordinator with a backward-compatible text API."""
 
-import json
 import threading
-import urllib.request
-import urllib.parse
-from typing import Callable, Optional, Dict, List
+import time
+from typing import Callable, Dict, List, Optional
 
 from ..logging_setup import get_logger
 from .config_service import ConfigService
+from .translation_models import TranslationMetrics, TranslationResult
+from .translation_providers import (
+    ProviderConfigurationError,
+    ProviderRegistry,
+    ProviderResponse,
+    ProviderResponseError,
+    TranslationProviderError,
+    ProviderUnknownError,
+)
 
 logger = get_logger("translation")
 
-try:
-    from deep_translator import GoogleTranslator
-
-    HAS_DEEP_TRANSLATOR = True
-except ImportError:
-    HAS_DEEP_TRANSLATOR = False
-
 
 class TranslationService:
-    """
-    Gestiona la traducción de texto utilizando múltiples motores configurables.
-    """
+    """Coordinates registered providers and exposes legacy and structured APIs."""
 
     SUPPORTED_LANGUAGES: List[Dict[str, str]] = [
         {"code": "es", "name": "Español"},
@@ -40,22 +35,64 @@ class TranslationService:
         {"code": "ru", "name": "Русский (Russian)"},
     ]
 
-    def __init__(self, config_service: Optional[ConfigService] = None):
+    # Compatibility policy: previous automatic fallbacks are now explicit/configurable.
+    DEFAULT_FALLBACKS = {
+        "deepl": ("google",),
+        "openai": ("google",),
+        "llm": ("google",),
+        "ollama": ("google",),
+    }
+
+    def __init__(
+        self,
+        config_service: Optional[ConfigService] = None,
+        *,
+        fallbacks: Optional[Dict[str, List[str]]] = None,
+        max_retries: int = 0,
+    ):
         self.config_service = config_service or ConfigService()
-        # El último error se guarda por hilo: la traducción en paralelo comparte el
-        # servicio entre workers y cada uno debe leer sólo el resultado de su llamada.
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or max_retries < 0
+        ):
+            raise ValueError("max_retries debe ser un entero no negativo")
+        self.max_retries = max_retries
+        configured_fallbacks = (
+            self.DEFAULT_FALLBACKS if fallbacks is None else fallbacks
+        )
+        self.fallbacks = {
+            str(name).casefold(): tuple(str(value).casefold() for value in values)
+            for name, values in configured_fallbacks.items()
+        }
         self._tls = threading.local()
 
     @property
     def last_error(self) -> Optional[str]:
-        """
-        Descripción del fallo del motor en la última llamada de este hilo
-        (`None` si la traducción se completó correctamente).
-        """
         return getattr(self._tls, "last_error", None)
 
+    @property
+    def last_result(self) -> Optional[TranslationResult]:
+        return getattr(self._tls, "last_result", None)
+
+    def _set_result(self, result: TranslationResult) -> None:
+        self._tls.last_result = result
+        self._tls.last_error = (
+            result.metrics.error_type if not result.metrics.success else None
+        )
+
     def _set_last_error(self, message: Optional[str]) -> None:
+        """Backward-compatible setter used by integrations and test doubles."""
         self._tls.last_error = message
+        result = getattr(self._tls, "last_result", None)
+        if result is not None and message:
+            result.metrics.success = False
+            result.metrics.error_message = message
+            result.metrics.error_type = "unknown"
+
+    def clear_last_result(self) -> None:
+        self._tls.last_result = None
+        self._tls.last_error = None
 
     def translate_text(
         self,
@@ -65,157 +102,262 @@ class TranslationService:
         engine: str = "google",
         progress_callback: Optional[Callable] = None,
     ) -> str:
-        """
-        Traduce un fragmento de texto usando el motor especificado.
-        Si el motor falla, devuelve el texto original y el motivo queda en `last_error`.
-        """
-        engine_lower = engine.lower()
-
-        if engine_lower == "deepl":
-            result = self._translate_deepl(text, target_language, source_language)
-        elif engine_lower in ["openai", "llm"]:
-            result = self._translate_openai(text, target_language, source_language)
-        else:
-            result = self._translate_google(text, target_language, source_language)
-
+        """Translate a fragment and preserve the legacy string-returning API."""
+        result = self.translate_with_metrics(
+            text=text,
+            target_language=target_language,
+            source_language=source_language,
+            provider=engine,
+        )
+        self._tls.last_error = (
+            result.metrics.error_type if not result.metrics.success else None
+        )
         if progress_callback:
-            progress_callback("translation", result)
+            progress_callback("translation", result.text)
+        return result.text
 
+    def translate_with_metrics(
+        self,
+        text: str,
+        target_language: str,
+        source_language: str = "auto",
+        provider: str = "google",
+        *,
+        context: Optional[str] = None,
+    ) -> TranslationResult:
+        """Translate via the registry and report metrics without leaking content/secrets."""
+        started = time.perf_counter()
+        requested = provider.casefold() if isinstance(provider, str) else str(provider)
+        if not isinstance(text, str):
+            error = ProviderConfigurationError("el texto debe ser una cadena")
+            result = self._failure_result(
+                text=str(text),
+                provider=requested,
+                source_language=source_language,
+                target_language=target_language,
+                started=started,
+                error=error,
+                requested_provider=requested,
+            )
+            self._set_result(result)
+            return result
+        if not text:
+            result = TranslationResult(
+                text,
+                TranslationMetrics.for_text(
+                    provider=requested,
+                    model=None,
+                    source_language=source_language,
+                    target_language=target_language,
+                    source_text=text,
+                    translated_text=text,
+                    duration_ms=0,
+                    success=True,
+                    requested_provider=requested,
+                    providers_used=[],
+                ),
+            )
+            self._set_result(result)
+            return result
+
+        try:
+            candidates = self._provider_chain(requested)
+        except ProviderConfigurationError as error:
+            result = self._failure_result(
+                text=text,
+                provider=requested,
+                source_language=source_language,
+                target_language=target_language,
+                started=started,
+                error=error,
+                requested_provider=requested,
+            )
+            self._set_result(result)
+            return result
+        providers_used: List[str] = []
+        attempted_providers: List[str] = []
+        fallback_used = False
+        original_error: Optional[TranslationProviderError] = None
+        fallback_error_type = None
+        last_error: Optional[TranslationProviderError] = None
+        response: Optional[ProviderResponse] = None
+        translated = text
+        selected = requested
+        total_retries = 0
+
+        for candidate_position, candidate in enumerate(candidates):
+            if candidate_position:
+                fallback_used = True
+                logger.warning(
+                    "Translation fallback: requested=%s provider=%s error_type=%s",
+                    requested,
+                    candidate,
+                    original_error.error_type if original_error else "unknown",
+                )
+            provider_attempts = 0
+            candidate_response = None
+            try:
+                active_provider = ProviderRegistry.get(candidate, self.config_service)
+                attempted_providers.append(candidate)
+                while True:
+                    try:
+                        candidate_response = active_provider.translate_detailed(
+                            text, source_language, target_language, context=context
+                        )
+                        if (
+                            not isinstance(candidate_response, ProviderResponse)
+                            or not isinstance(candidate_response.text, str)
+                            or not candidate_response.text.strip()
+                        ):
+                            raise ProviderResponseError(
+                                "provider devolvió una respuesta de traducción inválida"
+                            )
+                        response = candidate_response
+                        translated = candidate_response.text
+                        selected = candidate
+                        providers_used.append(candidate)
+                        last_error = None
+                        break
+                    except Exception as raw_error:
+                        exc = (
+                            raw_error
+                            if isinstance(raw_error, TranslationProviderError)
+                            else ProviderUnknownError(
+                                f"{candidate}: error de provider ({type(raw_error).__name__})"
+                            )
+                        )
+                        last_error = exc
+                        if candidate_position == 0:
+                            original_error = exc
+                            fallback_error_type = exc.error_type
+                        if exc.retryable and provider_attempts < self.max_retries:
+                            provider_attempts += 1
+                            total_retries += 1
+                            logger.warning(
+                                "Translation retry: provider=%s model=%s retry=%s error_type=%s",
+                                candidate,
+                                getattr(active_provider, "model", None),
+                                provider_attempts,
+                                exc.error_type,
+                            )
+                            continue
+                        raise
+                break
+            except TranslationProviderError as exc:
+                last_error = exc
+                if candidate_position == 0:
+                    original_error = exc
+                    fallback_error_type = exc.error_type
+                else:
+                    fallback_error_type = exc.error_type
+            except Exception as exc:
+                safe_error = (
+                    exc
+                    if isinstance(exc, TranslationProviderError)
+                    else ProviderUnknownError(
+                        f"{candidate}: error de provider ({type(exc).__name__})"
+                    )
+                )
+                last_error = safe_error
+                if candidate_position == 0:
+                    original_error = safe_error
+                fallback_error_type = safe_error.error_type
+
+        success = last_error is None and bool(translated)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        error_type = None
+        error_message = None
+        if not success:
+            error = last_error or ProviderConfigurationError(
+                f"no se pudo resolver el provider: {requested}"
+            )
+            error_type = error.error_type
+            error_message = None
+            logger.warning(
+                "Translation failed: provider=%s model=%s error_type=%s",
+                selected,
+                response.model if response else None,
+                error_type,
+            )
+
+        metrics = TranslationMetrics.for_text(
+            provider=selected,
+            model=response.model if response else None,
+            source_language=source_language,
+            target_language=target_language,
+            source_text=text,
+            translated_text=translated,
+            duration_ms=duration_ms,
+            success=success,
+            error_type=error_type,
+            retry_count=total_retries,
+            fallback_used=fallback_used,
+            input_tokens=response.input_tokens if response else None,
+            output_tokens=response.output_tokens if response else None,
+            total_tokens=response.total_tokens if response else None,
+            estimated_cost=response.estimated_cost if response else None,
+            requested_provider=requested,
+            providers_used=providers_used or attempted_providers,
+            error_message=error_message,
+            fallback_error_type=fallback_error_type,
+        )
+        result = TranslationResult(translated, metrics)
+        self._set_result(result)
+        if success:
+            logger.info(
+                "Translation completed: provider=%s model=%s duration_ms=%s retries=%s fallback=%s",
+                selected,
+                metrics.model,
+                duration_ms,
+                total_retries,
+                fallback_used,
+            )
         return result
 
-    def _translate_google(self, text: str, target: str, source: str) -> str:
-        src = "auto" if source == "auto" else source
-        if HAS_DEEP_TRANSLATOR:
-            try:
-                translator = GoogleTranslator(source=src, target=target)
-                translated = translator.translate(text)
-                self._set_last_error(None)
-                return translated
-            except Exception as exc:
-                logger.debug(
-                    "deep-translator falló (se intenta el fallback con urllib): %s", exc
+    def _provider_chain(self, requested: str) -> tuple[str, ...]:
+        """Resolve a bounded, deterministic fallback chain and reject cycles."""
+        chain = []
+        pending = [requested]
+        while pending:
+            candidate = pending.pop(0)
+            if candidate in chain:
+                raise ProviderConfigurationError(
+                    f"fallback circular o repetido para provider: {candidate}"
                 )
+            chain.append(candidate)
+            if len(chain) > 8:
+                raise ProviderConfigurationError(
+                    "la cadena de fallback supera 8 providers"
+                )
+            pending.extend(self.fallbacks.get(candidate, ()))
+        return tuple(chain)
 
-        # Fallback directo con urllib nativo
-        try:
-            encoded_text = urllib.parse.quote(text)
-            url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={src}&tl={target}&dt=t&q={encoded_text}"
-            req = urllib.request.Request(
-                url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                if data and isinstance(data[0], list):
-                    self._set_last_error(None)
-                    return "".join(
-                        segment[0] for segment in data[0] if segment and segment[0]
-                    )
-            self._set_last_error("respuesta inesperada del servicio de traducción")
-        except Exception as exc:
-            self._set_last_error(str(exc))
-            logger.warning(
-                "Google Translate no está disponible (%s); se devuelve el texto original",
-                exc,
-            )
-
-        return text
-
-    def _translate_deepl(self, text: str, target: str, source: str) -> str:
-        api_key = self.config_service.get("deepl_api_key", "").strip()
-        if not api_key:
-            logger.debug("DeepL sin clave API configurada: se usa Google Translate")
-            return self._translate_google(text, target, source)
-
-        is_pro = self.config_service.get("deepl_type", "free") == "pro"
-        url = (
-            "https://api.deepl.com/v2/translate"
-            if is_pro
-            else "https://api-free.deepl.com/v2/translate"
+    @staticmethod
+    def _failure_result(
+        *,
+        text,
+        provider,
+        source_language,
+        target_language,
+        started,
+        error,
+        requested_provider,
+    ):
+        return TranslationResult(
+            text,
+            TranslationMetrics.for_text(
+                provider=provider,
+                model=None,
+                source_language=source_language,
+                target_language=target_language,
+                source_text=text,
+                translated_text=text,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+                success=False,
+                error_type=error.error_type,
+                retry_count=error.retry_count,
+                requested_provider=requested_provider,
+                providers_used=[],
+                error_message=str(error),
+            ),
         )
-
-        target_code = target.upper()
-        if target_code == "EN":
-            target_code = "EN-US"
-        elif target_code == "PT":
-            target_code = "PT-PT"
-
-        headers = {
-            "Authorization": f"DeepL-Auth-Key {api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "text": [text],
-            "target_lang": target_code,
-        }
-        if source and source != "auto":
-            payload["source_lang"] = source.upper()
-
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                resp_json = json.loads(resp.read().decode("utf-8"))
-                translations = resp_json.get("translations", [])
-                if translations:
-                    self._set_last_error(None)
-                    return translations[0].get("text", text)
-            self._set_last_error("respuesta sin traducciones de DeepL")
-        except Exception as exc:
-            self._set_last_error(f"DeepL: {exc}")
-            logger.warning("DeepL falló (%s); se usa Google Translate", exc)
-            return self._translate_google(text, target, source)
-
-        return text
-
-    def _translate_openai(self, text: str, target: str, source: str) -> str:
-        api_key = self.config_service.get("openai_api_key", "").strip()
-        base_url = self.config_service.get(
-            "openai_base_url", "https://api.openai.com/v1"
-        ).rstrip("/")
-        model = self.config_service.get("openai_model", "gpt-4o-mini")
-
-        if not api_key and "localhost" not in base_url and "127.0.0.1" not in base_url:
-            logger.debug("OpenAI sin clave API configurada: se usa Google Translate")
-            return self._translate_google(text, target, source)
-
-        url = f"{base_url}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-        }
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
-        system_prompt = (
-            "You are a professional subtitle translator. "
-            f"Translate the following subtitle text to language code '{target}'. "
-            "Preserve formatting tags (like <i>, <b>, {\\an8}), punctuation, and line breaks. "
-            "Output ONLY the translated text, without commentary."
-        )
-
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text},
-            ],
-            "temperature": 0.2,
-        }
-
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                resp_json = json.loads(resp.read().decode("utf-8"))
-                choices = resp_json.get("choices", [])
-                if choices:
-                    self._set_last_error(None)
-                    return choices[0]["message"]["content"].strip()
-            self._set_last_error("respuesta sin resultados del modelo")
-        except Exception as exc:
-            self._set_last_error(f"OpenAI: {exc}")
-            logger.warning("El endpoint LLM falló (%s); se usa Google Translate", exc)
-            return self._translate_google(text, target, source)
-
-        return text

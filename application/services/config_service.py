@@ -8,13 +8,11 @@ logger = get_logger("config")
 
 
 class ConfigService:
-    """
-    Gestiona la configuración y credenciales del usuario de manera persistente en disco.
-    """
+    """Gestiona la configuración y credenciales del usuario de manera persistente."""
 
     DEFAULT_CONFIG = {
         "deepl_api_key": "",
-        "deepl_type": "free",  # "free" o "pro"
+        "deepl_type": "free",
         "openai_api_key": "",
         "openai_base_url": "https://api.openai.com/v1",
         "openai_model": "gpt-4o-mini",
@@ -30,7 +28,6 @@ class ConfigService:
         self.config_dir = self._get_config_dir()
         self.config_file = os.path.join(self.config_dir, "settings.json")
         self.config: Dict[str, Any] = dict(self.DEFAULT_CONFIG)
-        # Últimos fallos de lectura/escritura, para que la UI pueda avisar al usuario
         self.load_error: Optional[str] = None
         self.save_error: Optional[str] = None
         self.load()
@@ -45,19 +42,22 @@ class ConfigService:
 
         path = os.path.join(base, "SRT4U")
         os.makedirs(path, exist_ok=True)
+        if os.name != "nt":
+            os.chmod(path, 0o700)
         return path
 
     def load(self) -> None:
-        """Carga la configuración desde disco; registra el fallo si el archivo es ilegible."""
+        """Carga la configuración; conserva el comportamiento de valores por defecto."""
         if not os.path.exists(self.config_file):
             return
         try:
-            with open(self.config_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    self.config.update(data)
-                else:
-                    raise ValueError("el contenido no es un objeto JSON")
+            with open(self.config_file, "r", encoding="utf-8") as config_file:
+                data = json.load(config_file)
+            if not isinstance(data, dict):
+                raise ValueError("el contenido no es un objeto JSON")
+            self.config.update(data)
+            if os.name != "nt":
+                os.chmod(self.config_file, 0o600)
             self.load_error = None
         except Exception as exc:
             self.load_error = str(exc)
@@ -68,10 +68,15 @@ class ConfigService:
             )
 
     def save(self) -> bool:
-        """Escribe la configuración en disco. Devuelve False si no se pudo guardar."""
+        """Escribe configuración y claves con permisos restrictivos en POSIX."""
         try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=2, ensure_ascii=False)
+            os.makedirs(self.config_dir, exist_ok=True)
+            if os.name != "nt":
+                os.chmod(self.config_dir, 0o700)
+            with open(self.config_file, "w", encoding="utf-8") as config_file:
+                json.dump(self.config, config_file, indent=2, ensure_ascii=False)
+            if os.name != "nt":
+                os.chmod(self.config_file, 0o600)
             self.save_error = None
             return True
         except Exception as exc:
