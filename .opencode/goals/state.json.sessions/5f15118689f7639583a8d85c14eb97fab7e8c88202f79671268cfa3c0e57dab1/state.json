@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "goals": [
+    {
+      "goalId": "db4fc72d-7ac1-46f0-b86a-0f8c78e0defb",
+      "runId": "90bcfb7b-b742-4586-b4df-7e631f181ba8",
+      "condition": "Hacer la release 1.1.0 tomando como referencia la pre-release: dejar HEAD publicable, mover/crear tag v1.1.0 y publicar GitHub Release",
+      "successCriteria": "Badges y CHANGELOG coherentes, tag v1.1.0 en HEAD, push a origin y GitHub Release 1.1.0 disponible con checksums",
+      "constraints": "{\"maxCostUsd\": 5.0, \"maxDurationMs\": 3600000, \"maxTokens\": 100000, \"maxTurns\": 50}",
+      "mode": "normal",
+      "sessionID": "ses_f1b7beaa7ffekdwRpJvOAcZYn7",
+      "turnCount": 0,
+      "startedAt": 1790540698063,
+      "pausedAt": 0,
+      "totalTokens": 95742,
+      "usage": {
+        "input": 111673,
+        "output": 6951,
+        "reasoning": 5501,
+        "cacheRead": 2726515,
+        "cacheWrite": 0,
+        "cost": 0,
+        "costKnown": true
+      },
+      "options": {
+        "maxTurns": 10,
+        "maxDurationMs": 900000,
+        "maxTokens": 200000,
+        "maxCostUsd": 0,
+        "minDelayMs": 1500,
+        "maxRecentMessages": 50,
+        "noProgressTokenThreshold": 50,
+        "noProgressTurnsBeforePause": 2,
+        "noToolCallTurnsBeforePause": 2,
+        "noInterruptOnUserMessage": false,
+        "noContinueWhileChildrenActive": false,
+        "budgetWrapupRatio": 0.8,
+        "warnTurnsRemaining": 3,
+        "warnDurationMsRemaining": 60000,
+        "warnTokensRemaining": 25000,
+        "maxPromptFailures": 3,
+        "resultRetentionMs": 604800000,
+        "maxStoredResults": 200
+      },
+      "lastStatus": "Goal paused after user interruption. Run /goal resume to continue.",
+      "lastAssistantText": "",
+      "lastAssistantMessageID": "",
+      "lastContinueAt": 0,
+      "lastProgressAt": 1790541587003,
+      "noProgressTurns": 0,
+      "noToolCallTurns": 0,
+      "blockedReason": "",
+      "budgetWrapupSent": false,
+      "stopped": true,
+      "stopReason": "user interrupted",
+      "promptFailures": 0,
+      "formatFailures": 0,
+      "compactionEpoch": 0,
+      "stalledCompactions": 0,
+      "lastCompactionEventID": "",
+      "messageSeenSinceCompaction": true,
+      "compactionSourceAssistantMessageID": "",
+      "executionContext": {
+        "agent": "goal",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "muse-spark-1.3-contributor-free"
+        },
+        "variant": "xhigh"
+      },
+      "continuationClaim": null,
+      "messageIDs": [
+        "msg_0e48ab0bb001FA69O3LgHZRwgJ",
+        "msg_0e48ad2c8001yGEEt06P6rSuVd",
+        "msg_0e48adc69001nWaFv897Cfn24d",
+        "msg_0e48afe51001kR6G3EaGl0DCZQ",
+        "msg_0e48b3172001zoDbVtw5UQ5A7y",
+        "msg_0e48b4bd0001I8L42e8sNBWOvc",
+        "msg_0e48b52c70010syhU88WNrjmVw",
+        "msg_0e48b5b3c001iesyArZGtDR7M8",
+        "msg_0e48b67cc00178bkjY4TtVBBNr",
+        "msg_0e48b71dc001lWgFJkQa89gfzD",
+        "msg_0e48bb6ef001NjnG2BjwdzRMzE",
+        "msg_0e48bcc91001ioL0rQknQUHpGJ",
+        "msg_0e48bd401001zMrOhpjrOk0ne2",
+        "msg_0e48bda77001nkjU9gW41ZChHG",
+        "msg_0e48be53d001jAOv67bFdHIbyw",
+        "msg_0e48bee0f001pAc0Om1cycWPgG",
+        "msg_0e48bf4ca001CJ21Y7m7xf4SNl",
+        "msg_0e48c08a9001fLF6wdH1Dn6dX9",
+        "msg_0e48c1883001q570dkVWnapjJ3",
+        "msg_0e48c28c7001Ujxb3JPb13q7Iz",
+        "msg_0e48c4f31001Tk2lStELkBMgpg",
+        "msg_0e4972954001kpY6IdhziT7Cts",
+        "msg_0e4974375001ARLTMDVGQu75fO",
+        "msg_0e4976ff0001wsztaWiQyI7cZm",
+        "msg_0e4978ceb001i6SPp8NRp840kt",
+        "msg_0e4979675001rfDyRlXAnJWRqG",
+        "msg_0e497a284001MCLvQlIQyY4N91",
+        "msg_0e497ae79001eIGRos2RoklSyb",
+        "msg_0e497eea7001fgtXd4hGr3Lgiy",
+        "msg_0e4980029001soHbmTEXnqyEpB",
+        "msg_0e4982ce7001urouZV17Yjyfh0",
+        "msg_0e4983463001oSZOArE7Kjxckp",
+        "msg_0e4984302001fEGS2XCAs77uEY",
+        "msg_0e4984e800015n1uIc6CBuAK8P",
+        "msg_0e4985672001p9zvtxPaXSEisN"
+      ],
+      "history": [
+        {
+          "type": "set",
+          "detail": "Goal created via agent tool with limits: 10 auto-continues, 900s, 200,000 context tokens.",
+          "timestamp": 1790540698063
+        },
+        {
+          "type": "paused",
+          "detail": "Paused after OpenCode reported that the active turn was aborted.",
+          "timestamp": 1790541501155
+        }
+      ],
+      "checkpoints": [],
+      "lastCheckpoint": null,
+      "skipNextTerminalCheck": false,
+      "focused": true
+    }
+  ],
+  "results": [],
+  "archives": [
+    {
+      "sessionID": "ses_f1b7beaa7ffekdwRpJvOAcZYn7",
+      "results": [
+        {
+          "condition": "Auditar y verificar al 100% el código de SRT4U con la flota de tests en local para determinar si cumple criterios pre-release 1 y puede estrenarse como release 1.1.0",
+          "state": "achieved",
+          "reason": "",
+          "evidence": "Summary: Auditoría pre-release 1.1.0 verificada al 100% en local: 156 passed + lint/format limpios. Funcionalmente lista para estrenarse como v1.1.0 pre-release, con 2 higienes previas (badge 114→156 y tag v1.1.0 por detrás de HEAD por 1 commit solo-tests).\nCriterion: Suite completa pytest en verde + ruff lint/format limpios + coherencia versión/docs/código verificada + informe de veredicto release 1.1.0 | Evidence: ruff check: All checks passed; ruff format: 33 files already formatted; pytest: 156 passed (3 cleaning +3 conversion +26 e2e +7 i18n +13 logging +9 nav_theme +7 parsing +1 screenshot +20 system_dialogs +3 translation_free +5 ui_and_batch +54 ui_layout +5 video_burner); i18n: 223 claves x6 identicas, 0 vacias; emojis UI 0 (solo ♪/♫ funcionales), TODO 0, except: 0, print app 0; FileService ausente, platform_utils/logging_setup/screenshot tool presentes, requirements PyQt6>=6.6.1,<6.12 sin requests, CI con lint+format+smoke+suite y compat-min-pyqt6 como needs de release, prerelease:true, LICENSE en 3 builds\nCheck: .venv/bin/ruff check application main.py conftest.py tests tools | passed | exit 0; All checks passed\nCheck: .venv/bin/ruff format --check application main.py conftest.py tests tools | passed | exit 0; 33 files already formatted\nCheck: QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q | passed | exit 0; 156 passed in 179s (con media real local)",
+          "blockedReason": "",
+          "turnCount": 0,
+          "totalTokens": 62662,
+          "usage": {
+            "input": 39623,
+            "output": 3565,
+            "reasoning": 2587,
+            "cacheRead": 1010516,
+            "cacheWrite": 0,
+            "cost": 0,
+            "costKnown": true
+          },
+          "startedAt": 1790540272949,
+          "finishedAt": 1790540613058,
+          "lastStatus": "Goal completed.",
+          "lastCheckpoint": null,
+          "checkpoints": [],
+          "history": [
+            {
+              "type": "set",
+              "detail": "Goal created via agent tool with limits: 10 auto-continues, 900s, 200,000 context tokens.",
+              "timestamp": 1790540272949
+            },
+            {
+              "type": "completed",
+              "detail": "Marked complete via tool: Summary: Auditoría pre-release 1.1.0 verificada al 100% en local: 156 passed + lint/format limpios. Funcionalmente lista para estrenarse como v1.1.0 pre-release, con 2 higienes previas (badge 114→156 y tag v1.1.0 por detrás de HEAD por 1 commit solo-tests). Criterion: Suite completa pytest en verde + ruff lint/format limpios + coherencia versión/docs/código verificada + …",
+              "timestamp": 1790540613057
+            }
+          ],
+          "sessionID": "ses_f1b7beaa7ffekdwRpJvOAcZYn7"
+        }
+      ]
+    }
+  ],
+  "orderedSessions": []
+}
