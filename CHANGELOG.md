@@ -24,6 +24,27 @@ hack de espacios; fuente multiplataforma (`Styles.ui_font()`); icono
 play/pause sincronizado con el reproductor; accesibilidad básica en controles
 icon-only; normalización selectiva de QSS a constantes `Styles`.
 
+Cierre de production readiness: **CI estaba en rojo desde al menos cuatro
+pushes a `main`**. Los jobs `test` y `compat-min-pyqt6` fallaban en la
+colección con `ModuleNotFoundError: No module named 'fastapi'`, porque
+`tests/test_api.py`, `tests/test_pipeline.py` y `tests/test_transcription.py`
+importan `fastapi.testclient` a nivel de módulo y el workflow sólo instalaba
+la base de `requirements.txt`; ese fallo saltaba los tres builds y la release,
+así que no se publicaba ningún artefacto. Ambos jobs instalan ahora `".[api]"`
+(pyproject sigue siendo la única fuente de esos pines) y
+`test_ci_installs_the_api_extra_for_the_test_suite` lo vigila.
+
+Además: las puertas de `ruff check` y `ruff format --check` estaban en rojo
+con el mismo pin que usa CI (10 errores y 6 archivos), lo que dejaba pasar
+regresiones inadvertidas; se eliminó estado write-only duplicado en
+`MainWindow`; `btn_load_video` ya se nombra al construirse. El FFmpeg de los
+tres builds pasa a estar fijado por versión (`b6.1.1` de
+`eugeneware/ffmpeg-static`) en lugar de la etiqueta móvil `latest`, que hacía
+los artefactos irreproducibles; el binario se validó (`--enable-libass`,
+filtro `ass`, burn-in real) antes de fijarlo, y `appimagetool` también queda
+fijado porque iba por `continuous`. Un test impide volver a las etiquetas
+móviles. `contents: write` queda limitado al job `release`.
+
 ## [Unreleased]
 
 ### Added

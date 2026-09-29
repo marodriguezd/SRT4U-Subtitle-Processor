@@ -39,7 +39,7 @@ SRT4U is a standalone, cross-platform desktop application for processing, transl
 | :--- | :--- | :--- | :--- |
 | **`SRT4U-Windows-x64.exe`** | Windows 10 / 11 | x86_64 | Portable standalone executable (PyInstaller) |
 | **`SRT4U-Linux-x86_64.AppImage`** | Linux | x86_64 | Standalone AppImage with bundled Qt & static FFmpeg |
-| **`SRT4U-Linux-x86_64.tar.gz`** | Linux | x86_64 | Portable archive with run script |
+| **`SRT4U-Linux-x86_64.tar.gz`** | Linux | x86_64 | Portable archive with the standalone executable (run it directly) |
 | **`SRT4U-macOS.dmg`** | macOS 12+ | Universal (ARM64 / x86_64) | Bundled DMG with embedded universal FFmpeg |
 
 ---

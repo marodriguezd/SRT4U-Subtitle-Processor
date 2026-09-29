@@ -112,11 +112,12 @@ Arquitectura (GUI/CLI/API → servicios → providers/SQLite/FFmpeg) y guías:
 
 ### Binarios precompilados
 GitHub Actions genera artefactos de release cuando se publica un tag `v*`.
-El workflow incluye un ejecutable de FFmpeg en las compilaciones de Windows,
-Linux y macOS; los requisitos de bibliotecas del sistema siguen aplicando, por
-lo que la compatibilidad depende del sistema de destino. Consulta los assets
-para ver qué artefactos están publicados actualmente; la versión del árbol de
-trabajo no constituye por sí misma una release publicada.
+El workflow incluye un ejecutable de FFmpeg estático y fijado por versión en
+las compilaciones de Windows, Linux y macOS; los requisitos de bibliotecas del
+sistema siguen aplicando, por lo que la compatibilidad depende del sistema de
+destino. Consulta los assets para ver qué artefactos están publicados
+actualmente; la versión del árbol de trabajo no constituye por sí misma una
+release publicada.
 
 ---
 

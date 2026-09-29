@@ -10,7 +10,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  # FFmpeg estático fijado por versión: los tres builds usan el MISMO tag de
+  # eugeneware/ffmpeg-static, así que los artefactos son reproducibles. No usar
+  # la etiqueta móvil `latest` de yt-dlp/FFmpeg-Builds: sus autobuild se purgan
+  # a los ~14 días y una URL fijada a uno de ellos acabaría en 404.
+  # tests/test_coherence.py::test_ci_pins_static_ffmpeg_version lo vigila.
+  FFMPEG_VERSION: "b6.1.1"
+  # appimagetool también iba por la etiqueta móvil `continuous`, lo que dejaba
+  # el AppImage sin reproducir. Mismo tag estable para todos los builds.
+  APPIMAGETOOL_VERSION: "1.9.1"
 
 jobs:
   test:
@@ -34,7 +45,12 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # `.[api]` es obligatorio: tests/test_api.py, test_pipeline.py y
+          # test_transcription.py importan fastapi.testclient a nivel de módulo,
+          # así que sin el extra la colección falla y tumba todo el pipeline de
+          # CI (incluidos los builds). No duplicar estas dependencias aquí:
+          # pyproject.toml es la fuente y requirements.txt su espejo de base.
+          pip install -r requirements.txt ".[api]"
           pip install pytest ruff==0.16.9
 
       - name: "Lint with ruff (ruff.toml: F,E7,E9,B)"
@@ -95,7 +111,10 @@ jobs:
       - name: Install the declared minimum stack
         run: |
           python -m pip install --upgrade pip
-          pip install -r /tmp/requirements-min.txt "PyQt6-Qt6>=${{ steps.min.outputs.minor }},<${{ steps.min.outputs.next_minor }}" pytest
+          # `.[api]` por la misma razón que en el job de test: la suite importa
+          # fastapi a nivel de módulo. PyQt6 queda fijado a ==MIN por
+          # requirements-min.txt, que el paso siguiente verifica.
+          pip install -r /tmp/requirements-min.txt "PyQt6-Qt6>=${{ steps.min.outputs.minor }},<${{ steps.min.outputs.next_minor }}" pytest ".[api]"
 
       - name: Verify that the pinned minimum is really installed
         env:
@@ -140,10 +159,7 @@ jobs:
 
       - name: Download Static FFmpeg (Windows)
         run: |
-          Invoke-WebRequest -Uri "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
-          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "."
-          $ffmpegDir = Get-ChildItem -Directory -Filter "ffmpeg-master*" | Select-Object -First 1
-          Copy-Item "$($ffmpegDir.FullName)\bin\ffmpeg.exe" .\ffmpeg.exe
+          Invoke-WebRequest -Uri "https://github.com/eugeneware/ffmpeg-static/releases/download/${{ env.FFMPEG_VERSION }}/ffmpeg-win32-x64" -OutFile "ffmpeg.exe"
           .\ffmpeg.exe -version
 
       - name: Build executable with PyInstaller
@@ -195,10 +211,7 @@ jobs:
 
       - name: Download Static FFmpeg (Linux)
         run: |
-          curl -sL https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz -o ffmpeg-static.tar.xz
-          tar -xf ffmpeg-static.tar.xz
-          FFMPEG_DIR=$(find . -maxdepth 1 -type d -name "ffmpeg-master*" | head -n 1)
-          cp "$FFMPEG_DIR/bin/ffmpeg" ./ffmpeg
+          curl -sL "https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_VERSION}/ffmpeg-linux-x64" -o ffmpeg
           chmod +x ./ffmpeg
           ./ffmpeg -version
 
@@ -261,8 +274,9 @@ jobs:
           chmod +x AppDir/AppRun
 
           # 4. Descargar appimagetool y empaquetar AppImage
-          curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+          curl -sL "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage" -o appimagetool
           chmod +x appimagetool
+          ./appimagetool --version
           ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir dist/SRT4U-Linux-x86_64.AppImage
 
           # Respaldo tarball
@@ -300,8 +314,8 @@ jobs:
 
       - name: Download Static Universal FFmpeg (macOS)
         run: |
-          curl -sL https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64.gz | gzip -d > ffmpeg-arm64
-          curl -sL https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64.gz | gzip -d > ffmpeg-x64
+          curl -sL "https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_VERSION}/ffmpeg-darwin-arm64.gz" | gzip -d > ffmpeg-arm64
+          curl -sL "https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_VERSION}/ffmpeg-darwin-x64.gz" | gzip -d > ffmpeg-x64
           chmod +x ffmpeg-arm64 ffmpeg-x64
           lipo -create -output ffmpeg ffmpeg-arm64 ffmpeg-x64
           chmod +x ./ffmpeg
@@ -332,6 +346,10 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-windows, build-linux, build-macos, compat-min-pyqt6]
     runs-on: ubuntu-latest
+    # Única boca que escribe en el repo: el resto de jobs van con
+    # `contents: read`, así que un test o un build comprometido no puede publicar.
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

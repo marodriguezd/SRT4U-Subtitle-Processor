@@ -34,12 +34,6 @@ cada punto indica por qué no se toca.
     previsualización elegibles, superficies permanentes oscuras, hover
     `#059669`). Sin equivalencia exacta en `Styles`; no se inventan
     constantes de un solo uso.
-13. **FFmpeg en los builds de CI no es reproducible**: Windows y Linux usan la
-    etiqueta móvil `latest` de `yt-dlp/FFmpeg-Builds`; macOS fija `b6.1.1` de
-    `ffmpeg-static`. Las cuatro URLs responden y los artefactos son correctos,
-    así que no hay fallo funcional: solo puede variar la versión de FFmpeg
-    empaquetada entre builds. Fijar un commit/versión exigiría mantenimiento
-    periódico sin problema que lo justifique.
 
 ## Decisiones del hardening final (comprobado, no se toca)
 
@@ -54,6 +48,15 @@ cada punto indica por qué no se toca.
   Regresión cubierta en `test_history_partial_translation_failure_count`.
 - **Gap icono/texto de la navegación** lo define el QSS `nav-btn`, sin
   espacios literales (`test_nav_labels_have_no_layout_whitespace`).
+- **FFmpeg de los builds fijado por versión**: los tres jobs descargan el
+  mismo tag (`b6.1.1`) de `eugeneware/ffmpeg-static` vía `FFMPEG_VERSION`.
+  Se descartó `yt-dlp/FFmpeg-Builds` porque sus `autobuild-*` se purgan a los
+  ~14 días (fijar uno habría producido un 404 en semanas) y la etiqueta
+  `latest` no es reproducible. El build se validó antes de fijarlo: estático
+  x86-64/PE32+ con `--enable-libass` y filtro `ass`, y un burn-in real sobre
+  vídeo con subtítulos renderizados. `appimagetool` (que forma parte del
+  AppImage publicado) también quedó fijado (`APPIMAGETOOL_VERSION`) porque iba
+  por `continuous`. Lo vigila `test_ci_pins_static_ffmpeg_version`.
 - **`srt4u.desktop` del repo** es launcher del checkout (rutas relativas);
   las distribuciones instalan su propio launcher (AppImage: `Exec=SRT4U`).
 - **Fuente multiplataforma**: `Styles.ui_font()` (Segoe UI solo en Windows,

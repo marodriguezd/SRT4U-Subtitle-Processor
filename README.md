@@ -112,10 +112,11 @@ guides: [docs/cli.md](docs/cli.md), [docs/api.md](docs/api.md),
 
 ### Pre-built Binaries
 GitHub Actions builds release artifacts when a `v*` tag is published. The
-workflow bundles an FFmpeg executable in the Windows, Linux, and macOS builds;
-platform runtime-library requirements still apply, so compatibility depends
-on the target system. Check the release assets for the artifacts currently
-published; the working-tree version is not itself a published release.
+workflow bundles a version-pinned static FFmpeg executable in the Windows,
+Linux, and macOS builds; platform runtime-library requirements still apply, so
+compatibility depends on the target system. Check the release assets for the
+artifacts currently published; the working-tree version is not itself a
+published release.
 
 ---
 
