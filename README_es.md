@@ -4,7 +4,6 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-360+%20superados-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -85,10 +84,15 @@ pip install ".[transcription]"  # Whisper local: srt4u transcribe / pipeline
 pip install ".[dev]"            # pytest + ruff para contribuir
 ```
 
-La base (GUI + CLI + analytics + QA + traducción + historial + pipeline sobre
-subtítulos) viene con la instalación base — tanto `pip install .` como
-`pip install -r requirements.txt` la proporcionan, sin extras. Los modelos Whisper nunca se empaquetan: se
-descargan una vez con aviso previo (`SRT4U_WHISPER_MODEL_DIR` reubica la caché).
+La instalación base (`pip install .`) incluye la GUI y la CLI (PyQt6 +
+`deep-translator`), además de analytics, QA, traducción, historial y pipeline
+para archivos de subtítulos. `requirements.txt` refleja esas dependencias base
+para los checkouts y CI. Los extras `[api]`, `[transcription]` y `[dev]`
+añaden FastAPI, `faster-whisper` y herramientas de desarrollo. Los modelos
+Whisper no se empaquetan: se descargan al primer uso con aviso previo
+(`SRT4U_WHISPER_MODEL_DIR` permite reubicar la caché). Burn-in necesita FFmpeg;
+las compilaciones de CI incluyen un ejecutable, mientras que una instalación
+desde código fuente requiere FFmpeg disponible en `PATH` o en el paquete.
 
 ### Quickstart en 60 segundos
 
@@ -106,11 +110,13 @@ Arquitectura (GUI/CLI/API → servicios → providers/SQLite/FFmpeg) y guías:
 [docs/transcription.md](docs/transcription.md), [docs/pipeline.md](docs/pipeline.md),
 [docs/database.md](docs/database.md), [docs/tech-debt.md](docs/tech-debt.md).
 
-### Ejecutables autónomos precompilados
-GitHub Actions compila automáticamente binarios portables en cada tag de versión. **Vienen con un binario estático de FFmpeg integrado, por lo que funcionan de forma 100% autónoma sin instalar librerías externas**:
-- **Windows**: `SRT4U-Windows-x64.exe` (Ejecutable único autocontenido)
-- **Linux**: `SRT4U-Linux-x86_64.AppImage` (Portable en cualquier distribución de Linux)
-- **macOS**: `SRT4U-macOS.dmg` (Binario Universal para Apple Silicon M1-M4 e Intel)
+### Binarios precompilados
+GitHub Actions genera artefactos de release cuando se publica un tag `v*`.
+El workflow incluye un ejecutable de FFmpeg en las compilaciones de Windows,
+Linux y macOS; los requisitos de bibliotecas del sistema siguen aplicando, por
+lo que la compatibilidad depende del sistema de destino. Consulta los assets
+para ver qué artefactos están publicados actualmente; la versión del árbol de
+trabajo no constituye por sí misma una release publicada.
 
 ---
 

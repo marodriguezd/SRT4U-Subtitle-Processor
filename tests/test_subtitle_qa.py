@@ -147,6 +147,18 @@ def test_subtitle_service_exposes_independent_qa_api():
     assert any(finding.rule == "duration_too_short" for finding in report.findings)
 
 
+def test_qa_findings_never_retain_source_line_or_timecode_text():
+    source = (
+        "[Script Info]\n\n[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:99:01.00,0:00:03.00,Default,,0,0,0,,PRIVATE SUBTITLE SECRET\n"
+    )
+    report = SubtitleQA().validate([], "ass", source)
+    serialized = str([finding.to_dict() for finding in report.findings])
+    assert "PRIVATE SUBTITLE SECRET" not in serialized
+    assert "Dialogue:" not in serialized
+
+
 def test_raw_srt_timecode_errors_are_found_even_when_parser_omits_cue():
     source = "1\n00:00:02,000 --> 00:00:01,000\nBad time\n\n2\nmalformed\ntext\n"
     service = SubtitleService()

@@ -60,11 +60,10 @@ class ConfigService:
                 os.chmod(self.config_file, 0o600)
             self.load_error = None
         except Exception as exc:
-            self.load_error = str(exc)
+            self.load_error = type(exc).__name__
             logger.warning(
-                "No se pudo leer la configuración %s; se usan los valores por defecto: %s",
-                self.config_file,
-                exc,
+                "No se pudo leer la configuración (%s); se usan los valores por defecto",
+                type(exc).__name__,
             )
 
     def save(self) -> bool:
@@ -80,9 +79,9 @@ class ConfigService:
             self.save_error = None
             return True
         except Exception as exc:
-            self.save_error = str(exc)
-            logger.exception(
-                "No se pudo guardar la configuración en %s", self.config_file
+            self.save_error = type(exc).__name__
+            logger.error(
+                "No se pudo guardar la configuración (%s)", type(exc).__name__
             )
             return False
 

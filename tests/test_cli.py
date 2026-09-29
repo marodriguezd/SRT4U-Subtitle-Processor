@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -285,11 +287,16 @@ def test_cli_stats_json_emits_structured_metrics(tmp_path, monkeypatch, capsys):
 def test_cli_does_not_overwrite_input_file(tmp_path):
     source = tmp_path / "input.srt"
     source.write_text("1\n00:00:01,000 --> 00:00:02,000\nKeep me\n", encoding="utf-8")
+    hardlink = tmp_path / "alias.srt"
+    try:
+        os.link(source, hardlink)
+    except OSError as exc:
+        pytest.skip(f"hard links are unavailable: {exc}")
 
     result = run_cli(
         source,
         "--output",
-        source,
+        hardlink,
         config_home=tmp_path / "config",
     )
 

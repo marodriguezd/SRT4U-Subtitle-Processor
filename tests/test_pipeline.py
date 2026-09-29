@@ -1,6 +1,7 @@
 """Media pipeline tests: fake backends only, no network, no real models."""
 
 import json
+import os
 import threading
 import time
 
@@ -14,6 +15,7 @@ from application.services.media_pipeline import (
     MediaPipeline,
     PipelineConfig,
     PipelineConfigError,
+    STAGE_ORDER,
     record_pipeline_result,
 )
 from application.services.transcription_models import (
@@ -356,6 +358,30 @@ def test_translation_failure_binds_stage(fakes, media_file, tmp_path):
     assert result.errors[0]["error_type"] == "invalid_response"
 
 
+def test_partial_translation_failure_keeps_original_cue_and_exports(fakes, media_file, tmp_path):
+    output = tmp_path / "partial.srt"
+    config = PipelineConfig(
+        input_media=media_file,
+        output_subtitle=str(output),
+        clean_enabled=False,
+        qa_enabled=False,
+        translation_enabled=True,
+        target_language="en",
+        provider="fake-partial",
+    )
+
+    result = MediaPipeline().run(config)
+
+    assert result.success
+    assert result.failed_stage is None
+    assert result.translation_failures == 1
+    assert result.translation_metrics.success is False
+    assert _ok_stages(result)["translation"] == "ok"
+    assert _ok_stages(result)["export"] == "ok"
+    assert "esto es una prueba" in output.read_text(encoding="utf-8")
+    assert "[en]" in result.output_content
+
+
 # 8. strict QA ----------------------------------------------
 
 
@@ -416,6 +442,48 @@ def test_burn_in_uses_runner(fakes, media_file, tmp_path):
     assert open(video_out, encoding="utf-8").read() == "fakevideo"
 
 
+def test_pipeline_rejects_output_paths_that_overwrite_inputs(tmp_path, media_file, srt_file):
+    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+        PipelineConfig(input_media=media_file, output_video=media_file).validate()
+    hardlink = tmp_path / "hardlink.mp4"
+    try:
+        os.link(media_file, hardlink)
+    except OSError as exc:
+        pytest.skip(f"hard links are unavailable: {exc}")
+    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+        PipelineConfig(input_media=media_file, output_subtitle=str(hardlink)).validate()
+    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+        PipelineConfig(
+            input_media=media_file,
+            burn_in_enabled=True,
+            output_video=media_file,
+        ).validate()
+    with pytest.raises(PipelineConfigError, match="distintas"):
+        PipelineConfig(
+            input_media=media_file,
+            output_subtitle=str(tmp_path / "same.mp4"),
+            output_video=str(tmp_path / "same.mp4"),
+            burn_in_enabled=True,
+        ).validate()
+    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+        PipelineConfig(input_media=srt_file, output_subtitle=srt_file).validate()
+
+    symlink = tmp_path / "alias.srt"
+    try:
+        symlink.symlink_to(srt_file)
+    except OSError as exc:
+        pytest.skip(f"symlinks are unavailable: {exc}")
+
+    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+        PipelineConfig(input_media=srt_file, output_subtitle=str(symlink)).validate()
+
+    config = PipelineConfig(input_media=srt_file)
+    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+        MediaPipeline().run(config)
+    with open(srt_file, encoding="utf-8") as source:
+        assert source.read() == CLEAN_SRT
+
+
 def test_burn_in_config_errors(tmp_path, srt_file):
     with pytest.raises(PipelineConfigError):
         PipelineConfig(
@@ -440,6 +508,9 @@ def test_cancel_before_stages(media_file, tmp_path):
     assert not result.success
     assert result.cancelled
     assert result.output_subtitle is None
+    assert len(result.stages) == len(STAGE_ORDER)
+    assert [stage.name for stage in result.stages] == list(STAGE_ORDER)
+    assert all(stage.status == "skipped" for stage in result.stages)
 
 
 def test_cancel_mid_transcription(fakes, media_file, tmp_path):
@@ -523,8 +594,10 @@ def test_history_partial_translation_failure_count(fakes, media_file, tmp_path):
         provider="fake-partial",
     )
     result = MediaPipeline().run(config)
-    assert result.failed_stage == "translation"
+    assert result.success
+    assert result.failed_stage is None
     assert result.translation_failures == 1
+    assert result.translation_metrics.success is False
     record_pipeline_result(result, config, db)
     with HistoryStore(db) as store:
         rows = store.recent_runs(operation="pipeline")
@@ -633,6 +706,34 @@ def test_api_pipeline_job(fakes, api_client):
         stage["name"] == "export" and stage["status"] == "ok"
         for stage in job["result"]["stages"]
     )
+
+
+def test_api_translate_partial_failure_history_records_real_count(fakes, api_client):
+    partial_srt = """1
+00:00:01,000 --> 00:00:02,000
+hola mundo
+
+2
+00:00:03,000 --> 00:00:04,000
+esto es una prueba
+
+3
+00:00:05,000 --> 00:00:06,000
+adiós
+"""
+    response = api_client.post(
+        "/api/v1/translate",
+        files={"file": ("in.srt", partial_srt, "text/plain")},
+        data={"target_language": "en", "provider": "fake-partial"},
+    )
+    assert response.status_code == 202
+    job = _wait_job(api_client, response.json()["job_id"])
+    assert job["status"] == "completed"
+    assert "esto es una prueba" in job["result"]["text"]
+    with HistoryStore() as store:
+        row = store.recent_runs(operation="process", limit=1)[0]
+    assert row["translation_failures"] == 1
+    assert row["number_of_cues"] == 3
 
 
 def test_api_pipeline_validation(api_client):

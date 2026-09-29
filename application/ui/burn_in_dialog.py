@@ -4,6 +4,7 @@ de subtítulos en vídeo (Burn-In / Hardsub) con diseño Glassmorphism.
 """
 
 import os
+from pathlib import Path
 from typing import List
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -20,14 +21,21 @@ from PyQt6.QtWidgets import (
     QCheckBox,
 )
 
+from ..logging_setup import get_logger
 from ..services.subtitle_service import SubtitleItem
-from ..services.video_burner_service import BurnInOptions, BurnInWorker
+from ..services.video_burner_service import (
+    BurnInOptions,
+    BurnInWorker,
+    paths_refer_to_same_file,
+)
 from ..services.i18n_service import t
 from ..platform_utils import open_path, reveal_path
 from .file_dialogs import ask_open_file, ask_save_file
 from .message_boxes import ThemedMessageBox
 from .icons import Icons
 from .styles import Styles, sync_minimum_size
+
+logger = get_logger("ui")
 
 
 class BurnInDialog(QDialog):
@@ -391,7 +399,7 @@ class BurnInDialog(QDialog):
             )
             return
 
-        if os.path.abspath(v_path) == os.path.abspath(o_path):
+        if paths_refer_to_same_file(v_path, o_path):
             ThemedMessageBox.warning(
                 self, t("burn.err_same_path_title"), t("burn.err_same_path_desc")
             )
@@ -704,6 +712,7 @@ class BurnInProgressModal(QDialog):
         self.btn_close.show()
 
     def _on_failed(self, error_msg: str):
+        logger.error("Burn-in fallido; detalle técnico en el log de FFmpeg")
         self.lbl_title.setText(t("burn.err_title"))
         self.lbl_title.setStyleSheet(
             f"font-size: 16px; font-weight: 800; color: {Styles.DANGER};"
@@ -712,7 +721,9 @@ class BurnInProgressModal(QDialog):
         self.btn_cancel.setText(t("burn.btn_close"))
         self.btn_cancel.clicked.disconnect()
         self.btn_cancel.clicked.connect(self.reject)
-        ThemedMessageBox.critical(self, t("burn.error_dialog_title"), error_msg)
+        ThemedMessageBox.critical(
+            self, t("burn.error_dialog_title"), t("burn.err_desc")
+        )
 
     def _on_cancelled(self):
         self.lbl_title.setText(t("burn.cancelled_title"))

@@ -442,7 +442,6 @@ class SubtitleService:
         results: List[Optional[SubtitleItem]] = [None] * total_items
         failed_indices: List[int] = []
         translation_metrics: List[TranslationMetrics] = []
-        metric_failures: List[str] = []
         translation_errors: List[str] = []
 
         def translate_single_item(
@@ -484,7 +483,6 @@ class SubtitleService:
                     )
                 if engine_error:
                     failed_indices.append(item.index)
-                    metric_failures.append(engine_error)
                     translation_metrics[-1].success = False
                     if last_result is None:
                         translation_metrics[-1].error_type = "unknown"
@@ -516,7 +514,6 @@ class SubtitleService:
                 return idx, new_item
             except Exception as exc:
                 failed_indices.append(item.index)
-                metric_failures.append(type(exc).__name__)
                 translation_errors.append("unknown")
                 translation_metrics.append(
                     TranslationMetrics.for_text(
@@ -531,13 +528,14 @@ class SubtitleService:
                         error_type="unknown",
                         requested_provider=engine,
                         providers_used=[engine],
-                        error_message=type(exc).__name__,
+                        error_message=None,
                     )
                 )
-                logger.exception(
-                    "Excepción al traducir el bloque %s con el provider '%s'",
+                logger.error(
+                    "Excepción al traducir el cue %s con el provider '%s' (%s)",
                     item.index,
                     engine,
+                    type(exc).__name__,
                 )
                 return idx, item
 
@@ -608,9 +606,6 @@ class SubtitleService:
                 None,
             ),
         )
-        if metric_failures and self.last_translation_metrics.success is False:
-            # Do not retain raw exception messages that could contain sensitive data.
-            self.last_translation_metrics.error_message = translation_errors[0]
         if failed_indices:
             logger.warning(
                 "Traducción incompleta: %s de %s cues mantienen el texto original (error_type=%s)",

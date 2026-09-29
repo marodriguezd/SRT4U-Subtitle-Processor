@@ -8,9 +8,9 @@ version = "1.4.9"
 description = "Desktop and headless subtitle processing tool"
 requires-python = ">=3.10"
 # Base install is a functional desktop GUI + CLI: PyQt6 renders the interface
-# and deep-translator powers the keyless Google free tier. The same pins live
-# in requirements.txt, which remains the source-checkout/CI quick path
-# (the compat-min-pyqt6 job resolves the minimum from there).
+# and deep-translator powers the keyless Google free tier. requirements.txt is
+# the documented base-stack mirror for source checkout/CI; tests compare its
+# normalized requirements against this list to prevent silent drift.
 dependencies = [
     "PyQt6>=6.6.1,<6.12",
     "deep-translator>=1.11.4",

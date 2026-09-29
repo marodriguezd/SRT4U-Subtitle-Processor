@@ -40,7 +40,7 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
     async def _unhandled(request: Request, exc: Exception):  # noqa: ANN001, ANN202
         from .deps import logger as api_logger
 
-        api_logger.exception("Unhandled API error on %s", request.url.path)
+        api_logger.error("Unhandled API error (%s)", type(exc).__name__)
         return JSONResponse(status_code=500, content={"detail": "error interno"})
 
     for module in (

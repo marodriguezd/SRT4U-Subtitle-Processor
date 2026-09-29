@@ -4,7 +4,6 @@
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-360+%20passed-success.svg)]()
 
 [**English**](README.md) | [**Español**](README_es.md)
 
@@ -85,10 +84,15 @@ pip install ".[transcription]"  # local Whisper: srt4u transcribe / pipeline med
 pip install ".[dev]"            # pytest + ruff for contributors
 ```
 
-Base (GUI + CLI + analytics + QA + translation + history + pipeline over
-subtitle inputs) ships with the base install — `pip install .` and
-`pip install -r requirements.txt` both provide it, no extra needed. Whisper models are never bundled: they
-download once with prior notice (`SRT4U_WHISPER_MODEL_DIR` relocates the cache).
+The base install (`pip install .`) includes the GUI and CLI stack (PyQt6 +
+`deep-translator`) as well as analytics, QA, translation, history, and the
+pipeline for subtitle inputs. `requirements.txt` mirrors these base
+requirements for source checkouts and CI. The `[api]`, `[transcription]`, and
+`[dev]` extras add FastAPI, `faster-whisper`, and development tools. Whisper
+models are not bundled; they download on first use with prior notice
+(`SRT4U_WHISPER_MODEL_DIR` relocates the cache). Burn-in requires FFmpeg; CI
+builds bundle an FFmpeg executable, while source installs need a usable FFmpeg
+on `PATH` or in the application bundle.
 
 ### 60-second quickstart
 
@@ -106,11 +110,12 @@ guides: [docs/cli.md](docs/cli.md), [docs/api.md](docs/api.md),
 [docs/transcription.md](docs/transcription.md), [docs/pipeline.md](docs/pipeline.md),
 [docs/database.md](docs/database.md), [docs/tech-debt.md](docs/tech-debt.md).
 
-### Pre-built Standalone Binaries
-Standalone portable binaries are built via GitHub Actions for every release tag. **They come bundled with a static standalone FFmpeg build, requiring zero external dependencies or setup**:
-- **Windows**: `SRT4U-Windows-x64.exe` (Single self-contained `.exe`)
-- **Linux**: `SRT4U-Linux-x86_64.AppImage` (Portable on any Linux distro)
-- **macOS**: `SRT4U-macOS.dmg` (Universal binary for Apple Silicon M1-M4 and Intel)
+### Pre-built Binaries
+GitHub Actions builds release artifacts when a `v*` tag is published. The
+workflow bundles an FFmpeg executable in the Windows, Linux, and macOS builds;
+platform runtime-library requirements still apply, so compatibility depends
+on the target system. Check the release assets for the artifacts currently
+published; the working-tree version is not itself a published release.
 
 ---
 

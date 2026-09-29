@@ -76,7 +76,7 @@ def test_single_product_version_everywhere():
         text=True,
         cwd=ROOT,
     )
-    assert EXPECTED_VERSION in proc.stdout
+    assert proc.stdout.strip() == EXPECTED_VERSION
 
 
 def test_no_madrid_references_in_product():
@@ -156,6 +156,13 @@ def _pyproject():
         return tomllib.load(fh)
 
 
+def _normalize_requirement(requirement):
+    match = re.fullmatch(r"\s*([A-Za-z0-9_.-]+)\s*(.*)\s*", requirement)
+    assert match, f"unsupported dependency declaration: {requirement!r}"
+    name = re.sub(r"[-_.]+", "-", match.group(1)).casefold()
+    return name + match.group(2).replace(" ", "")
+
+
 def test_install_contract_base_has_desktop_stack():
     """`pip install .` must yield a functional desktop GUI + CLI base."""
     project = _pyproject()["project"]
@@ -163,15 +170,35 @@ def test_install_contract_base_has_desktop_stack():
     assert any(dep.startswith("PyQt6") for dep in base)
     assert any(dep.startswith("deep-translator") for dep in base)
 
+    desktop_alias = project["optional-dependencies"]["desktop"]
+    assert {_normalize_requirement(dep) for dep in desktop_alias} == {
+        _normalize_requirement(dep) for dep in base
+    }
+
     req_text = (ROOT / "requirements.txt").read_text(encoding="utf-8")
-    for dep in base:
-        name = re.split(r"[<>=!~ ]", dep, maxsplit=1)[0]
-        assert name in req_text, f"base dep {name} missing from requirements.txt"
+    declared = {_normalize_requirement(dep) for dep in base}
+    mirrored = {
+        _normalize_requirement(line.split("#", 1)[0].strip())
+        for line in req_text.splitlines()
+        if line.split("#", 1)[0].strip()
+    }
+    assert mirrored == declared, (
+        f"requirements.txt must exactly mirror base dependencies; "
+        f"missing={declared - mirrored}, extra={mirrored - declared}"
+    )
 
     extras = project["optional-dependencies"]
     assert "PyQt6" not in " ".join(extras["api"])
     assert "faster-whisper" not in " ".join(base)
     assert "fastapi" not in " ".join(base)
+    for extra in ("api", "transcription", "dev"):
+        assert extras[extra]
+    assert project["scripts"]["srt4u"] == "application.cli:main"
+    workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
+    minimum = re.search(r"PyQt6>=([0-9]+\.[0-9]+\.[0-9]+)", "\n".join(base))
+    assert minimum
+    assert f"pip install -r requirements.txt" in workflow
+    assert r"grep -oP 'PyQt6>=\K[0-9]+\.[0-9]+\.[0-9]+' requirements.txt" in workflow
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     readme_es = (ROOT / "README_es.md").read_text(encoding="utf-8")

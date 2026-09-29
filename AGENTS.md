@@ -18,8 +18,9 @@ Three front-ends share one core: PyQt6 desktop GUI (`main.py`), headless CLI
 - **Local-first.** Base install works offline except for the translation
   provider the user explicitly chooses.
 - Base install is usable with **zero paid services**: free Google Translate
-  tier needs no keys; cleaning, conversion, analytics, deterministic QA,
-  history and burn-in (with a system FFmpeg) are fully local.
+  tier needs no keys; cleaning, conversion, analytics, deterministic QA and
+  history are local. Burn-in is local but requires a working FFmpeg binary
+  (system-installed or bundled by a distribution).
 - Translation providers are **interchangeable** (`google`, `deepl`, `openai`,
   `ollama`, `llm`); do NOT claim external providers are free — only the
   Google free tier is keyless.
@@ -62,17 +63,22 @@ Key services (`application/services/`):
   (`strict_passed` semantics).
 - `TranslationBenchmark` (`translation_benchmark.py`) — versioned dataset,
   per-(provider, run) rows, JSON/CSV export; no quality judging.
-- `VideoBurnerService` — headless `run_burn_in_sync` with real ffmpeg
-  progress; the Qt `BurnInWorker` is UI-bound and must not be imported by
-  services/CLI/API.
+- `VideoBurnerService` — `run_burn_in_sync` with real FFmpeg progress; the
+  module imports PyQt6 because it also contains the UI-bound `BurnInWorker`.
+  Headless services/CLI/API must not instantiate or import `BurnInWorker`;
+  requested headless burn-in is available with the base desktop dependency.
 - `JobManager` (`application/api/jobs.py`) — in-memory local jobs
   (`queued/running/completed/failed/cancelled`); lost on restart by design.
 
-**Import rules:** the domain never imports PyQt6, FastAPI or Pydantic. Only
-`application/ui/*` and burn-in dialogs require PyQt6. `cli.py`, services,
-`history_store`, `media_pipeline` and the API layer must import without Qt
-(this is test-enforced via a Qt-free wheel proof pattern). `faster-whisper`
-is imported lazily inside the provider; base code paths must work without it.
+**Import rules:** core subtitle parsing, QA, analytics, history, translation
+providers and CLI processing do not require creating a Qt application.
+`application/services/i18n_service.py` and
+`application/services/video_burner_service.py` import PyQt6 (the latter also
+contains the UI-bound `BurnInWorker`); GUI modules require Qt. FastAPI/Pydantic
+are confined to the optional API layer. Headless burn-in imports the burner
+only when requested and therefore also requires the desktop/PyQt6 dependency.
+`faster-whisper` is imported lazily inside the provider; base code paths work
+without it and transcription reports the optional-extra install hint.
 
 ## 4. Repository structure
 
@@ -102,8 +108,9 @@ is imported lazily inside the provider; base code paths must work without it.
 - No PyQt/FastAPI in the domain; providers decoupled behind registries.
 - Optional dependencies must stay truly optional (lazy imports + clear
   install hints, e.g. `python -m pip install '.[transcription]'`).
-- UI strings go through `i18n_service.py` (291 keys × 6: en es pt de it zh-CN);
-  never leave a hardcoded fallback in another language. Spanish reference is
+- UI strings go through `i18n_service.py`; the six catalogs must have identical
+  keys and compatible placeholders (en es pt de it zh-CN). Never leave a
+  hardcoded fallback in another language. Spanish reference is
   es-ES (archivo, vídeo, configuración).
 - No emojis in UI (Qt/X11 FreeType limitation); use SVG via
   `application/ui/icons.py`. `♪/♫` in cleaning patterns are functional, not UI.
@@ -120,8 +127,8 @@ is imported lazily inside the provider; base code paths must work without it.
 
 ## 7. Git rules
 
-- Work only on the assigned branch (currently `optimizaciones`).
-- Never touch `main` unless explicitly instructed.
+- Work only on the branch assigned for the task; this final hardening was
+  explicitly assigned to the current `main` branch. Never switch branches.
 - Never commit or push unless explicitly requested. Never `reset --hard`,
   rebase destructively, or rewrite history.
 - Never delete other agents' work. Review `git diff` before finishing.
@@ -140,17 +147,20 @@ Relevant smokes: `srt4u --version`, `srt4u <cmd> --help`, API
 real-Whisper test (`SRT4U_TEST_REAL_WHISPER=1`), real-media e2e
 (`SRT4U_E2E_MEDIA`). Suite redirects `ConfigService` to a temp dir; keep it so.
 
-## 9. Optional dependencies (from `pyproject.toml`, all `>=3.10`, zero base deps)
+## 9. Installation dependencies (from `pyproject.toml`, Python `>=3.10`)
 
-- **base** (no extras): GUI + CLI + analytics + QA + translation + history +
-  pipeline over subtitle inputs.
+- **base**: `PyQt6` + `deep-translator`; GUI + headless CLI + analytics + QA +
+  translation + history + pipeline over subtitle inputs. `requirements.txt` is
+  a documented exact mirror of the base dependency list; a coherence test
+  prevents silent drift. The CLI does not create a Qt application.
 - **`.[api]`**: FastAPI + uvicorn (`srt4u serve`, default `127.0.0.1:8000`).
 - **`.[transcription]`**: `faster-whisper` (`srt4u transcribe`, media pipeline
   input). Models (`tiny/base/small/medium/large-v3/turbo`, default `small`)
   are NEVER bundled; first use downloads once with prior notice
   (`SRT4U_WHISPER_MODEL_DIR` relocates the cache).
 - **`.[dev]`**: pytest + ruff.
-- **full** = desktop + api + transcription (see `build_exe.bat` BASE vs FULL).
+- **`.[desktop]`** = compatibility alias for the base stack.
+- **full** = base + API + transcription (see `build_exe.bat` BASE vs FULL).
 
 ## 10. Translation providers
 

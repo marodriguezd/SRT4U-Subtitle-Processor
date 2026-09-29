@@ -81,7 +81,9 @@ def install_qt_message_handler() -> None:
             prefix = f"[{category}] " if category and category != "default" else ""
             logger.log(levels.get(msg_type, logging.INFO), "%s%s", prefix, message)
         except Exception as exc:
-            logger.debug("No se pudo registrar un mensaje de Qt: %s", exc)
+            logger.debug(
+                "No se pudo registrar un mensaje de Qt (%s)", type(exc).__name__
+            )
         finally:
             _qt_handler_state.busy = False
 
@@ -149,7 +151,9 @@ def setup_logging(
         logger.addHandler(file_handler)
     except OSError as exc:
         # No poder escribir el log nunca debe impedir que la app arranque
-        logger.warning("No se pudo abrir el archivo de log %s: %s", log_path, exc)
+        logger.warning(
+            "No se pudo abrir el archivo de log (%s)", type(exc).__name__
+        )
 
     _configured_path = log_path
     return log_path

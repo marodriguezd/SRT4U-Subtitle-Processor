@@ -12,9 +12,9 @@ From a source checkout:
 python -m application.cli process input.srt --output output.srt --clean
 ```
 
-Install the CLI entry point with `python -m pip install .` (or
-`python -m pip install '.[desktop]'` for the desktop dependencies as well). The
-equivalent console command is `srt4u`:
+Install the CLI entry point and base desktop stack with
+`python -m pip install .` (the `desktop` extra remains a compatibility alias).
+The equivalent console command is `srt4u`:
 
 ```bash
 srt4u process input.srt --output output.srt --clean
@@ -84,7 +84,9 @@ preset. Burn-in and arbitrary workflow steps remain out of scope.
 The CLI is an orchestration/argument-validation layer, not another processor:
 it calls the existing service and writes its returned content. This avoids
 separate implementations of parsing, cleaning, translation, or formatting.
-JSON uses Python's standard library, so presets add no runtime dependency. The
-headless import path was tested not to load PyQt6. YAML, a generic pipeline
-engine, and an additional business-logic facade were deferred because they add
-complexity without enabling a needed operation in this phase.
+JSON uses Python's standard library, so presets add no runtime dependency.
+CLI subtitle processing does not create a Qt application. Some other service
+modules, including the i18n service and the FFmpeg burner, import PyQt6, so a
+full wheel-level Qt-free import guarantee is not claimed. YAML, a generic
+pipeline engine, and an additional business-logic facade are outside the
+current CLI scope.

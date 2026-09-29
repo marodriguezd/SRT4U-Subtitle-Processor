@@ -530,9 +530,13 @@ def record_safely(
         with HistoryStore(db_path) as store:
             return store.record_run(operation, **fields)
     except HistoryError as exc:
-        logger.warning("History unavailable (%s); execution continues", exc)
+        logger.warning(
+            "History unavailable (%s); execution continues", type(exc).__name__
+        )
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("History unavailable (%s); execution continues", exc)
+        logger.warning(
+            "History unavailable (%s); execution continues", type(exc).__name__
+        )
     return None
 
 
@@ -544,7 +548,11 @@ def record_result_safely(
         with HistoryStore(db_path) as store:
             return store.record_processing_result(result, **kwargs)
     except HistoryError as exc:
-        logger.warning("History unavailable (%s); execution continues", exc)
+        logger.warning(
+            "History unavailable (%s); execution continues", type(exc).__name__
+        )
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("History unavailable (%s); execution continues", exc)
+        logger.warning(
+            "History unavailable (%s); execution continues", type(exc).__name__
+        )
     return None

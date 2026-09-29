@@ -133,7 +133,7 @@ async def pipeline(
         ).validate()
     except PipelineConfigError as exc:
         _cleanup()
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=safe_detail(exc)) from exc
 
     def _work() -> dict:
         from ...services.media_pipeline import record_pipeline_result
@@ -142,8 +142,12 @@ async def pipeline(
             result = MediaPipeline().run(config)
             try:
                 record_pipeline_result(result, config, file_path=filename)
-            except Exception:
-                pass
+            except Exception as exc:
+                from ..deps import logger as api_logger
+
+                api_logger.warning(
+                    "Pipeline history recording failed (%s)", type(exc).__name__
+                )
             payload = result.to_dict()
             payload["input_filename"] = filename
             payload["output_subtitle"] = None
@@ -153,7 +157,7 @@ async def pipeline(
         except Exception as exc:  # job boundary: sanitize
             from ..deps import logger as api_logger
 
-            api_logger.exception("Pipeline job failed")
+            api_logger.error("Pipeline job failed (%s)", type(exc).__name__)
             raise JobError(safe_detail(exc)) from exc
         finally:
             _cleanup()

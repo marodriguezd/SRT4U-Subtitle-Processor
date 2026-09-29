@@ -92,9 +92,7 @@ async def translate(
                 ProcessingResult(
                     stats=ProcessingStats(
                         processed_items_count=len(items),
-                        translation_failures=(
-                            0 if (metrics and metrics.success) else len(items)
-                        ),
+                        translation_failures=service.last_translation_failures,
                     ),
                     processed_items=translated,
                     translation_metrics=metrics,

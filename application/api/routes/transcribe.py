@@ -77,7 +77,7 @@ async def transcribe(
             try:
                 service.check_available("whisper")
             except TranscriptionError as exc:
-                raise JobError(str(exc)) from exc
+                raise JobError(safe_detail(exc)) from exc
 
             def _progress(step: str, payload: object) -> None:
                 return None
@@ -96,8 +96,12 @@ async def transcribe(
                     store.record_transcription_result(
                         result, file_path=filename, file_format=output_format
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                from ...logging_setup import get_logger
+
+                get_logger("api").warning(
+                    "No se pudo registrar la transcripción (%s)", type(exc).__name__
+                )
             payload = TranscriptionResultModel(
                 output_content=content,
                 output_format=output_format,

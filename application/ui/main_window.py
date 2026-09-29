@@ -121,8 +121,8 @@ class ProcessWorker(QThread):
             )
             self.completed.emit(result)
         except Exception as e:
-            logger.exception("Fallo al procesar %s", self.file_path)
-            self.failed.emit(str(e))
+            logger.exception("Fallo al procesar el subtítulo")
+            self.failed.emit("Error interno al procesar")
 
 
 class TranscribeWorker(QThread):
@@ -166,17 +166,17 @@ class TranscribeWorker(QThread):
                 cancel_event=self.cancel_event,
             )
             if self.cancel_event.is_set():
-                self.failed.emit(t("transcribe.cancelled", "Transcripción cancelada"))
+                self.failed.emit(t("transcribe.cancelled"))
                 return
             self.completed.emit(result)
-        except TranscriptionCancelledError as e:
-            self.failed.emit(str(e))
+        except TranscriptionCancelledError:
+            self.failed.emit(t("transcribe.cancelled"))
         except TranscriptionError as e:
-            logger.exception("Fallo al transcribir %s", self.media_path)
-            self.failed.emit(str(e))
+            logger.warning("Fallo de transcripción (%s)", e.error_type)
+            self.failed.emit(e.error_type)
         except Exception as e:
-            logger.exception("Fallo inesperado al transcribir %s", self.media_path)
-            self.failed.emit(str(e))
+            logger.exception("Fallo inesperado al transcribir el medio")
+            self.failed.emit("error interno")
 
 
 class PipelineWorker(QThread):
@@ -205,14 +205,15 @@ class PipelineWorker(QThread):
                 cancel_event=self.cancel_event,
             )
             if self.cancel_event.is_set() or result.cancelled:
-                self.failed.emit(t("pipeline.cancelled", "Pipeline cancelada"))
+                self.failed.emit(t("pipeline.cancelled"))
                 return
             self.completed.emit(result)
         except PipelineConfigError as e:
-            self.failed.emit(str(e))
+            logger.warning("Configuración de pipeline no válida (%s)", type(e).__name__)
+            self.failed.emit("configuración no válida")
         except Exception as e:
             logger.exception("Fallo inesperado en la pipeline")
-            self.failed.emit(str(e))
+            self.failed.emit("error interno")
 
 
 class MainWindow(QMainWindow):
@@ -1195,10 +1196,13 @@ class MainWindow(QMainWindow):
         try:
             content = self.transcription_service.render(result, output_format)
         except TranscriptionError as exc:
+            logger.warning(
+                "No se pudo renderizar la transcripción (%s)", type(exc).__name__
+            )
             ThemedMessageBox.critical(
                 self,
-                t("transcribe.render_error_title", "Error al generar subtítulos"),
-                str(exc),
+                t("transcribe.render_error_title"),
+                t("transcribe.error_generic"),
             )
             return
         base, _ = os.path.splitext(self.current_media_path or "transcription")
@@ -1208,8 +1212,11 @@ class MainWindow(QMainWindow):
                 f.write(content)
             self.saved_output_path = out_path
         except Exception as e:
+            logger.exception("No se pudo guardar la transcripción")
             ThemedMessageBox.critical(
-                self, t("alert.save_error_title"), t("alert.save_error_desc", err=e)
+                self,
+                t("alert.save_error_title"),
+                t("alert.save_error_desc", err="error de escritura"),
             )
             return
         self.last_result = None
@@ -1232,10 +1239,12 @@ class MainWindow(QMainWindow):
                     file_format=output_format,
                 )
         except Exception as exc:
-            logger.warning("No se pudo registrar la transcripción: %s", exc)
+            logger.warning(
+                "No se pudo registrar la transcripción (%s)", type(exc).__name__
+            )
 
     def _on_transcribe_failed(self, error_msg: str):
-        logger.error("Transcripción fallida: %s", error_msg)
+        logger.error("Transcripción fallida")
         modal = getattr(self, "transcribe_modal", None)
         if modal is not None and modal.isVisible():
             modal.reject()
@@ -1243,8 +1252,8 @@ class MainWindow(QMainWindow):
             return
         ThemedMessageBox.critical(
             self,
-            t("transcribe.error_title", "Error de transcripción"),
-            t("transcribe.error_desc", "No se pudo transcribir: {err}", err=error_msg),
+            t("transcribe.error_title"),
+            t("transcribe.error_generic"),
         )
 
     # ------------------ PÁGINA: PIPELINE ------------------
@@ -1475,7 +1484,7 @@ class MainWindow(QMainWindow):
         except PipelineConfigError as exc:
             ThemedMessageBox.warning(
                 self,
-                t("pipeline.config_title", "Configuración inválida"),
+                t("pipeline.config_title"),
                 str(exc),
             )
             return
@@ -1537,11 +1546,13 @@ class MainWindow(QMainWindow):
         if self.pipeline_cancelled:
             return
         if not result.success:
-            errors = "; ".join(f"[{e['stage']}] {e['message']}" for e in result.errors)
+            errors = "; ".join(
+                f"[{e['stage']}] {e['error_type']}" for e in result.errors
+            )
             ThemedMessageBox.critical(
                 self,
-                t("pipeline.error_title", "Pipeline fallida"),
-                errors or t("pipeline.error_unknown", "Error desconocido"),
+                t("pipeline.error_title"),
+                errors or t("pipeline.error_unknown"),
             )
             return
         self.saved_output_path = result.output_subtitle
@@ -1562,10 +1573,12 @@ class MainWindow(QMainWindow):
                 self.pipeline_worker.config,
             )
         except Exception as exc:
-            logger.warning("No se pudo registrar la pipeline: %s", exc)
+            logger.warning(
+                "No se pudo registrar la pipeline (%s)", type(exc).__name__
+            )
 
     def _on_pipeline_failed(self, error_msg: str):
-        logger.error("Pipeline fallida: %s", error_msg)
+        logger.error("Pipeline fallida")
         modal = getattr(self, "pipeline_modal", None)
         if modal is not None and modal.isVisible():
             modal.reject()
@@ -1573,8 +1586,8 @@ class MainWindow(QMainWindow):
             return
         ThemedMessageBox.critical(
             self,
-            t("pipeline.error_title", "Pipeline fallida"),
-            t("pipeline.error_desc", "La pipeline no completó: {err}", err=error_msg),
+            t("pipeline.error_title"),
+            t("pipeline.error_desc", err=error_msg),
         )
 
     def _build_batch_page(self) -> QWidget:
@@ -2011,8 +2024,11 @@ class MainWindow(QMainWindow):
                 f.write(result.output_content)
             self.saved_output_path = out_path
         except Exception as e:
+            logger.exception("No se pudo guardar el resultado procesado")
             ThemedMessageBox.critical(
-                self, t("alert.save_error_title"), t("alert.save_error_desc", err=e)
+                self,
+                t("alert.save_error_title"),
+                t("alert.save_error_desc", err="error de escritura"),
             )
             return
 
@@ -2059,13 +2075,13 @@ class MainWindow(QMainWindow):
             )
 
     def _on_processing_failed(self, error_msg: str):
-        logger.error("Procesamiento fallido: %s", error_msg)
+        logger.error("Procesamiento fallido")
         if hasattr(self, "modal") and self.modal.isVisible():
             self.modal.reject()
         ThemedMessageBox.critical(
             self,
             t("alert.process_error_title"),
-            t("alert.process_error_desc", err=error_msg),
+            t("alert.process_error_desc", err="error interno"),
         )
 
     def _start_fast_clean(self):
@@ -2129,8 +2145,11 @@ class MainWindow(QMainWindow):
                 t("alert.conv_success_desc", path=out_path),
             )
         except Exception as e:
+            logger.exception("Falló la conversión del archivo")
             ThemedMessageBox.critical(
-                self, t("alert.conv_error_title"), t("alert.conv_error_desc", err=e)
+                self,
+                t("alert.conv_error_title"),
+                t("alert.conv_error_desc", err="error de conversión"),
             )
 
     def _on_subtitles_edited(self, edited_items):
@@ -2251,8 +2270,11 @@ class MainWindow(QMainWindow):
                 if matching_vid:
                     self.video_player.load_video(matching_vid)
             except Exception as e:
+                logger.exception("No se pudo cargar el archivo de subtítulos")
                 ThemedMessageBox.critical(
-                    self, t("alert.load_error_title"), t("alert.load_error_desc", err=e)
+                    self,
+                    t("alert.load_error_title"),
+                    t("alert.load_error_desc", err="archivo ilegible"),
                 )
 
     def _open_saved_file(self):
@@ -2329,9 +2351,13 @@ class MainWindow(QMainWindow):
                     engine=engine,
                 )
             except Exception as e:
-                logger.exception("Fallo al procesar el archivo del lote %s", file_path)
+                logger.exception("Fallo al procesar el archivo del lote")
                 self.batch_table.setItem(
-                    row, 3, QTableWidgetItem(t("batch.status_error", err=e))
+                    row,
+                    3,
+                    QTableWidgetItem(
+                        t("batch.status_error", err="error interno")
+                    ),
                 )
 
         ThemedMessageBox.information(
@@ -2387,10 +2413,9 @@ class MainWindow(QMainWindow):
             ),
         ]
         if not all(saved):
-            # No se interrumpe el procesamiento por esto: sólo se registra
+            # No se interrumpe el procesamiento por esto: sólo se registra.
             logger.warning(
-                "No se pudieron guardar las opciones de la página de inicio (%s): %s",
-                self.config_service.config_file,
+                "No se pudieron guardar las opciones de la página de inicio (%s)",
                 self.config_service.save_error,
             )
 
@@ -2412,8 +2437,7 @@ class MainWindow(QMainWindow):
         ]
         if not all(saved):
             logger.error(
-                "No se pudieron guardar los ajustes en %s: %s",
-                self.config_service.config_file,
+                "No se pudieron guardar los ajustes (%s)",
                 self.config_service.save_error,
             )
             ThemedMessageBox.warning(

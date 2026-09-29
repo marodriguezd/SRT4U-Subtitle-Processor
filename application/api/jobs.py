@@ -78,8 +78,8 @@ class JobManager:
         if drop is not None:
             try:
                 drop()
-            except Exception:
-                logger.exception("Job %s drop cleanup failed", job_id)
+            except Exception as exc:
+                logger.error("Job drop cleanup failed (%s)", type(exc).__name__)
             return
         try:
             result = func()
@@ -91,8 +91,8 @@ class JobManager:
                     job["error"] = str(exc) or "error en el job"
                     job["finished_at"] = _utc_now_iso()
             return
-        except Exception:  # job boundary: sanitize, never leak traces
-            logger.exception("Job %s failed", job_id)
+        except Exception as exc:  # job boundary: sanitize, never leak traces
+            logger.error("Job failed (%s)", type(exc).__name__)
             with self._lock:
                 job = self._jobs.get(job_id)
                 if job is not None:

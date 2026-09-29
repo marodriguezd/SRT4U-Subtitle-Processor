@@ -6,11 +6,12 @@ y cálculo de progreso/ETA en tiempo real.
 
 import os
 import re
-import sys
 import shutil
-import tempfile
 import subprocess
+import sys
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, List, Tuple
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -18,6 +19,20 @@ from ..logging_setup import get_logger
 from .subtitle_service import SubtitleItem
 
 logger = get_logger("burner")
+
+
+def paths_refer_to_same_file(first: str, second: str) -> bool:
+    """Compare canonical paths and existing filesystem identities (hard links)."""
+    first_path = Path(first)
+    second_path = Path(second)
+    try:
+        if first_path.samefile(second_path):
+            return True
+    except OSError:
+        pass
+    return os.path.normcase(str(first_path.resolve())) == os.path.normcase(
+        str(second_path.resolve())
+    )
 
 
 @dataclass
@@ -45,7 +60,7 @@ class VideoBurnerService:
             )
             return res.returncode == 0
         except Exception as exc:
-            logger.debug("Candidato de FFmpeg descartado (%s): %s", path, exc)
+            logger.debug("Candidato de FFmpeg descartado (%s)", type(exc).__name__)
             return False
 
     @classmethod
@@ -133,7 +148,9 @@ class VideoBurnerService:
                 video_path,
             )
         except Exception as exc:
-            logger.warning("No se pudo obtener la duración de %s: %s", video_path, exc)
+            logger.warning(
+                "No se pudo obtener la duración (%s)", type(exc).__name__
+            )
 
         return None
 
@@ -169,9 +186,8 @@ class VideoBurnerService:
             )
         except Exception as exc:
             logger.warning(
-                "No se pudieron detectar las dimensiones de %s (se asume 1920x1080): %s",
-                video_path,
-                exc,
+                "No se pudieron detectar las dimensiones (se asume 1920x1080): %s",
+                type(exc).__name__,
             )
 
         return 1920, 1080
@@ -327,17 +343,29 @@ class BurnInWorker(QThread):
                 self._process.wait(timeout=1.5)
             except Exception as exc:
                 logger.warning(
-                    "FFmpeg no respondió a terminate (%s); se fuerza el cierre", exc
+                    "FFmpeg no respondió a terminate (%s); se fuerza el cierre",
+                    type(exc).__name__,
                 )
                 try:
                     self._process.kill()
                 except Exception as kill_exc:
                     logger.warning(
-                        "No se pudo matar el proceso de FFmpeg: %s", kill_exc
+                        "No se pudo matar el proceso de FFmpeg (%s)",
+                        type(kill_exc).__name__,
                     )
 
     def run(self):
         ffmpeg_bin = VideoBurnerService.get_ffmpeg_path()
+        if not self.video_path or not os.path.isfile(self.video_path):
+            logger.error("El archivo de vídeo no existe")
+            self.failed.emit("El archivo de vídeo no existe")
+            return
+        if paths_refer_to_same_file(self.video_path, self.output_path):
+            logger.error("La salida del burn-in coincide con el vídeo de entrada")
+            self.failed.emit(
+                "El archivo de salida debe ser distinto al vídeo de entrada"
+            )
+            return
         if not ffmpeg_bin:
             logger.error(
                 "No se encontró un binario de FFmpeg funcional; no se puede incrustar subtítulos"
@@ -348,27 +376,26 @@ class BurnInWorker(QThread):
             )
             return
 
-        if not os.path.exists(self.video_path):
-            logger.error("El archivo de vídeo no existe: %s", self.video_path)
-            self.failed.emit(f"El archivo de vídeo no existe:\n{self.video_path}")
+        try:
+            out_dir = os.path.dirname(os.path.abspath(self.output_path))
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
+            duration_ms = VideoBurnerService.get_video_duration_ms(
+                self.video_path, ffmpeg_bin
+            )
+            duration_sec = (
+                (duration_ms / 1000.0) if duration_ms and duration_ms > 0 else None
+            )
+            vw, vh = VideoBurnerService.get_video_dimensions(
+                self.video_path, ffmpeg_bin
+            )
+            temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
+        except Exception as exc:
+            logger.error("No se pudo preparar el burn-in (%s)", type(exc).__name__)
+            self.failed.emit("No se pudo preparar la salida del burn-in")
             return
 
-        # Asegurar directorio de salida
-        out_dir = os.path.dirname(os.path.abspath(self.output_path))
-        if out_dir:
-            os.makedirs(out_dir, exist_ok=True)
-
-        # 1. Obtener duración y dimensiones del vídeo
-        duration_ms = VideoBurnerService.get_video_duration_ms(
-            self.video_path, ffmpeg_bin
-        )
-        duration_sec = (
-            (duration_ms / 1000.0) if duration_ms and duration_ms > 0 else None
-        )
-        vw, vh = VideoBurnerService.get_video_dimensions(self.video_path, ffmpeg_bin)
-
         # 2. Generar archivo ASS en directorio temporal
-        temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
         ass_filename = "subtitles.ass"
         ass_path = os.path.join(temp_dir, ass_filename)
         stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
@@ -429,9 +456,8 @@ class BurnInWorker(QThread):
                                 os.remove(self.output_path)
                             except OSError as exc:
                                 logger.warning(
-                                    "No se pudo eliminar el archivo parcial %s: %s",
-                                    self.output_path,
-                                    exc,
+                                    "No se pudo eliminar el archivo parcial (%s)",
+                                    type(exc).__name__,
                                 )
                         logger.info("Burn-in cancelado por el usuario")
                         self.cancelled.emit()
@@ -450,7 +476,7 @@ class BurnInWorker(QThread):
                             current_time_sec = us / 1000000.0
                         except ValueError as exc:
                             logger.debug(
-                                "Línea de progreso ilegible: %s (%s)", line, exc
+                                "Línea de progreso ilegible (%s)", type(exc).__name__
                             )
                     elif line.startswith("speed="):
                         val = line.split("=")[1].strip()
@@ -496,10 +522,10 @@ class BurnInWorker(QThread):
                         os.remove(self.output_path)
                     except OSError as exc:
                         logger.warning(
-                            "No se pudo eliminar el archivo parcial %s: %s",
-                            self.output_path,
-                            exc,
+                            "No se pudo eliminar el archivo parcial (%s)",
+                            type(exc).__name__,
                         )
+
                 self.cancelled.emit()
                 return
 
@@ -508,31 +534,22 @@ class BurnInWorker(QThread):
                 self.progress_updated.emit(100.0, current_speed_str, "00:00")
                 self.finished_success.emit(self.output_path)
             else:
-                stderr_text = ""
-                if os.path.exists(stderr_log_path):
-                    try:
-                        with open(
-                            stderr_log_path, "r", encoding="utf-8", errors="replace"
-                        ) as ef:
-                            stderr_text = ef.read()
-                    except OSError as exc:
-                        logger.warning(
-                            "No se pudo leer el log de FFmpeg (%s): %s",
-                            stderr_log_path,
-                            exc,
-                        )
                 logger.error(
-                    "FFmpeg terminó con error (código %s)\n%s",
+                    "FFmpeg terminó con error (código %s); detalles técnicos omitidos",
                     self._process.returncode,
-                    stderr_text[-2000:],
                 )
+                try:
+                    if os.path.exists(self.output_path):
+                        os.remove(self.output_path)
+                except OSError:
+                    logger.warning("No se pudo eliminar el vídeo parcial de FFmpeg")
                 self.failed.emit(
-                    f"FFmpeg finalizó con error (código {self._process.returncode}):\n{stderr_text[-600:]}"
+                    f"FFmpeg finalizó con error (código {self._process.returncode})"
                 )
 
         except Exception as e:
-            logger.exception("Excepción al ejecutar FFmpeg")
+            logger.error("Excepción al ejecutar FFmpeg (%s)", type(e).__name__)
             if not self._is_cancelled:
-                self.failed.emit(f"Excepción al ejecutar FFmpeg:\n{str(e)}")
+                self.failed.emit("Excepción al ejecutar FFmpeg")
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)

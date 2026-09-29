@@ -156,7 +156,6 @@ class _CueIndexRule(SubtitleQARule):
                         if isinstance(index, int) and not isinstance(index, bool)
                         else None,
                         "El índice del cue debe ser un entero positivo.",
-                        {"index": index},
                     )
                 )
             elif index in first_by_index:
@@ -364,7 +363,6 @@ class _FormattingRule(SubtitleQARule):
                                 "malformed_formatting_tag",
                                 item.index,
                                 "Las etiquetas HTML del cue no están equilibradas.",
-                                {"tag": tag_name},
                             )
                         )
                         break
@@ -379,7 +377,6 @@ class _FormattingRule(SubtitleQARule):
                             "malformed_formatting_tag",
                             item.index,
                             "El cue contiene etiquetas HTML sin cerrar.",
-                            {"unclosed_tags": stack},
                         )
                     )
 
@@ -399,10 +396,6 @@ class _FormattingRule(SubtitleQARule):
                         "malformed_formatting_tag",
                         item.index,
                         "Las etiquetas de estilo ASS del cue tienen llaves desequilibradas.",
-                        {
-                            "unmatched_open_braces": unmatched_open,
-                            "unmatched_close_braces": unmatched_close,
-                        },
                     )
                 )
             if incomplete_html and not item.text.endswith(">"):
@@ -574,7 +567,6 @@ class SubtitleQA:
                             "invalid_index",
                             cue_number,
                             "El cue SRT no tiene un índice numérico.",
-                            {"index_line": lines[0]},
                         )
                     )
                 else:
@@ -655,7 +647,6 @@ class SubtitleQA:
                             "invalid_timecode",
                             cue_number,
                             "No se pudo interpretar la línea de timecode del archivo.",
-                            {"timecode": time_line},
                         )
                     )
                 continue
@@ -742,7 +733,6 @@ class SubtitleQA:
                         "invalid_format",
                         dialogue_number,
                         "La línea Dialogue de ASS/SSA no tiene los campos esperados.",
-                        {"line": dialogue_line},
                     )
                 )
                 continue
@@ -760,6 +750,5 @@ class SubtitleQA:
                         "invalid_timecode",
                         dialogue_number,
                         "La línea Dialogue de ASS/SSA contiene timecodes inválidos.",
-                        {"line": dialogue_line},
                     )
                 )

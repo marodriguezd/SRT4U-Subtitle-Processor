@@ -85,8 +85,48 @@ def remove_temp(path: Optional[Path]) -> None:
 
 
 def safe_detail(exc: Exception, fallback: str = "error interno") -> str:
-    """Short, non-sensitive error text for HTTP responses."""
-    text = str(exc).strip()
-    if not text or "Traceback" in text:
-        return fallback
-    return text[:300]
+    """Map known errors to short public messages without exception internals."""
+    from ..services.transcription_providers import TranscriptionError
+    from ..services.transcription_whisper import INSTALL_HINT
+    from ..services.translation_providers import (
+        ProviderAuthenticationError,
+        ProviderConfigurationError,
+        ProviderNetworkError,
+        ProviderRateLimitError,
+        ProviderResponseError,
+        ProviderTimeoutError,
+        ProviderUnknownError,
+        TranslationProviderError,
+    )
+
+    if isinstance(exc, TranscriptionError):
+        message = str(exc).strip()
+        if INSTALL_HINT in message:
+            return INSTALL_HINT
+        error_types = {
+            "provider_not_installed",
+            "model_unavailable",
+            "invalid_file",
+            "ffmpeg_unavailable",
+            "unsupported_format",
+            "out_of_memory",
+            "cancelled",
+            "unknown",
+        }
+        error_type = exc.error_type if exc.error_type in error_types else "unknown"
+        return f"error de transcripción ({error_type})"
+    if isinstance(exc, TranslationProviderError):
+        messages = {
+            ProviderAuthenticationError: "el proveedor rechazó la autenticación",
+            ProviderConfigurationError: "configuración del proveedor no válida",
+            ProviderNetworkError: "no se pudo conectar con el proveedor",
+            ProviderRateLimitError: "el proveedor aplicó un límite de solicitudes",
+            ProviderResponseError: "el proveedor devolvió una respuesta no válida",
+            ProviderTimeoutError: "el proveedor agotó el tiempo de espera",
+            ProviderUnknownError: "falló el proveedor de traducción",
+        }
+        for error_class, message in messages.items():
+            if isinstance(exc, error_class):
+                return message
+        return "falló el proveedor de traducción"
+    return fallback

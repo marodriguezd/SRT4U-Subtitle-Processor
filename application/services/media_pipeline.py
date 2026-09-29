@@ -42,6 +42,19 @@ logger = get_logger("pipeline")
 SUBTITLE_EXTENSIONS = {".srt", ".vtt", ".ass", ".ssa", ".txt"}
 EXPORT_FORMATS = ("srt", "vtt")
 
+
+def _same_file_path(first: str, second: str) -> bool:
+    """Compare normalized paths and existing filesystem identities (hard links)."""
+    if os.path.normcase(os.path.realpath(first)) == os.path.normcase(
+        os.path.realpath(second)
+    ):
+        return True
+    try:
+        return os.path.samefile(first, second)
+    except OSError:
+        return False
+
+
 STAGE_TRANSCRIBE = "transcription"
 STAGE_PARSE = "parse"
 STAGE_CLEAN = "cleaning"
@@ -101,9 +114,7 @@ class PipelineConfig:
     def validate(self) -> "PipelineConfig":
         source = self.input_media or ""
         if not source or not os.path.isfile(source):
-            raise PipelineConfigError(
-                f"archivo de entrada no encontrado: {source or '(vacío)'}"
-            )
+            raise PipelineConfigError("archivo de entrada no encontrado o ilegible")
         suffix = os.path.splitext(source)[1].lower()
         if suffix not in MEDIA_EXTENSIONS and suffix not in SUBTITLE_EXTENSIONS:
             raise PipelineConfigError(
@@ -122,8 +133,27 @@ class PipelineConfig:
             raise PipelineConfigError(
                 "target_language es obligatorio cuando la traducción está activada"
             )
-        if self.max_retries is None or self.max_retries < 0:
+        if (
+            isinstance(self.max_retries, bool)
+            or not isinstance(self.max_retries, int)
+            or self.max_retries < 0
+        ):
             raise PipelineConfigError("max_retries debe ser un entero no negativo")
+        if self.transcription_device not in {"auto", "cpu", "cuda"}:
+            raise PipelineConfigError("transcription_device debe ser auto, cpu o cuda")
+        if not (self.transcription_language or "").strip():
+            raise PipelineConfigError("transcription_language no puede estar vacío")
+        if not (self.source_language or "").strip():
+            raise PipelineConfigError("source_language no puede estar vacío")
+        if not (self.provider or "").strip():
+            raise PipelineConfigError("provider no puede estar vacío")
+        if (
+            self.transcription_enabled
+            and is_media
+            and self.transcription_model
+            not in {"tiny", "base", "small", "medium", "large-v3", "turbo"}
+        ):
+            raise PipelineConfigError("modelo de transcripción no soportado")
         if self.burn_in_enabled:
             if not is_media or suffix not in VIDEO_EXTENSIONS:
                 raise PipelineConfigError("el burn-in requiere un vídeo como entrada")
@@ -131,18 +161,37 @@ class PipelineConfig:
                 raise PipelineConfigError(
                     "output_video es obligatorio cuando el burn-in está activado"
                 )
-        if self.output_subtitle:
-            parent = os.path.dirname(os.path.abspath(self.output_subtitle))
-            try:
-                os.makedirs(parent, exist_ok=True)
-            except OSError as exc:
-                raise PipelineConfigError(
-                    f"no se pudo crear el directorio de salida: {exc}"
-                ) from exc
-            if os.path.abspath(self.output_subtitle) == os.path.abspath(source):
-                raise PipelineConfigError(
-                    "la salida no puede sobrescribir el archivo de entrada"
-                )
+        elif self.output_video:
+            raise PipelineConfigError("output_video requiere activar el burn-in")
+
+        if self.output_subtitle is not None and not self.output_subtitle.strip():
+            raise PipelineConfigError("output_subtitle no puede estar vacío")
+
+        subtitle_output = self.output_subtitle
+        if subtitle_output is None:
+            base, _ = os.path.splitext(source)
+            subtitle_output = f"{base}_pipeline.{self.output_format}"
+        if _same_file_path(source, subtitle_output) or (
+            self.output_video and _same_file_path(source, self.output_video)
+        ):
+            raise PipelineConfigError("las salidas no pueden sobrescribir la entrada")
+        if self.output_video and _same_file_path(subtitle_output, self.output_video):
+            raise PipelineConfigError(
+                "las salidas de vídeo y subtítulo deben ser distintas"
+            )
+
+        for output_path, description in (
+            (subtitle_output, "salida"),
+            (self.output_video, "vídeo de salida"),
+        ):
+            if output_path:
+                parent = os.path.dirname(os.path.abspath(output_path))
+                try:
+                    os.makedirs(parent, exist_ok=True)
+                except OSError as exc:
+                    raise PipelineConfigError(
+                        f"no se pudo preparar el directorio de {description}"
+                    ) from exc
         return self
 
     def is_media_input(self) -> bool:
@@ -248,6 +297,14 @@ class MediaPipeline:
         cancel_event: Optional[threading.Event] = None,
     ) -> PipelineResult:
         config.validate()
+        if cancel_event is not None and cancel_event.is_set():
+            return PipelineResult(
+                cancelled=True,
+                output_format=config.output_format,
+                stages=[PipelineStage(name=stage) for stage in STAGE_ORDER],
+            )
+        if config.output_subtitle is None:
+            config.output_subtitle = self._default_output(config)
         result = PipelineResult(output_format=config.output_format)
         started = time.perf_counter()
         items: List[SubtitleItem] = []
@@ -412,11 +469,13 @@ class MediaPipeline:
                 progress_callback=lambda step, payload: emit(STAGE_TRANSCRIBE, payload),
                 cancel_event=cancel_event,
             )
-        except TranscriptionCancelledError as exc:
-            raise PipelineStageError(STAGE_TRANSCRIBE, "cancelled", str(exc)) from exc
+        except TranscriptionCancelledError:
+            raise PipelineStageError(
+                STAGE_TRANSCRIBE, "cancelled", "pipeline cancelada"
+            ) from None
         except TranscriptionError as exc:
             raise PipelineStageError(
-                STAGE_TRANSCRIBE, exc.error_type, str(exc)
+                STAGE_TRANSCRIBE, exc.error_type, exc.error_type
             ) from exc
         result.transcription_result = transcription
         result.media_duration_ms = transcription.duration_ms
@@ -434,8 +493,9 @@ class MediaPipeline:
             parsed = self.subtitle_service.parse_subtitles(content, file_format)
         except (OSError, UnicodeError, ValueError) as exc:
             raise PipelineStageError(
-                STAGE_PARSE, "invalid_file", f"no se pudo leer el subtítulo: {exc}"
+                STAGE_PARSE, "invalid_file", "no se pudo leer el subtítulo"
             ) from exc
+
         if not parsed:
             raise PipelineStageError(
                 STAGE_PARSE, "invalid_file", "el subtítulo no contiene cues"
@@ -520,13 +580,19 @@ class MediaPipeline:
                 parallel=False,
                 progress_callback=_progress,
             )
-        except TranscriptionCancelledError as exc:
-            raise PipelineStageError(STAGE_TRANSLATE, "cancelled", str(exc)) from exc
+        except TranscriptionCancelledError:
+            raise PipelineStageError(
+                STAGE_TRANSLATE, "cancelled", "pipeline cancelada"
+            ) from None
         metrics = worker.last_translation_metrics
         result.translation_metrics = metrics
         failures = worker.last_translation_failures
         result.translation_failures = failures or 0
-        if metrics is not None and not metrics.success:
+        if (
+            metrics is not None
+            and not metrics.success
+            and failures >= metrics.number_of_cues
+        ):
             raise PipelineStageError(
                 STAGE_TRANSLATE,
                 metrics.error_type or "translation_error",
@@ -552,7 +618,7 @@ class MediaPipeline:
             content = self.subtitle_service.format_output(items, config.output_format)
         except (ValueError, TypeError) as exc:
             raise PipelineStageError(
-                STAGE_EXPORT, "export_error", f"no se pudo formatear: {exc}"
+                STAGE_EXPORT, "export_error", "no se pudo formatear el subtítulo"
             ) from exc
         destination = config.output_subtitle or self._default_output(config)
         try:
@@ -562,7 +628,7 @@ class MediaPipeline:
                 f.write(content)
         except OSError as exc:
             raise PipelineStageError(
-                STAGE_EXPORT, "export_error", f"no se pudo escribir: {exc}"
+                STAGE_EXPORT, "export_error", "no se pudo escribir el archivo de salida"
             ) from exc
         result.output_content = content
         result.output_subtitle = destination
@@ -584,13 +650,16 @@ class MediaPipeline:
                 progress_callback=lambda payload: emit(STAGE_BURN, payload),
                 cancel_event=cancel_event,
             )
-        except TranscriptionCancelledError as exc:
-            raise PipelineStageError(STAGE_BURN, "cancelled", str(exc)) from exc
+        except TranscriptionCancelledError:
+            raise PipelineStageError(
+                STAGE_BURN, "cancelled", "pipeline cancelada"
+            ) from None
         except PipelineStageError:
             raise
         except Exception as exc:
+            logger.error("Burn-in fallido (%s)", type(exc).__name__)
             raise PipelineStageError(
-                STAGE_BURN, "burn_in_error", f"burn-in fallido: {exc}"
+                STAGE_BURN, "burn_in_error", "falló la incrustación de subtítulos"
             ) from exc
         result.output_video = output
         return items
@@ -630,19 +699,29 @@ def run_burn_in_sync(
     burner requires PyQt6 (desktop extra): absence surfaces as a clear error.
     """
     try:
-        from .video_burner_service import BurnInOptions, VideoBurnerService
+        from .video_burner_service import (
+            BurnInOptions,
+            VideoBurnerService,
+            paths_refer_to_same_file,
+        )
     except ImportError as exc:
         raise PipelineStageError(
             STAGE_BURN, "burn_in_error", "burn-in requiere el extra desktop (PyQt6)"
         ) from exc
+    if not video_path or not os.path.isfile(video_path):
+        raise PipelineStageError(
+            STAGE_BURN, "burn_in_error", "vídeo de entrada no encontrado"
+        )
+    if paths_refer_to_same_file(video_path, output_path):
+        raise PipelineStageError(
+            STAGE_BURN,
+            "burn_in_error",
+            "el vídeo de salida debe ser distinto al vídeo de entrada",
+        )
     ffmpeg_bin = VideoBurnerService.get_ffmpeg_path()
     if not ffmpeg_bin:
         raise PipelineStageError(
             STAGE_BURN, "ffmpeg_unavailable", "FFmpeg no disponible en el sistema"
-        )
-    if not video_path or not os.path.isfile(video_path):
-        raise PipelineStageError(
-            STAGE_BURN, "burn_in_error", "vídeo de entrada no encontrado"
         )
     if cancel_event is not None and cancel_event.is_set():
         raise TranscriptionCancelledError("pipeline cancelada")
@@ -729,21 +808,16 @@ def run_burn_in_sync(
                     )
         process.wait()
         if process.returncode != 0:
-            stderr_tail = ""
             try:
-                with open(
-                    stderr_log_path, "r", encoding="utf-8", errors="replace"
-                ) as ef:
-                    stderr_tail = ef.read()[-2000:]
+                if os.path.exists(output_path):
+                    os.remove(output_path)
             except OSError:
-                pass
-            logger.error(
-                "FFmpeg falló (código %s): %s", process.returncode, stderr_tail
-            )
+                logger.warning("No se pudo eliminar el vídeo parcial de la pipeline")
+            logger.error("FFmpeg falló (código %s)", process.returncode)
             raise PipelineStageError(
                 STAGE_BURN,
                 "burn_in_error",
-                f"FFmpeg finalizó con código {process.returncode}",
+                "Falló la codificación de vídeo; consulta el registro de la aplicación",
             )
     finally:
         import shutil

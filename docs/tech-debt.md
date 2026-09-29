@@ -11,9 +11,10 @@ cada punto indica por qué no se toca.
 2. **API analyze/qa síncronas en handlers async**: trabajo CPU acotado por el
    tope de 5 MB; sin necesidad demostrada de `to_thread`.
 3. **PyQt6 en `i18n_service` y `video_burner_service`**: import a nivel de
-   módulo. Verificado que CLI/API/servicios/historial/pipeline importan sin
-   Qt (hasta probado con wheel sin PyQt6); burn-in headless usa import
-   perezoso con error claro. Extraerlos rompería i18n reactiva sin beneficio.
+   módulo. CLI de procesamiento subtitle no crea una aplicación Qt, pero no se
+   garantiza que todos los módulos de servicios/API/pipeline importen sin Qt.
+   El burn-in headless importa el burner bajo demanda; en la base el extra
+   desktop está instalado.
 4. **Exit codes CLI**: fallo de ejecución → 1 (`process`, `pipeline`),
    QA no superado → 1, configuración/uso → 2. Intencional y documentado.
 5. **CI ejecuta la suite completa con red**: los runners la tienen; en local
@@ -54,16 +55,17 @@ cada punto indica por qué no se toca.
 - **Reproductor**: el icono play/pause se sincroniza con `playbackState`
   (cubre fin/error); arrastrar volumen sale de mute; reset visual al cargar
   vídeo nuevo.
-- **Flujos de error UI verificados sin cambios**: completado / cancelado /
-  fallo se distinguen; cancelar es silencioso; los fallos muestran diálogos
-  sanitizados; el historial nunca rompe la ejecución.
+- **Errores de UI**: rutas internas y stderr de FFmpeg no se muestran; la
+  información técnica queda en el log. La regresión API de fallos parciales
+  comprueba un fallo entre tres cues y el recuento guardado en historial.
 
 ## Veredictos (comprobado, no se toca)
 
-- Sin imports circulares; el dominio no importa FastAPI/Pydantic; solo UI y
-  burn-in requieren PyQt6.
-- Sin secretos en logs/errores/respuestas (grep + tests que buscan textos y
-  `Traceback` en salidas).
+- Sin imports circulares conocidos; el dominio no importa FastAPI/Pydantic.
+  `i18n_service` y `video_burner_service` requieren PyQt6.
+- Errores normalizados de proveedores protegen credenciales; los errores
+  de subprocess y de escritura no se interpolan en mensajes UI. Pendiente de
+  reejecutar pruebas de seguridad en este entorno.
 - Fallback sin ciclos (cadena acotada a 8, error ante repetición);
   `max_retries` acotado en API (0–10) y no negativo en servicios/CLI.
 - Temporales API siempre eliminados (incluido cancel en cola vía `on_drop`;
@@ -72,6 +74,6 @@ cada punto indica por qué no se toca.
   transcript/audio/vídeo/claves (tests lo afirman para transcription y
   pipeline), GUI/CLI/API aíslan errores con `HistoryError`.
 - OpenAPI con 13 paths; jobs con 404/409 y proyección sin campos internos.
-- Wheel/base importan sin extras opcionales: CLI/API/servicios/historial/
-  pipeline funcionan sin Qt (transcripción y burn-in con import perezoso y
-  error claro).
+- La suite normal incluye pruebas de imports Qt-free limitadas al CLI
+  (analyze/qa) y del hint del extra de transcripción; no se afirma una prueba
+  completa de wheel sin Qt para todos los módulos.

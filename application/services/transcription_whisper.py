@@ -252,7 +252,7 @@ def _normalize_error(exc: Exception, model: str) -> TranscriptionError:
             f"(soportados: {', '.join(WHISPER_MODELS)}); "
             "revisa tu conexión la primera vez, el modelo se descarga una vez"
         )
-    logger.warning("Whisper falló (%s): %s", type(exc).__name__, message[:200])
+    logger.warning("Whisper falló (%s)", type(exc).__name__)
     return TranscriptionUnknownError(
         f"whisper: error inesperado ({type(exc).__name__})"
     )

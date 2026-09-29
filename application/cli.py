@@ -29,7 +29,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="srt4u",
         description="Procesa y analiza subtítulos sin iniciar la interfaz de escritorio.",
     )
-    parser.add_argument("--version", action="version", version="SRT4U 1.4.9")
+    parser.add_argument("--version", action="version", version="1.4.9")
     subparsers = parser.add_subparsers(dest="command", required=True)
     process = subparsers.add_parser(
         "process", help="limpia, traduce o convierte uno o varios archivos"
@@ -385,7 +385,9 @@ def _load_pipeline(config_path: Optional[str]) -> Dict[str, Any]:
         with open(config_path, "r", encoding="utf-8") as config_file:
             document = json.load(config_file)
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"no se pudo leer el preset JSON: {exc}") from exc
+        raise ValueError(
+            f"no se pudo leer el preset JSON ({type(exc).__name__})"
+        ) from exc
     if not isinstance(document, dict):
         raise ValueError("el preset debe ser un objeto JSON")
     pipeline = document.get("pipeline", document)
@@ -453,6 +455,15 @@ def _resolve_options(
     ):
         parser.error("'target_language' debe ser un código de idioma")
     return options
+
+
+def _paths_refer_to_same_file(first: Path, second: Path) -> bool:
+    if first.resolve() == second.resolve():
+        return True
+    try:
+        return first.samefile(second)
+    except OSError:
+        return False
 
 
 def _collect_inputs(
@@ -533,7 +544,9 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         sources, relative_paths = _collect_inputs(args.input, output_directory)
     except ValueError as exc:
         parser.error(str(exc))
-    if output_file and output_file == sources[0]:
+    if output_file and any(
+        _paths_refer_to_same_file(output_file, source) for source in sources
+    ):
         parser.error("el archivo de salida no puede sobrescribir el archivo de entrada")
     if batch_mode:
         if output_directory.exists() and not output_directory.is_dir():
@@ -544,10 +557,17 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
             destination = output_directory / relative_paths[source]
             if options.get("target_format") or source.suffix.lower() == ".ssa":
                 destination = destination.with_suffix(f".{selected_format}")
-            if destination.resolve() == source:
+            if any(
+                _paths_refer_to_same_file(destination, source_file)
+                for source_file in sources
+            ):
                 parser.error("la salida no puede sobrescribir un archivo de entrada")
             batch_destinations.append(destination.resolve())
-        if len(batch_destinations) != len(set(batch_destinations)):
+        if len(batch_destinations) != len(set(batch_destinations)) or any(
+            _paths_refer_to_same_file(first, second)
+            for index, first in enumerate(batch_destinations)
+            for second in batch_destinations[index + 1 :]
+        ):
             parser.error("varios archivos producirían la misma ruta de salida")
 
     service = SubtitleService()
@@ -621,7 +641,10 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
                 )
         except Exception as exc:
             failed += 1
-            print(f"ERROR {source}: {exc}", file=sys.stderr)
+            print(
+                f"ERROR: no se pudo procesar el archivo ({type(exc).__name__})",
+                file=sys.stderr,
+            )
             if not args.no_history:
                 record_safely(
                     "process",
@@ -723,13 +746,19 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         else:
             analytics, qa_report = service.analyze_file(str(source))
     except FileNotFoundError:
+        print("ERROR: archivo de subtítulos no encontrado", file=sys.stderr)
+        return 2
+    except (OSError, UnicodeError, ValueError) as exc:
         print(
-            f"ERROR: no se pudo analizar '{source}': archivo no encontrado",
+            f"ERROR: no se pudo analizar el archivo ({type(exc).__name__})",
             file=sys.stderr,
         )
         return 2
-    except (OSError, UnicodeError, ValueError) as exc:
-        print(f"ERROR: no se pudo analizar '{source}': {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(
+            f"ERROR: no se pudo analizar el archivo ({type(exc).__name__})",
+            file=sys.stderr,
+        )
         return 2
     payload = (
         qa_report.to_dict()
@@ -769,7 +798,10 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(rendered, encoding="utf-8", newline="")
         except OSError as exc:
-            print(f"ERROR: no se pudo guardar el informe: {exc}", file=sys.stderr)
+            print(
+                f"ERROR: no se pudo guardar el informe ({type(exc).__name__})",
+                file=sys.stderr,
+            )
             return 2
         if not args.json:
             print(f"Informe guardado: {output_path}")
@@ -837,7 +869,10 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(rendered, encoding="utf-8", newline="")
         except OSError as exc:
-            print(f"ERROR: no se pudo guardar el informe: {exc}", file=sys.stderr)
+            print(
+                f"ERROR: no se pudo guardar el informe ({type(exc).__name__})",
+                file=sys.stderr,
+            )
             return 2
         print(f"Informe guardado: {output_path}")
     else:
@@ -848,7 +883,10 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             csv_path.parent.mkdir(parents=True, exist_ok=True)
             csv_path.write_text(report.to_csv(), encoding="utf-8", newline="")
         except OSError as exc:
-            print(f"ERROR: no se pudo guardar el CSV: {exc}", file=sys.stderr)
+            print(
+                f"ERROR: no se pudo guardar el CSV ({type(exc).__name__})",
+                file=sys.stderr,
+            )
             return 2
         print(f"CSV guardado: {csv_path}")
     failed = sum(1 for run in report.runs if not run.success)
@@ -869,7 +907,10 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
                 file=sys.stderr,
             )
         except HistoryError as exc:
-            print(f"AVISO: no se pudo guardar el benchmark: {exc}", file=sys.stderr)
+            print(
+                f"AVISO: no se pudo guardar el benchmark ({type(exc).__name__})",
+                file=sys.stderr,
+            )
     return 0
 
 
@@ -907,7 +948,10 @@ def _run_history(args: argparse.Namespace, parser: argparse.ArgumentParser) -> i
                 only_fallbacks=args.fallback_only,
             )
     except HistoryError as exc:
-        print(f"ERROR: no se pudo leer el historial: {exc}", file=sys.stderr)
+        print(
+            f"ERROR: no se pudo leer el historial ({type(exc).__name__})",
+            file=sys.stderr,
+        )
         return 2
     if args.json:
         sys.stdout.write(
@@ -939,7 +983,14 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     try:
         service.check_available("whisper")
     except TranscriptionError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        from .services.transcription_whisper import INSTALL_HINT
+
+        message = (
+            INSTALL_HINT
+            if INSTALL_HINT in str(exc)
+            else f"provider de transcripción no disponible ({exc.error_type})"
+        )
+        print(f"ERROR: {message}", file=sys.stderr)
         return 2
     size, description = WHISPER_MODELS.get(args.model, ("?", ""))
     print(
@@ -964,7 +1015,9 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
             progress_callback=_progress,
         )
     except TranscriptionError as exc:
-        print(f"ERROR: no se pudo transcribir '{source}': {exc}", file=sys.stderr)
+        print(
+            f"ERROR: no se pudo transcribir ({exc.error_type})", file=sys.stderr
+        )
         if not args.no_history:
             record_safely(
                 "transcription",
@@ -982,7 +1035,10 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     try:
         content = service.render(result, args.target_format)
     except TranscriptionError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        print(
+            f"ERROR: no se pudieron generar los subtítulos ({exc.error_type})",
+            file=sys.stderr,
+        )
         return 2
     if args.output:
         destination = Path(args.output).expanduser()
@@ -994,7 +1050,10 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(content, encoding="utf-8", newline="")
     except OSError as exc:
-        print(f"ERROR: no se pudo guardar: {exc}", file=sys.stderr)
+        print(
+            f"ERROR: no se pudo guardar la transcripción ({type(exc).__name__})",
+            file=sys.stderr,
+        )
         return 2
     metrics = result.metrics
     print(
@@ -1016,7 +1075,10 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
                     file_format=args.target_format,
                 )
         except Exception as exc:
-            print(f"AVISO: no se pudo registrar el historial: {exc}", file=sys.stderr)
+            print(
+                f"AVISO: no se pudo registrar el historial ({type(exc).__name__})",
+                file=sys.stderr,
+            )
     return 0
 
 
@@ -1069,7 +1131,14 @@ def _run_pipeline(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
             if count:
                 print(f"... transcripción: {count} segmentos", file=sys.stderr)
 
-    result = MediaPipeline().run(config, progress_callback=_progress)
+    try:
+        result = MediaPipeline().run(config, progress_callback=_progress)
+    except Exception as exc:
+        print(
+            f"ERROR: no se pudo completar la pipeline ({type(exc).__name__})",
+            file=sys.stderr,
+        )
+        return 1
     if not args.no_history:
         record_pipeline_result(result, config, args.db)
     if args.stats_json:
