@@ -312,7 +312,7 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller pillow
 
-      - name: Download Static Universal FFmpeg (macOS)
+      - name: Download Static FFmpeg (macOS)
         run: |
           curl -sL "https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_VERSION}/ffmpeg-darwin-arm64.gz" | gzip -d > ffmpeg-arm64
           curl -sL "https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_VERSION}/ffmpeg-darwin-x64.gz" | gzip -d > ffmpeg-x64

@@ -296,7 +296,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         events = []
         for item in processed_items:
-            clean_text = item.text or ""
+            # 1) Escape de las llaves del TEXTO DEL USUARIO, antes de generar
+            #    ningún tag. En ASS una llave abre un bloque de override, así que
+            #    un subtítulo que contenga `{b1}` o `{\p1}m 0 0 l 9 9{\p0}` cambiaría
+            #    el render (negrita, cursiva, posición, dibujo) sin que la aplicación
+            #    lo haya generado. `\{` y `\}` se dibujan literalmente (verificado
+            #    contra libass) y no abren bloque de override.
+            #    El orden importa: este escape se aplica ANTES de traducir el
+            #    marcado <i>/<b>/<u>, de modo que los tags legítimos que genera
+            #    SRT4U sigan siendo overrides reales, y ANTES de convertir los
+            #    saltos de línea reales en `\N`.
+            clean_text = (item.text or "").replace("{", r"\{").replace("}", r"\}")
+            # 2) Tags ASS legítimos, derivados del marcado del propio subtítulo.
             clean_text = clean_text.replace("<i>", r"{\i1}").replace("</i>", r"{\i0}")
             clean_text = clean_text.replace("<b>", r"{\b1}").replace("</b>", r"{\b0}")
             clean_text = clean_text.replace("<u>", r"{\u1}").replace("</u>", r"{\u0}")

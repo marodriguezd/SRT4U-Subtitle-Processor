@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.9] - 2026-09-28 (working tree, sin publicar)
 
+Cierre de la auditoría integral (pre-release cleanup, sin funcionalidades nuevas):
+
+- **ASS: escape de llaves del texto de usuario.** En `generate_ass_script` las
+  llaves `{`/`}` del texto del subtítulo se escapan (`\{`, `\}`) ANTES de generar
+  los tags legítimos de `<i>`/`<b>`/`<u>` y de convertir saltos de línea en `\N`.
+  Antes, un subtítulo con `{\b1}`/`{\p1}m ...{\p0}` introducía bloques de override
+  ASS no generados por la aplicación (negrita, cursiva, posición, dibujo) en el
+  vídeo quemado. Verificado empíricamente contra libass: `\{` se dibuja
+  literal y no abre bloque de override; los tags que la aplicación sí genera y el
+  `\N` siguen funcionando. Cubierto por dos tests nuevos en
+  `tests/test_video_burner.py`.
+- **Documentación de macOS corregida.** `RELEASE_NOTES.md` afirmaba
+  "Universal (ARM64 / x86_64)" con "embedded universal FFmpeg". El artefacto
+  real —verificado inspeccionando el `.app` del build de CI— es **arm64-only**
+  (runner `macos-14-arm64`; `SRT4U.app/Contents/MacOS/SRT4U` y
+  `Contents/Frameworks/ffmpeg` son Mach-O thin arm64, sin slice x86_64). La
+  tabla y la nota de instalación describen ahora el artefacto real y avisan de
+  que no arranca en Macs Intel. No se cambia el workflow en esta ronda.
+- **`RELEASE_NOTES.md` deja de ser el cuerpo de la v1.1.0.** Seguía titulado
+  "What's New in 1.1.0" pese a ser el `body_path` del job `release`: una futura
+  tag publicaría notas obsoletas. Reescrito con el estado real de 1.4.9, marcado
+  explícitamente como preparado y no publicado, y sin presentar 1.4.9 como
+  existente.
+- **`build_exe.bat` alineado con el build de Windows de CI.** El script local no
+  empaquetaba `LICENSE` ni FFmpeg, de modo que su `.exe` no era equivalente al
+  publicado pese a que las notas lo describen como autocontenido. Ahora usa los
+  mismos cuatro `--add-data`/`--add-binary`, exige `bin\ffmpeg.exe` con un error
+  claro si falta, y documenta la variante BASE (sin extras) y cómo obtener
+  FFmpeg. Sin descargas automáticas.
+
 Versión consolidada del estado actual del desarrollo en la rama `optimizaciones`:
 incluye todo lo documentado abajo como `[Unreleased]` (fases 1–11) más la
 auditoría integral de coherencia (fase 12: catálogo i18n completo para las
@@ -118,7 +148,7 @@ móviles. `contents: write` queda limitado al job `release`.
 - **Hardsub / Burn-in Video Export**: Subtitle burn-in rendering directly to video via embedded static FFmpeg, supporting customizable fonts, outline, shadow, box backdrops, and proportional font scaling (`PlayResX`/`PlayResY`).
 - **Multi-language Support (i18n)**: Native UI localizations for English, Spanish, German, Italian, Portuguese, and Simplified Chinese with automatic system locale detection.
 - **Multi-format Conversion**: Seamless conversion and parsing between SRT, VTT, ASS, and plain TXT subtitle transcripts.
-- **Automated CI/CD Multiplatform Packaging**: GitHub Actions release pipeline for standalone Windows x64 executable, Linux x86_64 AppImage & tarball, and macOS universal DMG.
+- **Automated CI/CD Multiplatform Packaging**: GitHub Actions release pipeline for standalone Windows x64 executable, Linux x86_64 AppImage & tarball, and macOS arm64 DMG.
 
 ### Fixed
 - Proportional subtitle sizing during video burn-in across arbitrary video resolutions via ASS header scaling.
