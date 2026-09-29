@@ -93,7 +93,7 @@ def test_cli_qa_reports_missing_file_with_exit_code_two(tmp_path):
     result = run_cli("qa", tmp_path / "no-such-file.srt", "--json")
     assert result.returncode == 2
     assert result.stdout == ""
-    assert "archivo no encontrado" in result.stderr
+    assert "archivo de subtítulos no encontrado" in result.stderr
 
 
 def test_cli_qa_strict_passes_without_warnings_or_errors(tmp_path):
@@ -183,7 +183,7 @@ def test_cli_reports_missing_file_cleanly():
 
     assert result.returncode == 2
     assert result.stdout == ""
-    assert "no se pudo analizar" in result.stderr
+    assert "archivo de subtítulos no encontrado" in result.stderr
 
 
 def test_cli_rejects_invalid_export_format():

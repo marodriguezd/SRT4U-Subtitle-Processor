@@ -34,6 +34,17 @@ def test_player_icon_only_controls_are_named(qapp):
     assert player.play_btn.accessibleName() == t("preview.play_tooltip")
 
 
+def test_player_controls_are_named_before_any_language_change(qapp):
+    """Los controles se nombran al construirse, no solo tras `retranslate()`."""
+    from application.services.i18n_service import t
+    from application.ui.widgets import VideoPreviewPlayer
+
+    player = VideoPreviewPlayer()
+    assert player.btn_load_video.accessibleName() == t("preview.btn_load_video")
+    assert player.time_slider.accessibleName() == t("preview.seek_tooltip")
+    assert player.vol_slider.accessibleName() == t("preview.volume_tooltip")
+
+
 def test_ui_components(qapp):
     toggle = ModernToggle(checked=False)
     assert not toggle.isChecked()

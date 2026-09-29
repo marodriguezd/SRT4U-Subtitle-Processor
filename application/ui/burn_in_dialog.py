@@ -4,7 +4,6 @@ de subtítulos en vídeo (Burn-In / Hardsub) con diseño Glassmorphism.
 """
 
 import os
-from pathlib import Path
 from typing import List
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtWidgets import (

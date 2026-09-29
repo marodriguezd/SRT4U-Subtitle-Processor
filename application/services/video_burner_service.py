@@ -148,9 +148,7 @@ class VideoBurnerService:
                 video_path,
             )
         except Exception as exc:
-            logger.warning(
-                "No se pudo obtener la duración (%s)", type(exc).__name__
-            )
+            logger.warning("No se pudo obtener la duración (%s)", type(exc).__name__)
 
         return None
 

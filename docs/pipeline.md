@@ -124,5 +124,5 @@ srt4u pipeline charla.mp4 --model small --language auto --clean --qa \
 ## Límites
 
 Sin diarización, hablantes, streaming, resumen, embeddings, nube ni auth.
-La traducción cancela entre etapas (no a mitad de cue). Los jobs en memoria
-se pierden al reiniciar.
+La traducción cancela al terminar el cue en curso (se comprueba tras cada cue,
+no a mitad de uno). Los jobs en memoria se pierden al reiniciar.

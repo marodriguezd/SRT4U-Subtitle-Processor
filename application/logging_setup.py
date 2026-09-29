@@ -151,9 +151,7 @@ def setup_logging(
         logger.addHandler(file_handler)
     except OSError as exc:
         # No poder escribir el log nunca debe impedir que la app arranque
-        logger.warning(
-            "No se pudo abrir el archivo de log (%s)", type(exc).__name__
-        )
+        logger.warning("No se pudo abrir el archivo de log (%s)", type(exc).__name__)
 
     _configured_path = log_path
     return log_path

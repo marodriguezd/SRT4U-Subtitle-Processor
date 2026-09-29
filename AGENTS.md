@@ -91,8 +91,9 @@ without it and transcription reports the optional-extra install hint.
 - `application/ui/` — `main_window.py` (11 pages), widgets, styles, i18n
   consumers, burn-in dialog; no business logic.
 - `tests/` — full suite + fixtures (never write into `tests/fixtures/`).
-- `docs/` — product docs (`cli/api/transcription/pipeline/database/
-  providers/benchmarking/tech-debt`). Product documentation: do NOT move.
+- `docs/` — product docs (`cli/api/analytics/qa/transcription/pipeline/
+  database/providers/benchmarking/benchmark_analysis/tech-debt`). Product
+  documentation: do NOT move.
 - `analysis/`, `notebooks/` — benchmark analysis (stdlib core; pandas/
   matplotlib only as optional analysis-env bridges).
 - `tools/regenerate_screenshots.py` — offscreen screenshot gallery + CI smoke.

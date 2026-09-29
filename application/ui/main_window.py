@@ -120,7 +120,7 @@ class ProcessWorker(QThread):
                 progress_callback=callback,
             )
             self.completed.emit(result)
-        except Exception as e:
+        except Exception:
             logger.exception("Fallo al procesar el subtítulo")
             self.failed.emit("Error interno al procesar")
 
@@ -174,7 +174,7 @@ class TranscribeWorker(QThread):
         except TranscriptionError as e:
             logger.warning("Fallo de transcripción (%s)", e.error_type)
             self.failed.emit(e.error_type)
-        except Exception as e:
+        except Exception:
             logger.exception("Fallo inesperado al transcribir el medio")
             self.failed.emit("error interno")
 
@@ -211,7 +211,7 @@ class PipelineWorker(QThread):
         except PipelineConfigError as e:
             logger.warning("Configuración de pipeline no válida (%s)", type(e).__name__)
             self.failed.emit("configuración no válida")
-        except Exception as e:
+        except Exception:
             logger.exception("Fallo inesperado en la pipeline")
             self.failed.emit("error interno")
 
@@ -233,7 +233,6 @@ class MainWindow(QMainWindow):
         )
 
         self.current_subtitle_path: Optional[str] = None
-        self.current_video_path: Optional[str] = None
         self.current_media_path: Optional[str] = None
         self.transcribe_cancelled = False
         self.pipeline_input_path: Optional[str] = None
@@ -1211,7 +1210,7 @@ class MainWindow(QMainWindow):
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(content)
             self.saved_output_path = out_path
-        except Exception as e:
+        except Exception:
             logger.exception("No se pudo guardar la transcripción")
             ThemedMessageBox.critical(
                 self,
@@ -1498,7 +1497,6 @@ class MainWindow(QMainWindow):
         self.pipeline_worker.step_updated.connect(self._on_pipeline_step)
         self.pipeline_worker.completed.connect(self._on_pipeline_completed)
         self.pipeline_worker.failed.connect(self._on_pipeline_failed)
-        self.pipeline_start_time = time.time()
         self.pipeline_worker.start()
 
     def _cancel_pipeline(self):
@@ -1573,9 +1571,7 @@ class MainWindow(QMainWindow):
                 self.pipeline_worker.config,
             )
         except Exception as exc:
-            logger.warning(
-                "No se pudo registrar la pipeline (%s)", type(exc).__name__
-            )
+            logger.warning("No se pudo registrar la pipeline (%s)", type(exc).__name__)
 
     def _on_pipeline_failed(self, error_msg: str):
         logger.error("Pipeline fallida")
@@ -1928,8 +1924,9 @@ class MainWindow(QMainWindow):
 
     # ------------------ ACCIONES Y FLUJO ------------------
     def _on_file_selected(self, subtitle_path: str, video_path: str):
+        # El DropZone ya guarda su propio `current_video_path`; MainWindow solo
+        # necesita el subtítulo (el vídeo vive en `self.video_player`).
         self.current_subtitle_path = subtitle_path
-        self.current_video_path = video_path
 
         if video_path and os.path.exists(video_path):
             self.video_player.load_video(video_path)
@@ -2023,7 +2020,7 @@ class MainWindow(QMainWindow):
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(result.output_content)
             self.saved_output_path = out_path
-        except Exception as e:
+        except Exception:
             logger.exception("No se pudo guardar el resultado procesado")
             ThemedMessageBox.critical(
                 self,
@@ -2144,7 +2141,7 @@ class MainWindow(QMainWindow):
                 t("alert.conv_success_title"),
                 t("alert.conv_success_desc", path=out_path),
             )
-        except Exception as e:
+        except Exception:
             logger.exception("Falló la conversión del archivo")
             ThemedMessageBox.critical(
                 self,
@@ -2269,7 +2266,7 @@ class MainWindow(QMainWindow):
                 matching_vid = self.drop_zone._find_matching_video(path)
                 if matching_vid:
                     self.video_player.load_video(matching_vid)
-            except Exception as e:
+            except Exception:
                 logger.exception("No se pudo cargar el archivo de subtítulos")
                 ThemedMessageBox.critical(
                     self,
@@ -2350,14 +2347,12 @@ class MainWindow(QMainWindow):
                     target_language=target_lang,
                     engine=engine,
                 )
-            except Exception as e:
+            except Exception:
                 logger.exception("Fallo al procesar el archivo del lote")
                 self.batch_table.setItem(
                     row,
                     3,
-                    QTableWidgetItem(
-                        t("batch.status_error", err="error interno")
-                    ),
+                    QTableWidgetItem(t("batch.status_error", err="error interno")),
                 )
 
         ThemedMessageBox.information(

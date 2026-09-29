@@ -909,6 +909,10 @@ class VideoPreviewPlayer(QFrame):
 
         self.btn_load_video = QPushButton(t("preview.btn_load_video"))
         self.btn_load_video.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Nombre accesible desde la construcción: `retranslate()` no se llama en
+        # __init__, así que esperarlo dejaba el control sin nombrar hasta que
+        # el usuario cambiara de idioma.
+        self.btn_load_video.setAccessibleName(t("preview.btn_load_video"))
         self.btn_load_video.setStyleSheet("""
             QPushButton {
                 background: rgba(255, 255, 255, 0.08);

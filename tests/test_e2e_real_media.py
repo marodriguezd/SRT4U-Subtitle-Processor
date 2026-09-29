@@ -500,6 +500,26 @@ def test_13_preview_player_shows_the_real_subtitles(qapp):
         items = service.parse_subtitles(handle.read(), "srt")
 
     player = VideoPreviewPlayer()
+    player.show()
+
+    loop = QEventLoop()
+    player.player.mediaStatusChanged.connect(
+        lambda status: (
+            loop.quit()
+            if status
+            in (
+                QMediaPlayer.MediaStatus.LoadedMedia,
+                QMediaPlayer.MediaStatus.InvalidMedia,
+            )
+            else None
+        )
+    )
+    player.load_video(VIDEO_PATH)
+    QTimer.singleShot(20_000, loop.quit)
+    loop.exec()
+    qapp.processEvents()
+    assert player.player.mediaStatus() == QMediaPlayer.MediaStatus.LoadedMedia
+
     player.set_subtitles(items)
     player.seek_to_ms(1000)
     qapp.processEvents()
@@ -529,7 +549,6 @@ def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     win._switch_page(0)
     win._on_file_selected(source, VIDEO_PATH)
     assert win.current_subtitle_path == source
-    assert win.current_video_path == VIDEO_PATH
 
     # El vídeo real se carga en el reproductor de la vista previa
     loop = QEventLoop()

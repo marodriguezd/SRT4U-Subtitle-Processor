@@ -358,7 +358,9 @@ def test_translation_failure_binds_stage(fakes, media_file, tmp_path):
     assert result.errors[0]["error_type"] == "invalid_response"
 
 
-def test_partial_translation_failure_keeps_original_cue_and_exports(fakes, media_file, tmp_path):
+def test_partial_translation_failure_keeps_original_cue_and_exports(
+    fakes, media_file, tmp_path
+):
     output = tmp_path / "partial.srt"
     config = PipelineConfig(
         input_media=media_file,
@@ -442,9 +444,13 @@ def test_burn_in_uses_runner(fakes, media_file, tmp_path):
     assert open(video_out, encoding="utf-8").read() == "fakevideo"
 
 
-def test_pipeline_rejects_output_paths_that_overwrite_inputs(tmp_path, media_file, srt_file):
+def test_pipeline_rejects_output_paths_that_overwrite_inputs(
+    tmp_path, media_file, srt_file
+):
     with pytest.raises(PipelineConfigError, match="sobrescribir"):
-        PipelineConfig(input_media=media_file, output_video=media_file).validate()
+        PipelineConfig(
+            input_media=media_file, burn_in_enabled=True, output_video=media_file
+        ).validate()
     hardlink = tmp_path / "hardlink.mp4"
     try:
         os.link(media_file, hardlink)
@@ -452,12 +458,9 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(tmp_path, media_fil
         pytest.skip(f"hard links are unavailable: {exc}")
     with pytest.raises(PipelineConfigError, match="sobrescribir"):
         PipelineConfig(input_media=media_file, output_subtitle=str(hardlink)).validate()
-    with pytest.raises(PipelineConfigError, match="sobrescribir"):
-        PipelineConfig(
-            input_media=media_file,
-            burn_in_enabled=True,
-            output_video=media_file,
-        ).validate()
+    # output_video sin burn-in se rechaza antes, con su propio mensaje.
+    with pytest.raises(PipelineConfigError, match="requiere activar el burn-in"):
+        PipelineConfig(input_media=media_file, output_video=media_file).validate()
     with pytest.raises(PipelineConfigError, match="distintas"):
         PipelineConfig(
             input_media=media_file,
@@ -477,9 +480,12 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(tmp_path, media_fil
     with pytest.raises(PipelineConfigError, match="sobrescribir"):
         PipelineConfig(input_media=srt_file, output_subtitle=str(symlink)).validate()
 
+    # La salida por defecto (`in_pipeline.srt`) no colisiona con la entrada:
+    # la ejecución correcta deja el SRT de origen intacto.
     config = PipelineConfig(input_media=srt_file)
-    with pytest.raises(PipelineConfigError, match="sobrescribir"):
-        MediaPipeline().run(config)
+    default_result = MediaPipeline().run(config)
+    assert default_result.success
+    assert default_result.output_subtitle.endswith("_pipeline.srt")
     with open(srt_file, encoding="utf-8") as source:
         assert source.read() == CLEAN_SRT
 

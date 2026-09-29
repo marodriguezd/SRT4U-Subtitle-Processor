@@ -197,7 +197,7 @@ def test_install_contract_base_has_desktop_stack():
     workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
     minimum = re.search(r"PyQt6>=([0-9]+\.[0-9]+\.[0-9]+)", "\n".join(base))
     assert minimum
-    assert f"pip install -r requirements.txt" in workflow
+    assert "pip install -r requirements.txt" in workflow
     assert r"grep -oP 'PyQt6>=\K[0-9]+\.[0-9]+\.[0-9]+' requirements.txt" in workflow
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

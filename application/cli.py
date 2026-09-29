@@ -1015,9 +1015,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
             progress_callback=_progress,
         )
     except TranscriptionError as exc:
-        print(
-            f"ERROR: no se pudo transcribir ({exc.error_type})", file=sys.stderr
-        )
+        print(f"ERROR: no se pudo transcribir ({exc.error_type})", file=sys.stderr)
         if not args.no_history:
             record_safely(
                 "transcription",

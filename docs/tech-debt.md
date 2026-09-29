@@ -34,6 +34,12 @@ cada punto indica por qué no se toca.
     previsualización elegibles, superficies permanentes oscuras, hover
     `#059669`). Sin equivalencia exacta en `Styles`; no se inventan
     constantes de un solo uso.
+13. **FFmpeg en los builds de CI no es reproducible**: Windows y Linux usan la
+    etiqueta móvil `latest` de `yt-dlp/FFmpeg-Builds`; macOS fija `b6.1.1` de
+    `ffmpeg-static`. Las cuatro URLs responden y los artefactos son correctos,
+    así que no hay fallo funcional: solo puede variar la versión de FFmpeg
+    empaquetada entre builds. Fijar un commit/versión exigiría mantenimiento
+    periódico sin problema que lo justifique.
 
 ## Decisiones del hardening final (comprobado, no se toca)
 

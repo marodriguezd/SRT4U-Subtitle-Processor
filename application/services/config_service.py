@@ -80,9 +80,7 @@ class ConfigService:
             return True
         except Exception as exc:
             self.save_error = type(exc).__name__
-            logger.error(
-                "No se pudo guardar la configuración (%s)", type(exc).__name__
-            )
+            logger.error("No se pudo guardar la configuración (%s)", type(exc).__name__)
             return False
 
     def get(self, key: str, default: Any = None) -> Any:

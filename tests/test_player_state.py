@@ -1,5 +1,6 @@
 """Preview-player state tests that do not depend on multimedia codecs."""
 
+import pytest
 from PyQt6.QtCore import QUrl
 from PyQt6.QtMultimedia import QMediaPlayer
 
@@ -40,7 +41,7 @@ def test_player_mute_icon_and_volume_restore_follow_audio_state(qapp):
     player._refresh_media_controls()
 
     player.vol_slider.setValue(35)
-    assert player.audio_output.volume() == 0.35
+    assert player.audio_output.volume() == pytest.approx(0.35, abs=1e-6)
     assert player.btn_mute.toolTip() == t("preview.mute_tooltip")
 
     player._toggle_mute()
@@ -49,5 +50,5 @@ def test_player_mute_icon_and_volume_restore_follow_audio_state(qapp):
 
     player.vol_slider.setValue(60)
     assert not player.audio_output.isMuted()
-    assert player.audio_output.volume() == 0.60
+    assert player.audio_output.volume() == pytest.approx(0.60, abs=1e-6)
     assert player.btn_mute.toolTip() == t("preview.mute_tooltip")

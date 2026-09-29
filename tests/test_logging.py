@@ -196,7 +196,7 @@ def test_translation_exceptions_are_logged(tmp_path, monkeypatch, caplog):
 
     assert translated[0].text == "Hello"
     assert service.last_translation_failures == 1
-    assert "Excepción al traducir el bloque 1" in caplog.text
+    assert "Excepción al traducir el cue 1" in caplog.text
 
 
 def test_main_window_warns_when_translation_fails(qapp, tmp_path, monkeypatch):
