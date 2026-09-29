@@ -16,6 +16,8 @@ from typing import Optional, List, Tuple
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ..logging_setup import get_logger
+from .i18n_service import t
+from . import ass_utils
 from .subtitle_service import SubtitleItem
 
 logger = get_logger("burner")
@@ -278,46 +280,27 @@ class VideoBurnerService:
             outline_color = "&H80000000"  # Caja semitransparente
             back_color = "&H80000000"
 
-        header = f"""[Script Info]
-Title: SRT4U Burn-In Subtitles
-ScriptType: v4.00+
-WrapStyle: 0
-ScaledBorderAndShadow: yes
-YCbCr Matrix: TV.601
-PlayResX: {vw}
-PlayResY: {vh}
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,sans-serif,{fontsize},{primary_color},&H000000FF,{outline_color},{back_color},0,0,0,0,100,100,0,0,{border_style},{outline},{shadow},2,{margin_lr},{margin_lr},{margin_v},1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
+        style_body = (
+            f"sans-serif,{fontsize},{primary_color},&H000000FF,{outline_color},"
+            f"{back_color},0,0,0,0,100,100,0,0,{border_style},{outline},"
+            f"{shadow},2,{margin_lr},{margin_lr},{margin_v},1"
+        )
         events = []
         for item in processed_items:
-            # 1) Escape de las llaves del TEXTO DEL USUARIO, antes de generar
-            #    ningún tag. En ASS una llave abre un bloque de override, así que
-            #    un subtítulo que contenga `{b1}` o `{\p1}m 0 0 l 9 9{\p0}` cambiaría
-            #    el render (negrita, cursiva, posición, dibujo) sin que la aplicación
-            #    lo haya generado. `\{` y `\}` se dibujan literalmente (verificado
-            #    contra libass) y no abren bloque de override.
-            #    El orden importa: este escape se aplica ANTES de traducir el
-            #    marcado <i>/<b>/<u>, de modo que los tags legítimos que genera
-            #    SRT4U sigan siendo overrides reales, y ANTES de convertir los
-            #    saltos de línea reales en `\N`.
-            clean_text = (item.text or "").replace("{", r"\{").replace("}", r"\}")
-            # 2) Tags ASS legítimos, derivados del marcado del propio subtítulo.
-            clean_text = clean_text.replace("<i>", r"{\i1}").replace("</i>", r"{\i0}")
-            clean_text = clean_text.replace("<b>", r"{\b1}").replace("</b>", r"{\b0}")
-            clean_text = clean_text.replace("<u>", r"{\u1}").replace("</u>", r"{\u0}")
-            ass_text = clean_text.replace("\n", r"\N")
-            start = item.get_ass_start()
-            end = item.get_ass_end()
-            style = "Default"
-            events.append(f"Dialogue: 0,{start},{end},{style},,0,0,0,,{ass_text}")
+            # The rendering contract lives in ``ass_utils`` so the ``.ass``
+            # exporter and this burn-in script can never disagree about the
+            # same cue (deep-audit M1). In ASS a brace opens an override block,
+            # so user text containing ``{b1}`` or ``{\p1}m 0 0 l 9 9{\p0}`` would
+            # otherwise change the render without SRT4U generating it.
+            ass_text = ass_utils.to_ass_text(item.text)
+            events.append((item.start_ms, item.end_ms, ass_text))
 
-        return header + "\n".join(events) + "\n"
+        return ass_utils.build_ass_document(
+            events,
+            {ass_utils.DEFAULT_STYLE_NAME: style_body},
+            title="SRT4U Burn-In Subtitles",
+            play_res=(vw, vh),
+        )
 
 
 class BurnInWorker(QThread):
@@ -367,22 +350,17 @@ class BurnInWorker(QThread):
         ffmpeg_bin = VideoBurnerService.get_ffmpeg_path()
         if not self.video_path or not os.path.isfile(self.video_path):
             logger.error("El archivo de vídeo no existe")
-            self.failed.emit("El archivo de vídeo no existe")
+            self.failed.emit(t("burn.error_video_missing"))
             return
         if paths_refer_to_same_file(self.video_path, self.output_path):
             logger.error("La salida del burn-in coincide con el vídeo de entrada")
-            self.failed.emit(
-                "El archivo de salida debe ser distinto al vídeo de entrada"
-            )
+            self.failed.emit(t("burn.error_same_path"))
             return
         if not ffmpeg_bin:
             logger.error(
                 "No se encontró un binario de FFmpeg funcional; no se puede incrustar subtítulos"
             )
-            self.failed.emit(
-                "No se encontró un binario de FFmpeg funcional en el sistema ni en el paquete de la aplicación.\n"
-                "Asegúrate de tener FFmpeg instalado para incrustar subtítulos."
-            )
+            self.failed.emit(t("burn.error_no_ffmpeg"))
             return
 
         try:
@@ -401,7 +379,7 @@ class BurnInWorker(QThread):
             temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
         except Exception as exc:
             logger.error("No se pudo preparar el burn-in (%s)", type(exc).__name__)
-            self.failed.emit("No se pudo preparar la salida del burn-in")
+            self.failed.emit(t("burn.error_prepare"))
             return
 
         # 2. Generar archivo ASS en directorio temporal
@@ -553,12 +531,12 @@ class BurnInWorker(QThread):
                 except OSError:
                     logger.warning("No se pudo eliminar el vídeo parcial de FFmpeg")
                 self.failed.emit(
-                    f"FFmpeg finalizó con error (código {self._process.returncode})"
+                    t("burn.error_ffmpeg_failed", code=self._process.returncode)
                 )
 
         except Exception as e:
             logger.error("Excepción al ejecutar FFmpeg (%s)", type(e).__name__)
             if not self._is_cancelled:
-                self.failed.emit("Excepción al ejecutar FFmpeg")
+                self.failed.emit(t("burn.error_exception"))
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)

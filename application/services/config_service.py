@@ -3,6 +3,7 @@ import os
 from typing import Any, Dict, Optional
 
 from ..logging_setup import get_logger
+from .atomic_write import atomic_write_text
 
 logger = get_logger("config")
 
@@ -67,15 +68,26 @@ class ConfigService:
             )
 
     def save(self) -> bool:
-        """Escribe configuración y claves con permisos restrictivos en POSIX."""
+        """Escribe configuración y claves de forma atómica y restrictiva.
+
+        Deep-audit H4: this used to ``open(path, "w")`` and dump straight into
+        the destination, so any interruption left a truncated JSON file and the
+        next ``load()`` silently reverted the user to defaults, losing every
+        stored API key with nothing but a log line. The content is now written
+        to a sibling temporary file, fsynced, chmod'ed to 0600 *before* the
+        rename, and only then moved into place with ``os.replace()``.
+        """
         try:
             os.makedirs(self.config_dir, exist_ok=True)
             if os.name != "nt":
                 os.chmod(self.config_dir, 0o700)
-            with open(self.config_file, "w", encoding="utf-8") as config_file:
-                json.dump(self.config, config_file, indent=2, ensure_ascii=False)
-            if os.name != "nt":
-                os.chmod(self.config_file, 0o600)
+            payload = json.dumps(self.config, indent=2, ensure_ascii=False)
+            atomic_write_text(
+                self.config_file,
+                payload,
+                encoding="utf-8",
+                permissions=0o600 if os.name != "nt" else None,
+            )
             self.save_error = None
             return True
         except Exception as exc:

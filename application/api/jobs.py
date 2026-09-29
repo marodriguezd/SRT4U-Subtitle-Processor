@@ -16,6 +16,16 @@ from ..logging_setup import get_logger
 
 logger = get_logger("api")
 
+#: Retention defaults (deep-audit M9). Without these, ``_jobs`` grew without
+#: bound and every finished job kept its full result payload alive for the
+#: lifetime of the server.
+DEFAULT_MAX_JOBS = 200
+DEFAULT_TTL_SECONDS = 3600.0
+
+#: States from which a job can never be evicted: it is still doing work, or the
+#: caller has not been told yet.
+_LIVE_STATES = {"queued", "running"}
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -28,12 +38,20 @@ class JobError(Exception):
 class JobManager:
     """Submit callables, poll by id. Thread-safe via a single lock."""
 
-    def __init__(self, max_workers: int = 2):
+    def __init__(
+        self,
+        max_workers: int = 2,
+        *,
+        max_jobs: int = DEFAULT_MAX_JOBS,
+        ttl_seconds: float = DEFAULT_TTL_SECONDS,
+    ):
         self._executor = ThreadPoolExecutor(
             max_workers=max(1, max_workers), thread_name_prefix="srt4u-api-job"
         )
         self._lock = threading.Lock()
         self._jobs: Dict[str, Dict[str, Any]] = {}
+        self._max_jobs = max(1, max_jobs)
+        self._ttl_seconds = max(0.0, float(ttl_seconds))
 
     def submit(
         self,
@@ -70,6 +88,7 @@ class JobManager:
                 if job is not None:
                     job["status"] = "cancelled"
                     job["finished_at"] = _utc_now_iso()
+                    self._prune_locked()
                 drop = on_drop
                 on_drop = None
             else:
@@ -90,6 +109,7 @@ class JobManager:
                     job["status"] = "cancelled" if job["cancel_requested"] else "failed"
                     job["error"] = str(exc) or "error en el job"
                     job["finished_at"] = _utc_now_iso()
+                    self._prune_locked()
             return
         except Exception as exc:  # job boundary: sanitize, never leak traces
             logger.error("Job failed (%s)", type(exc).__name__)
@@ -102,6 +122,7 @@ class JobManager:
                         job["status"] = "failed"
                         job["error"] = "error interno del job"
                     job["finished_at"] = _utc_now_iso()
+                    self._prune_locked()
             return
         with self._lock:
             job = self._jobs.get(job_id)
@@ -112,11 +133,53 @@ class JobManager:
                     job["status"] = "completed"
                     job["result"] = result
                 job["finished_at"] = _utc_now_iso()
+                self._prune_locked()
 
     def get(self, job_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             job = self._jobs.get(job_id)
             return dict(job) if job else None
+
+    def _prune_locked(self) -> None:
+        """Drop finished jobs that are too old or beyond the retention cap.
+
+        Only terminal jobs are ever evicted, and the oldest go first, so a
+        client that polls normally always finds its own job. Callers must hold
+        ``self._lock``.
+        """
+        if not self._jobs:
+            return
+        finished = sorted(
+            (job for job in self._jobs.values() if job["status"] not in _LIVE_STATES),
+            key=lambda job: (job["finished_at"] or job["created_at"], job["job_id"]),
+        )
+        survivors = len(self._jobs) - len(finished)
+        to_drop: List[str] = []
+        for job in finished:
+            over_cap = survivors + len(to_drop) >= self._max_jobs
+            age = self._age_seconds(job)
+            expired = (
+                self._ttl_seconds > 0 and age is not None and age > self._ttl_seconds
+            )
+            if over_cap or expired:
+                to_drop.append(job["job_id"])
+        for job_id in to_drop:
+            self._jobs.pop(job_id, None)
+        if to_drop:
+            logger.debug("Jobs retencionados: %s eliminados", len(to_drop))
+
+    @staticmethod
+    def _age_seconds(job: Dict[str, Any]) -> Optional[float]:
+        stamp = job.get("finished_at") or job.get("created_at")
+        if not stamp:
+            return None
+        try:
+            moment = datetime.fromisoformat(stamp)
+        except (TypeError, ValueError):
+            return None
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - moment).total_seconds()
 
     def list(self, limit: int = 50) -> List[Dict[str, Any]]:
         with self._lock:
@@ -137,6 +200,7 @@ class JobManager:
             if job["status"] == "queued":
                 job["status"] = "cancelled"
                 job["finished_at"] = _utc_now_iso()
+                self._prune_locked()
             return job["status"]
 
     def wait_for(

@@ -23,8 +23,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from ..logging_setup import get_logger
+from .atomic_write import atomic_write_text
 from .config_service import ConfigService
-from .subtitle_service import SubtitleItem, SubtitleService
+from .subtitle_service import SubtitleCancelledError, SubtitleItem, SubtitleService
 from .transcription_models import TranscriptionResult
 from .transcription_providers import (
     TranscriptionCancelledError,
@@ -36,6 +37,7 @@ from .transcription_service import (
     TranscriptionService,
 )
 from .translation_service import TranslationService
+from .transcription_whisper import WHISPER_MODELS
 
 logger = get_logger("pipeline")
 
@@ -150,10 +152,20 @@ class PipelineConfig:
         if (
             self.transcription_enabled
             and is_media
-            and self.transcription_model
-            not in {"tiny", "base", "small", "medium", "large-v3", "turbo"}
+            and self.transcription_model not in WHISPER_MODELS
         ):
-            raise PipelineConfigError("modelo de transcripción no soportado")
+            raise PipelineConfigError(
+                "modelo de transcripción no soportado: "
+                f"{self.transcription_model} (soportados: {', '.join(WHISPER_MODELS)})"
+            )
+        # Deep-audit L8: strict QA with QA disabled *looks* like a gate is
+        # applied while the stage is silently skipped. Reject the incoherent
+        # combination instead of pretending, consistently across CLI/API/GUI.
+        if self.qa_strict and not self.qa_enabled:
+            raise PipelineConfigError(
+                "qa_strict requiere qa_enabled: no se puede exigir QA estricto "
+                "con la etapa de QA desactivada"
+            )
         if self.burn_in_enabled:
             if not is_media or suffix not in VIDEO_EXTENSIONS:
                 raise PipelineConfigError("el burn-in requiere un vídeo como entrada")
@@ -579,8 +591,9 @@ class MediaPipeline:
                 engine=config.provider,
                 parallel=False,
                 progress_callback=_progress,
+                cancel_event=cancel_event,
             )
-        except TranscriptionCancelledError:
+        except (TranscriptionCancelledError, SubtitleCancelledError):
             raise PipelineStageError(
                 STAGE_TRANSLATE, "cancelled", "pipeline cancelada"
             ) from None
@@ -622,10 +635,10 @@ class MediaPipeline:
             ) from exc
         destination = config.output_subtitle or self._default_output(config)
         try:
-            parent = os.path.dirname(os.path.abspath(destination))
-            os.makedirs(parent, exist_ok=True)
-            with open(destination, "w", encoding="utf-8", newline="") as f:
-                f.write(content)
+            # Deep-audit L9: writing straight into the destination destroyed the
+            # previous good file if the write failed part-way. The content is
+            # staged in a sibling temp file and renamed into place instead.
+            atomic_write_text(destination, content, encoding="utf-8")
         except OSError as exc:
             raise PipelineStageError(
                 STAGE_EXPORT, "export_error", "no se pudo escribir el archivo de salida"

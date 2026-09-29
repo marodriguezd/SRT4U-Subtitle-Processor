@@ -333,6 +333,9 @@ def test_cli_process_records_history(tmp_path, monkeypatch, capsys):
     class FakeResult:
         stats = FakeStats()
         output_content = "translated"
+        # ``ProcessingResult`` contract (deep-audit H1/M7): parse issues are
+        # surfaced to the user instead of being dropped silently.
+        parse_issues = []
         translation_metrics = None
         qa_report = None
 

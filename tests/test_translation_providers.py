@@ -115,8 +115,8 @@ def test_google_provider_urllib_response_and_timeout_classification(monkeypatch)
 
     monkeypatch.setattr(providers, "HAS_DEEP_TRANSLATOR", False)
     monkeypatch.setattr(
-        providers.urllib.request,
-        "urlopen",
+        providers,
+        "_open",
         lambda *a, **kw: _response([[["Hola", "Hello", None, None, 1]]]),
     )
     provider = GoogleProvider()
@@ -126,7 +126,7 @@ def test_google_provider_urllib_response_and_timeout_classification(monkeypatch)
     def timeout(*args, **kwargs):
         raise TimeoutError("private detail is not exposed")
 
-    monkeypatch.setattr(providers.urllib.request, "urlopen", timeout)
+    monkeypatch.setattr(providers, "_open", timeout)
     with pytest.raises(ProviderTimeoutError):
         provider.translate("Hello", "auto", "es")
 
@@ -142,7 +142,7 @@ def test_deepl_request_uses_config_without_logging_api_key(monkeypatch, caplog):
         captured["payload"] = json.loads(request.data)
         return _response({"translations": [{"text": "Hola"}]})
 
-    monkeypatch.setattr(providers.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(providers, "_open", fake_urlopen)
     key = "secret-test-key-do-not-log"
     provider = DeepLProvider(MemoryConfig(deepl_api_key=key, deepl_type="pro"))
     assert provider.translate("Hello", "en", "es") == "Hola"
@@ -163,7 +163,7 @@ def test_deepl_requires_key_and_normalizes_auth_and_rate_limit(monkeypatch):
             "https://api-free.deepl.com/v2/translate", 401, "unauthorized", {}, None
         )
 
-    monkeypatch.setattr(providers.urllib.request, "urlopen", auth_error)
+    monkeypatch.setattr(providers, "_open", auth_error)
     with pytest.raises(ProviderAuthenticationError):
         DeepLProvider(MemoryConfig(deepl_api_key="secret")).translate(
             "text", "auto", "es"
@@ -174,7 +174,7 @@ def test_deepl_requires_key_and_normalizes_auth_and_rate_limit(monkeypatch):
             "https://api-free.deepl.com/v2/translate", 429, "limited", {}, None
         )
 
-    monkeypatch.setattr(providers.urllib.request, "urlopen", limited)
+    monkeypatch.setattr(providers, "_open", limited)
     with pytest.raises(ProviderRateLimitError):
         DeepLProvider(MemoryConfig(deepl_api_key="secret")).translate(
             "text", "auto", "es"
@@ -201,7 +201,7 @@ def test_openai_compatible_preserves_prompt_and_reads_reported_usage(monkeypatch
             }
         )
 
-    monkeypatch.setattr(providers.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(providers, "_open", fake_urlopen)
     provider = OpenAICompatibleProvider(
         MemoryConfig(
             openai_base_url="http://localhost:11434/v1/",
@@ -224,9 +224,7 @@ def test_openai_compatible_preserves_prompt_and_reads_reported_usage(monkeypatch
 def test_openai_compatible_bad_response_is_normalized(monkeypatch):
     import application.services.translation_providers as providers
 
-    monkeypatch.setattr(
-        providers.urllib.request, "urlopen", lambda *a, **kw: _response({"choices": []})
-    )
+    monkeypatch.setattr(providers, "_open", lambda *a, **kw: _response({"choices": []}))
     provider = OpenAICompatibleProvider(
         MemoryConfig(openai_base_url="http://localhost:11434/v1", openai_model="llama3")
     )

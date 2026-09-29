@@ -1,5 +1,6 @@
 """Provider contract, normalized errors, registry, and existing translation backends."""
 
+import ipaddress
 import json
 import urllib.error
 import urllib.parse
@@ -12,6 +13,89 @@ from ..logging_setup import get_logger
 from .config_service import ConfigService
 
 logger = get_logger("translation")
+
+#: Host names that are unambiguously this machine.
+_LOCAL_HOSTNAMES = {"localhost", "::1", "0:0:0:0:0:0:0:1"}
+
+
+def is_loopback_host(hostname: Optional[str]) -> bool:
+    """True when ``hostname`` provably refers to this machine.
+
+    Policy (deep-audit M6): only the loopback interface is trusted. The whole
+    ``127.0.0.0/8`` range and the "unspecified" address (``0.0.0.0`` / ``::``,
+    which a client connecting to it reaches locally) qualify; private LAN
+    addresses such as ``192.168.1.50`` deliberately do **not**, because a
+    machine on the LAN is not the local machine and must not silently get the
+    keyless/cleartext exemptions.
+    """
+    if not hostname:
+        return False
+    host = hostname.strip().strip("[]").lower()
+    if host in _LOCAL_HOSTNAMES:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return bool(address.is_loopback or address.is_unspecified)
+
+
+class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Follow redirects, but never across an origin boundary.
+
+    ``urllib``'s stock handler copies every request header — including
+    ``Authorization`` — onto the redirect target, so a 302 from a configured
+    (or hijacked) endpoint exfiltrates the API key to whoever chose the
+    ``Location`` (deep-audit M4). Same-origin redirects are still allowed
+    because self-hosted servers legitimately use them to add a trailing slash
+    or move a path.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _origin(req.full_url) != _origin(newurl):
+            raise urllib.error.HTTPError(
+                req.full_url,
+                code,
+                "redirección entre orígenes rechazada",
+                headers,
+                fp,
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _origin(url: str) -> tuple:
+    parsed = urllib.parse.urlparse(url)
+    return (
+        parsed.scheme.lower(),
+        (parsed.hostname or "").lower(),
+        parsed.port,
+    )
+
+
+def _open(request, timeout: float):
+    """Open ``request`` under the same-origin redirect policy.
+
+    This is the single network seam for every provider, so tests and the
+    redirect policy cannot drift apart.
+
+    ``build_opener`` installs the stock handlers *before* any custom ones and
+    ``OpenerDirector.add_handler`` keeps the first implementation of
+    ``http_error_30x`` it sees, so passing the subclass there is silently
+    ignored. The opener is therefore assembled by hand with our redirect
+    handler in the stock handler's place.
+    """
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.ProxyHandler,
+        urllib.request.HTTPHandler,
+        urllib.request.HTTPDefaultErrorHandler,
+        _SameOriginRedirectHandler,
+        urllib.request.HTTPSHandler,
+        urllib.request.HTTPErrorProcessor,
+    ):
+        opener.add_handler(handler())
+    return opener.open(request, timeout=timeout)
+
 
 try:
     from deep_translator import GoogleTranslator
@@ -150,6 +234,14 @@ class ProviderRegistry:
     def names(cls):
         return tuple(sorted(cls._factories))
 
+    @classmethod
+    def supports(cls, name: str) -> bool:
+        """True when ``name`` (or an alias) resolves to a registered provider."""
+        try:
+            return cls._normalize(name) in cls._factories
+        except ProviderConfigurationError:
+            return False
+
     @staticmethod
     def _normalize(name: str) -> str:
         if not isinstance(name, str) or not name.strip():
@@ -193,7 +285,7 @@ class GoogleProvider(TranslationProvider):
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
+            with _open(request, 10) as response:
                 data = json.loads(response.read().decode("utf-8"))
             if not data or not isinstance(data[0], list):
                 raise ProviderResponseError("Google devolvió una respuesta inesperada")
@@ -259,7 +351,7 @@ class DeepLProvider(TranslationProvider):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=10) as response:
+            with _open(request, 10) as response:
                 data = json.loads(response.read().decode("utf-8"))
             translations = data.get("translations", [])
             translated = translations[0].get("text") if translations else None
@@ -286,7 +378,15 @@ class OpenAICompatibleProvider(TranslationProvider):
         parsed_url = urllib.parse.urlparse(self.base_url)
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
             raise ProviderConfigurationError("la URL base del endpoint no es válida")
-        self._local_endpoint = parsed_url.hostname in {"localhost", "127.0.0.1", "::1"}
+        self._local_endpoint = is_loopback_host(parsed_url.hostname)
+        # Deep-audit M5: cleartext HTTP is only acceptable when the request can
+        # never leave the machine. For anything else the API key would travel
+        # unencrypted, so the configuration is rejected instead of warned about.
+        if parsed_url.scheme == "http" and not self._local_endpoint:
+            raise ProviderConfigurationError(
+                "los endpoints remotos requieren HTTPS; sólo se permite HTTP "
+                "para localhost, 127.0.0.0/8 o ::1"
+            )
 
     def _credentials(self):
         api_key = str(self.config_service.get("openai_api_key", "")).strip()
@@ -330,7 +430,7 @@ class OpenAICompatibleProvider(TranslationProvider):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=15) as response:
+            with _open(request, 15) as response:
                 data = json.loads(response.read().decode("utf-8"))
             choices = data.get("choices", [])
             if not choices:
@@ -372,6 +472,12 @@ def _normalize_error(exc: Exception, provider: str) -> TranslationProviderError:
     ):
         return ProviderTimeoutError(f"{provider}: timeout")
     if isinstance(exc, urllib.error.HTTPError):
+        if exc.code in (301, 302, 303, 307, 308):
+            # A cross-origin redirect is refused on purpose; say so instead of
+            # reporting a meaningless status code.
+            return ProviderResponseError(
+                f"{provider}: redirección rechazada ({exc.reason or exc.code})"
+            )
         if exc.code in (401, 403):
             return ProviderAuthenticationError(
                 f"{provider}: autenticación rechazada (HTTP {exc.code})"

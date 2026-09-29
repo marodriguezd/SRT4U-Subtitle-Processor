@@ -23,7 +23,7 @@ def test_timestamp_conversions():
     assert parse_timestamp_to_ms("01:23:45.678") == ms
     assert ms_to_srt_time(ms) == "01:23:45,678"
     assert ms_to_vtt_time(ms) == "01:23:45.678"
-    assert ms_to_ass_time(ms) == "1:23:45.67"
+    assert ms_to_ass_time(ms) == "1:23:45.68"
 
 
 def test_detect_format_by_extension(service):

@@ -113,6 +113,20 @@ class HistoryError(Exception):
     """Raised for history-store failures; never carries secrets."""
 
 
+def _split_statements(ddl: str):
+    """Split a migration script into individual statements.
+
+    ``executescript`` cannot be used inside an explicit transaction because it
+    issues an implicit COMMIT first; executing the statements one by one keeps
+    the whole migration atomic. All migrations in this module use simple
+    ``;``-terminated statements with no embedded semicolons in string literals.
+    """
+    for chunk in ddl.split(";"):
+        statement = chunk.strip()
+        if statement:
+            yield statement
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -163,19 +177,35 @@ class HistoryStore:
         return int(row[0]) if row else 0
 
     def _migrate(self) -> None:
+        """Apply pending migrations, one transaction per step.
+
+        Deep-audit L11: this used to mix ``executescript`` (which implicitly
+        commits before running) with a surrounding ``with self._conn`` block, so
+        a failure midway could roll ``user_version`` back while leaving the DDL
+        committed — DDL and version out of sync. Each step now runs inside its
+        own explicit transaction and only advances ``user_version`` once that
+        step is durable, so a failure always leaves a consistent state (either
+        fully at N, or fully at N-1 and retried next open).
+        """
         current = self._version()
         if current > SCHEMA_VERSION:
             raise HistoryError(
                 f"history database is newer (v{current}) than supported "
                 f"(v{SCHEMA_VERSION}); refusing to modify it"
             )
-        try:
-            with self._conn:
-                for version in range(current + 1, SCHEMA_VERSION + 1):
-                    self._conn.executescript(_MIGRATIONS[version])
-                    self._conn.execute(f"PRAGMA user_version = {version}")
-        except sqlite3.DatabaseError as exc:
-            raise HistoryError(f"history migration failed: {exc}") from exc
+        for version in range(current + 1, SCHEMA_VERSION + 1):
+            ddl = _MIGRATIONS[version]
+            try:
+                self._conn.execute("BEGIN IMMEDIATE")
+                for statement in _split_statements(ddl):
+                    self._conn.execute(statement)
+                self._conn.execute(f"PRAGMA user_version = {version}")
+                self._conn.commit()
+            except sqlite3.DatabaseError as exc:
+                self._conn.rollback()
+                raise HistoryError(
+                    f"history migration to v{version} failed: {exc}"
+                ) from exc
 
     def close(self) -> None:
         try:
@@ -193,6 +223,14 @@ class HistoryStore:
 
     def record_run(self, operation: str, **fields: Any) -> int:
         """Insert one execution row; returns its id. All values parameterized."""
+        try:
+            with self._conn:
+                return self._insert_run(operation, fields)
+        except sqlite3.DatabaseError as exc:
+            raise HistoryError(f"cannot record run: {exc}") from exc
+
+    def _insert_run(self, operation: str, fields: Dict[str, Any]) -> int:
+        """Insert a run row inside the caller's transaction (no commit here)."""
         if not operation or not isinstance(operation, str):
             raise HistoryError("operation is required")
         values: Dict[str, Any] = {
@@ -217,21 +255,27 @@ class HistoryStore:
             if values.get(flag) is not None:
                 values[flag] = 1 if values[flag] else 0
         columns = [key for key in _RUN_COLUMNS if key in values]
-        try:
-            with self._conn:
-                cursor = self._conn.execute(
-                    f"INSERT INTO runs ({', '.join(columns)}) "
-                    f"VALUES ({', '.join('?' for _ in columns)})",
-                    [values[key] for key in columns],
-                )
-        except sqlite3.DatabaseError as exc:
-            raise HistoryError(f"cannot record run: {exc}") from exc
+        cursor = self._conn.execute(
+            f"INSERT INTO runs ({', '.join(columns)}) "
+            f"VALUES ({', '.join('?' for _ in columns)})",
+            [values[key] for key in columns],
+        )
         return int(cursor.lastrowid)
 
     def record_qa_findings(
         self, run_id: int, findings: List[Any], limit: int = 500
     ) -> int:
         """Persist QA finding metadata (no subtitle texts). One transaction."""
+        try:
+            with self._conn:
+                return self._insert_qa_findings(run_id, findings, limit)
+        except sqlite3.DatabaseError as exc:
+            raise HistoryError(f"cannot record QA findings: {exc}") from exc
+
+    def _insert_qa_findings(
+        self, run_id: int, findings: List[Any], limit: int = 500
+    ) -> int:
+        """Insert findings inside the caller's transaction (no commit here)."""
         rows = []
         for finding in findings[:limit]:
             if isinstance(finding, dict):
@@ -249,16 +293,13 @@ class HistoryStore:
             if isinstance(metadata, (dict, list)):
                 metadata = json.dumps(metadata, ensure_ascii=False, sort_keys=True)
             rows.append((run_id, severity, rule, index, str(message), metadata))
-        try:
-            with self._conn:
-                self._conn.executemany(
-                    "INSERT INTO qa_findings "
-                    "(run_id, severity, rule, subtitle_index, message, metadata) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    rows,
-                )
-        except sqlite3.DatabaseError as exc:
-            raise HistoryError(f"cannot record QA findings: {exc}") from exc
+        if rows:
+            self._conn.executemany(
+                "INSERT INTO qa_findings "
+                "(run_id, severity, rule, subtitle_index, message, metadata) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                rows,
+            )
         return len(rows)
 
     def record_processing_result(
@@ -271,8 +312,22 @@ class HistoryStore:
         source_language: Optional[str] = None,
         target_language: Optional[str] = None,
         engine: Optional[str] = None,
+        success: Optional[bool] = None,
     ) -> int:
-        """Build a run row from a ProcessingResult without importing services."""
+        """Build a run row from a ProcessingResult without importing services.
+
+        Deep-audit L1: the run row and its QA findings are written in **one**
+        transaction, so a failure while storing findings rolls the run back
+        instead of leaving a half-recorded execution.
+
+        Deep-audit L2: ``success`` means the same thing here as it does in
+        ``record_pipeline_result`` — did this execution produce a usable
+        result? It is resolved in this order: the explicit ``success``
+        argument, then ``ProcessingResult.success`` (set by the pipeline-style
+        outcome), then the translation metrics, and only then a successful run.
+        A translation-free ``process`` run is no longer implicitly "successful"
+        just because it had no metrics.
+        """
         stats = getattr(result, "stats", None)
         metrics = getattr(result, "translation_metrics", None)
         qa_report = getattr(result, "qa_report", None)
@@ -295,7 +350,6 @@ class HistoryStore:
                 words_input=getattr(metrics, "words_input", None),
                 words_output=getattr(metrics, "words_output", None),
                 duration_ms=getattr(metrics, "duration_ms", None),
-                success=getattr(metrics, "success", True),
                 error_type=getattr(metrics, "error_type", None),
                 retry_count=getattr(metrics, "retry_count", 0),
                 fallback_used=getattr(metrics, "fallback_used", False),
@@ -305,19 +359,29 @@ class HistoryStore:
                 total_tokens=getattr(metrics, "total_tokens", None),
                 estimated_cost=getattr(metrics, "estimated_cost", None),
             )
+        if success is None:
+            success = getattr(result, "success", None)
+        if success is None and metrics is not None:
+            success = bool(getattr(metrics, "success", True))
+        fields["success"] = True if success is None else bool(success)
         if stats is not None:
             fields["translation_failures"] = getattr(stats, "translation_failures", 0)
+        findings: List[Any] = []
         if qa_report is not None:
-            findings = getattr(qa_report, "findings", []) or []
+            findings = list(getattr(qa_report, "findings", []) or [])
             fields["qa_errors"] = sum(
                 1 for item in findings if _finding_attr(item, "severity") == "error"
             )
             fields["qa_warnings"] = sum(
                 1 for item in findings if _finding_attr(item, "severity") == "warning"
             )
-        run_id = self.record_run(operation, **fields)
-        if qa_report is not None:
-            self.record_qa_findings(run_id, list(getattr(qa_report, "findings", [])))
+        try:
+            with self._conn:
+                run_id = self._insert_run(operation, fields)
+                if qa_report is not None:
+                    self._insert_qa_findings(run_id, findings)
+        except sqlite3.DatabaseError as exc:
+            raise HistoryError(f"cannot record processing result: {exc}") from exc
         return run_id
 
     def record_transcription_result(
@@ -522,6 +586,11 @@ def _finding_attr(item: Any, name: str) -> Any:
     return getattr(item, name, None)
 
 
+def _warn_history_unavailable(exc: Exception) -> None:
+    """Log and swallow any history failure; history never breaks execution."""
+    logger.warning("History unavailable (%s); execution continues", type(exc).__name__)
+
+
 def record_safely(
     operation: str, db_path: Optional[str] = None, **fields: Any
 ) -> Optional[int]:
@@ -529,14 +598,8 @@ def record_safely(
     try:
         with HistoryStore(db_path) as store:
             return store.record_run(operation, **fields)
-    except HistoryError as exc:
-        logger.warning(
-            "History unavailable (%s); execution continues", type(exc).__name__
-        )
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "History unavailable (%s); execution continues", type(exc).__name__
-        )
+    except Exception as exc:
+        _warn_history_unavailable(exc)
     return None
 
 
@@ -547,12 +610,6 @@ def record_result_safely(
     try:
         with HistoryStore(db_path) as store:
             return store.record_processing_result(result, **kwargs)
-    except HistoryError as exc:
-        logger.warning(
-            "History unavailable (%s); execution continues", type(exc).__name__
-        )
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "History unavailable (%s); execution continues", type(exc).__name__
-        )
+    except Exception as exc:
+        _warn_history_unavailable(exc)
     return None

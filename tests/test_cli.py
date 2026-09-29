@@ -159,6 +159,9 @@ def test_cli_stats_is_opt_in_and_preserves_default_output(
     class FakeResult:
         stats = FakeStats()
         output_content = "translated"
+        # ``ProcessingResult`` contract (deep-audit H1/M7): parse issues are
+        # surfaced to the user instead of being dropped silently.
+        parse_issues = []
         translation_metrics = TranslationMetrics.for_text(
             provider="google",
             model=None,
@@ -204,6 +207,9 @@ def test_cli_translation_reuses_service_and_resolves_ollama_alias(
     class FakeResult:
         stats = FakeStats()
         output_content = "translated"
+        # ``ProcessingResult`` contract (deep-audit H1/M7): parse issues are
+        # surfaced to the user instead of being dropped silently.
+        parse_issues = []
 
     class FakeSubtitleService:
         def process_subtitles(self, **kwargs):
@@ -253,6 +259,9 @@ def test_cli_stats_json_emits_structured_metrics(tmp_path, monkeypatch, capsys):
     class FakeResult:
         stats = FakeStats()
         output_content = "translated"
+        # ``ProcessingResult`` contract (deep-audit H1/M7): parse issues are
+        # surfaced to the user instead of being dropped silently.
+        parse_issues = []
         translation_metrics = TranslationMetrics.for_text(
             provider="ollama",
             model="llama3",

@@ -10,6 +10,10 @@ from fastapi import HTTPException, UploadFile
 from ..logging_setup import get_logger
 from ..services.history_store import HistoryError, HistoryStore
 from ..services.subtitle_service import SubtitleService
+from ..services.translation_providers import (
+    ProviderConfigurationError,
+    ProviderRegistry,
+)
 
 logger = get_logger("api")
 
@@ -37,6 +41,32 @@ def validate_extension(filename: Optional[str]) -> str:
             detail=f"formato de entrada no soportado: {suffix or '(sin extensión)'}",
         )
     return suffix
+
+
+def validate_provider(provider: str) -> str:
+    """Reject an unknown translation provider as a configuration error.
+
+    Deep-audit L7: an unvalidated provider was accepted, the job ran, every cue
+    "failed" with the opaque ``unknown`` error type, and the caller still got a
+    completed job. The registry is the single source of truth shared with the
+    CLI and the GUI, so this check cannot drift from what would actually run.
+    Resolving the provider also surfaces a broken endpoint configuration
+    (e.g. a non-HTTPS remote URL) as a 422 instead of a late per-cue failure.
+    """
+    name = (provider or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="provider es obligatorio")
+    try:
+        ProviderRegistry.get(name)
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"provider no soportado: {name} "
+                f"(disponibles: {', '.join(ProviderRegistry.names())})"
+            ),
+        ) from exc
+    return name
 
 
 async def save_upload(

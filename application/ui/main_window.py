@@ -47,7 +47,11 @@ from ..platform_utils import open_path, reveal_path
 from .file_dialogs import ask_open_file, ask_open_files, ask_save_file
 from .message_boxes import ThemedMessageBox
 from ..services.config_service import ConfigService
-from ..services.subtitle_service import SubtitleService, ProcessingResult
+from ..services.subtitle_service import (
+    SubtitleCancelledError,
+    SubtitleService,
+    ProcessingResult,
+)
 from ..services.translation_service import TranslationService
 from ..services.transcription_providers import (
     TranscriptionCancelledError,
@@ -65,6 +69,24 @@ from ..logging_setup import get_logger
 
 logger = get_logger("ui")
 
+#: How long ``closeEvent`` waits for a cooperative cancellation to land before
+#: it defers the window close. Long enough for an in-flight provider call to
+#: return, short enough that the user does not think the app has hung.
+CLOSE_GRACE_SECONDS = 5.0
+
+
+def _is_running_thread(candidate) -> bool:
+    """True when ``candidate`` is a background thread that is still running.
+
+    Duck-typed on ``isRunning`` so the close policy can be exercised with a
+    stand-in worker in tests, without ever requiring a live ``QThread``.
+    """
+    return (
+        candidate is not None
+        and callable(getattr(candidate, "isRunning", None))
+        and bool(candidate.isRunning())
+    )
+
 
 def _nav_label(key: str) -> str:
     """Sidebar label text.
@@ -76,9 +98,21 @@ def _nav_label(key: str) -> str:
 
 
 class ProcessWorker(QThread):
+    """Subtitle processing off the UI thread with cooperative cancellation.
+
+    Deep-audit H3: this used to be cancelled with ``QThread.terminate()``,
+    which killed the thread while it was inside a ``ThreadPoolExecutor``. The
+    pool's ``__exit__`` never ran, its non-daemon worker threads survived the
+    kill and kept calling the provider and writing to the *shared*
+    ``SubtitleService``. It now uses the same ``cancel_event`` model as
+    ``TranscribeWorker`` and ``PipelineWorker``, so the pool always shuts down
+    cleanly and no zombie thread can write into the next job.
+    """
+
     step_updated = pyqtSignal(str, object)
     completed = pyqtSignal(object)
     failed = pyqtSignal(str)
+    cancelled = pyqtSignal()
 
     def __init__(
         self,
@@ -102,6 +136,10 @@ class ProcessWorker(QThread):
         self.engine = engine
         self.target_format = target_format
         self.parallel = parallel
+        self.cancel_event = threading.Event()
+
+    def cancel(self):
+        self.cancel_event.set()
 
     def run(self):
         def callback(event_name: str, payload: object):
@@ -118,11 +156,17 @@ class ProcessWorker(QThread):
                 target_format=self.target_format,
                 parallel=self.parallel,
                 progress_callback=callback,
+                cancel_event=self.cancel_event,
             )
+            if self.cancel_event.is_set():
+                self.cancelled.emit()
+                return
             self.completed.emit(result)
+        except SubtitleCancelledError:
+            self.cancelled.emit()
         except Exception:
             logger.exception("Fallo al procesar el subtítulo")
-            self.failed.emit("Error interno al procesar")
+            self.failed.emit(t("worker.error_processing"))
 
 
 class TranscribeWorker(QThread):
@@ -176,7 +220,7 @@ class TranscribeWorker(QThread):
             self.failed.emit(e.error_type)
         except Exception:
             logger.exception("Fallo inesperado al transcribir el medio")
-            self.failed.emit("error interno")
+            self.failed.emit(t("worker.error_transcribe"))
 
 
 class PipelineWorker(QThread):
@@ -210,10 +254,10 @@ class PipelineWorker(QThread):
             self.completed.emit(result)
         except PipelineConfigError as e:
             logger.warning("Configuración de pipeline no válida (%s)", type(e).__name__)
-            self.failed.emit("configuración no válida")
+            self.failed.emit(t("worker.error_pipeline_config"))
         except Exception:
             logger.exception("Fallo inesperado en la pipeline")
-            self.failed.emit("error interno")
+            self.failed.emit(t("worker.error_pipeline_internal"))
 
 
 class MainWindow(QMainWindow):
@@ -396,6 +440,70 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
         return sidebar
+
+    def _active_workers(self) -> List[QThread]:
+        """Every background thread this window currently owns."""
+        found: List[QThread] = []
+        for name in ("worker", "transcribe_worker", "pipeline_worker"):
+            candidate = getattr(self, name, None)
+            if _is_running_thread(candidate):
+                found.append(candidate)
+        dialog = getattr(self, "burn_dialog", None)
+        if dialog is not None:
+            candidate = getattr(dialog, "worker", None)
+            if _is_running_thread(candidate):
+                found.append(candidate)
+        return found
+
+    def closeEvent(self, event):  # noqa: N802 - Qt naming
+        """Never let Qt destroy a QThread that is still running.
+
+        Deep-audit M11: there was no ``closeEvent`` at all, so closing the
+        window during a transcription, a pipeline or a burn-in destroyed a
+        running ``QThread``. That aborts with "QThread: Destroyed while thread
+        is still running" and orphans the FFmpeg child plus its ``srt4u_burn_*``
+        temp directory, because the worker's ``finally`` never runs.
+
+        Policy: ask every worker to cancel cooperatively, pump the event loop
+        until they stop, and if any refuses, *refuse the close* rather than
+        terminate it. Losing a queued window close is much cheaper than
+        destroying a live thread.
+        """
+        workers = self._active_workers()
+        if not workers:
+            event.accept()
+            return
+
+        logger.warning(
+            "Cierre solicitado con %s worker(s) activo(s): cancelando",
+            len(workers),
+        )
+        for worker in workers:
+            cancel = getattr(worker, "cancel", None)
+            if callable(cancel):
+                try:
+                    cancel()
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.warning(
+                        "No se pudo cancelar un worker (%s)", type(exc).__name__
+                    )
+
+        deadline = time.monotonic() + CLOSE_GRACE_SECONDS
+        while time.monotonic() < deadline:
+            if not any(worker.isRunning() for worker in workers):
+                break
+            QApplication.processEvents()
+            time.sleep(0.02)
+
+        still_running = [worker for worker in workers if worker.isRunning()]
+        if still_running:
+            logger.error(
+                "Cierre pospuesto: %s worker(s) no terminaron a tiempo",
+                len(still_running),
+            )
+            event.ignore()
+            return
+        event.accept()
 
     def _switch_page(self, page_index: int):
         self.stack.setCurrentIndex(page_index)
@@ -1207,8 +1315,7 @@ class MainWindow(QMainWindow):
         base, _ = os.path.splitext(self.current_media_path or "transcription")
         out_path = f"{base}_transcribed.{output_format}"
         try:
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write(content)
+            self.subtitle_service.write_output_file(out_path, content)
             self.saved_output_path = out_path
         except Exception:
             logger.exception("No se pudo guardar la transcripción")
@@ -1968,12 +2075,14 @@ class MainWindow(QMainWindow):
         self.worker.step_updated.connect(self._on_worker_step)
         self.worker.completed.connect(self._on_processing_completed)
         self.worker.failed.connect(self._on_processing_failed)
+        self.worker.cancelled.connect(self._on_processing_cancelled)
         self.start_process_time = time.time()
         self.worker.start()
 
     def _cancel_worker(self):
-        if hasattr(self, "worker") and self.worker.isRunning():
-            self.worker.terminate()
+        worker = getattr(self, "worker", None)
+        if worker is not None and worker.isRunning() and hasattr(worker, "cancel"):
+            worker.cancel()
 
     def _on_worker_step(self, step_name: str, payload: object):
         if not hasattr(self, "modal") or not self.modal.isVisible():
@@ -2017,8 +2126,9 @@ class MainWindow(QMainWindow):
         base, ext = os.path.splitext(self.current_subtitle_path)
         out_path = f"{base}_processed{ext}"
         try:
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write(result.output_content)
+            # Deep-audit L9: write atomically so a failure never destroys the
+            # user's previous good file.
+            self.subtitle_service.write_output_file(out_path, result.output_content)
             self.saved_output_path = out_path
         except Exception:
             logger.exception("No se pudo guardar el resultado procesado")
@@ -2081,6 +2191,13 @@ class MainWindow(QMainWindow):
             t("alert.process_error_desc", err="error interno"),
         )
 
+    def _on_processing_cancelled(self):
+        """The user cancelled: close the modal, publish nothing."""
+        logger.info("Procesamiento cancelado por el usuario")
+        modal = getattr(self, "modal", None)
+        if modal is not None and modal.isVisible():
+            modal.reject()
+
     def _start_fast_clean(self):
         if not self.current_subtitle_path:
             ThemedMessageBox.warning(
@@ -2132,8 +2249,7 @@ class MainWindow(QMainWindow):
             items = self.subtitle_service.parse_subtitles(content, src_fmt)
             out_content = self.subtitle_service.format_output(items, tgt_fmt)
 
-            with open(out_path, "w", encoding="utf-8") as out_f:
-                out_f.write(out_content)
+            self.subtitle_service.write_output_file(out_path, out_content)
 
             self.saved_output_path = out_path
             ThemedMessageBox.information(
@@ -2201,8 +2317,7 @@ class MainWindow(QMainWindow):
         if path:
             ext = os.path.splitext(path)[1].lstrip(".")
             content = self.subtitle_service.format_output(items, ext)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
+            self.subtitle_service.write_output_file(path, content)
             self.saved_output_path = path
             ThemedMessageBox.information(
                 self,
@@ -2332,8 +2447,7 @@ class MainWindow(QMainWindow):
                 )
                 base, ext = os.path.splitext(file_path)
                 out_path = f"{base}_processed{ext}"
-                with open(out_path, "w", encoding="utf-8") as out_f:
-                    out_f.write(result.output_content)
+                self.subtitle_service.write_output_file(out_path, result.output_content)
                 self.batch_table.setItem(
                     row, 3, QTableWidgetItem(t("batch.status_completed"))
                 )

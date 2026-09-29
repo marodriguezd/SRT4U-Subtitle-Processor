@@ -10,6 +10,7 @@ from ..deps import (
     safe_detail,
     save_upload,
     validate_extension,
+    validate_provider,
 )
 from ..jobs import JobError, JobManager
 from ..schemas import JobCreatedResponse, ProcessResultModel, TranslationResultModel
@@ -61,6 +62,7 @@ async def translate(
     no_fallback: Annotated[bool, Form(description="Desactiva el fallback")] = False,  # noqa: B008
 ) -> JobCreatedResponse:
     suffix = validate_extension(file.filename)
+    provider = validate_provider(provider)
     if not target_language or not target_language.strip():
         raise HTTPException(status_code=422, detail="target_language es obligatorio")
     if max_retries < 0 or max_retries > 10:
@@ -154,6 +156,7 @@ async def process(
     no_fallback: Annotated[bool, Form(description="Desactiva el fallback")] = False,  # noqa: B008
 ) -> JobCreatedResponse:
     suffix = validate_extension(file.filename)
+    provider = validate_provider(provider)
     if translate and not (target_language or "").strip():
         raise HTTPException(
             status_code=422, detail="target_language es obligatorio al traducir"

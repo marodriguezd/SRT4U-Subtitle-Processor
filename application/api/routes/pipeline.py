@@ -5,7 +5,13 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from ..deps import MAX_UPLOAD_BYTES, remove_temp, safe_detail, save_upload
+from ..deps import (
+    MAX_UPLOAD_BYTES,
+    remove_temp,
+    safe_detail,
+    save_upload,
+    validate_provider,
+)
 from ..jobs import JobError, JobManager
 from ..schemas import JobCreatedResponse
 from ...services.media_pipeline import (
@@ -77,6 +83,7 @@ async def pipeline(
     output_format: Annotated[str, Form(description="srt o vtt")] = "srt",  # noqa: B008
 ) -> JobCreatedResponse:
     suffix = _validate_pipeline_extension(file.filename)
+    provider = validate_provider(provider)
     is_media = suffix in MEDIA_EXTENSIONS
     if is_media and not transcribe:
         raise HTTPException(

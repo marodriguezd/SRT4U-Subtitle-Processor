@@ -8,8 +8,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from .services.atomic_write import atomic_write_text
 from .services.history_store import record_result_safely, record_safely
 from .services.subtitle_service import SubtitleService
+from .services.translation_providers import ProviderRegistry
+
+#: Deep-audit L7: the provider catalogue lives in the registry, so the CLI,
+#: the API and the GUI can never accept different provider names.
+TRANSLATION_PROVIDERS = ProviderRegistry.names()
 
 SUPPORTED_EXTENSIONS = {".srt", ".vtt", ".ass", ".ssa", ".txt"}
 PIPELINE_OPTIONS = {
@@ -67,7 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     process.add_argument(
         "--engine",
-        choices=("google", "deepl", "openai", "ollama", "llm"),
+        choices=TRANSLATION_PROVIDERS,
         help="motor configurado en SRT4U (Ollama/OpenRouter usan el endpoint compatible OpenAI)",
     )
     process.add_argument(
@@ -323,7 +329,7 @@ def _build_parser() -> argparse.ArgumentParser:
     pipeline.add_argument(
         "--provider",
         default="google",
-        choices=("google", "deepl", "openai", "ollama", "llm"),
+        choices=TRANSLATION_PROVIDERS,
         help="provider de traducción (por defecto: google)",
     )
     pipeline.add_argument(
@@ -600,7 +606,7 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
                 parallel=options["parallel"],
             )
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(result.output_content, encoding="utf-8")
+            atomic_write_text(str(destination), result.output_content, encoding="utf-8")
             translation_failures += result.stats.translation_failures
             print(
                 f"OK {source} -> {destination} "
@@ -626,6 +632,13 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
             if result.stats.translation_failures:
                 print(
                     f"AVISO: {result.stats.translation_failures} cues no se tradujeron",
+                    file=sys.stderr,
+                )
+            if result.parse_issues:
+                kinds = ", ".join(sorted({issue.kind for issue in result.parse_issues}))
+                print(
+                    f"AVISO: {len(result.parse_issues)} bloque(s) del archivo no se "
+                    f"pudieron procesar ({kinds}); revisa el archivo de entrada",
                     file=sys.stderr,
                 )
             if not args.no_history:
@@ -796,7 +809,7 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         try:
             output_path = Path(args.output).expanduser()
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(rendered, encoding="utf-8", newline="")
+            atomic_write_text(str(output_path), rendered, encoding="utf-8")
         except OSError as exc:
             print(
                 f"ERROR: no se pudo guardar el informe ({type(exc).__name__})",
@@ -867,7 +880,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         try:
             output_path = Path(args.output).expanduser()
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(rendered, encoding="utf-8", newline="")
+            atomic_write_text(str(output_path), rendered, encoding="utf-8")
         except OSError as exc:
             print(
                 f"ERROR: no se pudo guardar el informe ({type(exc).__name__})",
@@ -881,7 +894,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         try:
             csv_path = Path(args.output_csv).expanduser()
             csv_path.parent.mkdir(parents=True, exist_ok=True)
-            csv_path.write_text(report.to_csv(), encoding="utf-8", newline="")
+            atomic_write_text(str(csv_path), report.to_csv(), encoding="utf-8")
         except OSError as exc:
             print(
                 f"ERROR: no se pudo guardar el CSV ({type(exc).__name__})",
@@ -1046,7 +1059,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         )
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(content, encoding="utf-8", newline="")
+        atomic_write_text(str(destination), content, encoding="utf-8")
     except OSError as exc:
         print(
             f"ERROR: no se pudo guardar la transcripción ({type(exc).__name__})",
