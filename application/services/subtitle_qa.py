@@ -19,6 +19,14 @@ from typing import (
     Tuple,
 )
 
+from . import timestamps as ts
+from .timestamps import (
+    ass_dialogue_timing_to_ms,
+    ass_timestamp_to_ms,
+    srt_timestamp_to_ms,
+    vtt_timestamp_to_ms,
+)
+
 if TYPE_CHECKING:
     from .subtitle_service import SubtitleItem
 
@@ -412,15 +420,20 @@ class _FormattingRule(SubtitleQARule):
 class SubtitleQA:
     """Runs composable deterministic rules over parsed cues and source structure."""
 
+    # D4: the timestamp grammar is now shared with the parser via the
+    # ``timestamps`` module. The full-line regexes below only add the arrow,
+    # optional cue settings and line anchors around the SAME component grammar
+    # ``SubtitleService`` accepts, so a file the parser reads cannot be
+    # reported as structurally broken here (and vice versa).
     _SRT_TIMESTAMP = re.compile(
-        r"^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})\s*-->\s*"
-        r"(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})(?:\s+.*)?$"
+        rf"^({ts.SRT_TIMESTAMP_PATTERN})\s*-->\s*"
+        rf"({ts.SRT_TIMESTAMP_PATTERN})(?:\s+.*)?$"
     )
     _VTT_TIMESTAMP = re.compile(
-        r"^((?:\d{2,}:)?\d{2}:\d{2})\.(\d{1,3})\s*-->\s*"
-        r"((?:\d{2,}:)?\d{2}:\d{2})\.(\d{1,3})(?:\s+.*)?$"
+        rf"^({ts.VTT_TIMESTAMP_PATTERN})\s*-->\s*"
+        rf"({ts.VTT_TIMESTAMP_PATTERN})(?:\s+.*)?$"
     )
-    _ASS_TIME = re.compile(r"(\d{1,2}):(\d{2}):(\d{2})\.(\d{1,2})")
+    _ASS_TIME = re.compile(rf"{ts.ASS_TIMESTAMP_PATTERN}")
     _FORMATTING_TAG = re.compile(
         r"</?(?:b|i|u|s|strike|em|strong|font|br|ruby|rt|c)(?:\s[^<>]*)?/?>"
         r"|\{\\[^}]*\}",
@@ -532,7 +545,18 @@ class SubtitleQA:
         if not content.strip():
             return
 
-        blocks = re.split(r"\r?\n\s*\r?\n", content.strip())
+        # D4: split source structure the way each format models cues.
+        # WebVTT terminates a cue at every blank line, so the plain split is
+        # exact there. SRT does not: ``_parse_srt`` (M7) keeps a cue that
+        # contains internal blank lines, so a blank line only starts a new
+        # block when the next line looks like a cue index (digit), the same
+        # cue-shape heuristic the parser uses to stop collecting a cue's
+        # text. Anything else stays inside the cue instead of becoming a
+        # phantom block reported as a structural error.
+        if file_format == "srt":
+            blocks = re.split(r"\r?\n\s*\r?\n(?=\s*\d+)", content.strip())
+        else:
+            blocks = re.split(r"\r?\n\s*\r?\n", content.strip())
         cue_number = 0
         declared_indices: Dict[int, int] = {}
         invalid_parsed_intervals = Counter(
@@ -547,9 +571,14 @@ class SubtitleQA:
                 continue
             if file_format == "vtt":
                 if lines[0].upper() == "WEBVTT" or lines[0].upper().startswith(
-                    "WEBVTT "
+                    ("WEBVTT ", "WEBVTT\t")
                 ):
-                    continue
+                    # D4: the header may share a block with the first cue (the
+                    # block split only fires on cue-number boundaries); drop
+                    # the header line and keep validating the rest.
+                    lines = lines[1:]
+                    if not lines:
+                        continue
                 if lines[0].upper().startswith(("NOTE", "STYLE", "REGION")):
                     continue
                 if "-->" not in lines[0] and len(lines) > 1 and "-->" in lines[1]:
@@ -627,19 +656,18 @@ class SubtitleQA:
             if not match or not self._timestamp_components_valid(match, file_format):
                 duplicate_parsed_interval = False
                 if match and file_format == "srt":
-                    groups = match.groups()
-                    start_parts = tuple(int(value) for value in groups[:3])
-                    end_parts = tuple(int(value) for value in groups[4:7])
-                    start_ms = (
-                        (start_parts[0] * 60 + start_parts[1]) * 60 + start_parts[2]
-                    ) * 1000 + int(groups[3].ljust(3, "0"))
-                    end_ms = (
-                        (end_parts[0] * 60 + end_parts[1]) * 60 + end_parts[2]
-                    ) * 1000 + int(groups[7].ljust(3, "0"))
-                    interval = (start_ms, end_ms)
-                    duplicate_parsed_interval = invalid_parsed_intervals[interval] > 0
-                    if duplicate_parsed_interval:
-                        invalid_parsed_intervals[interval] -= 1
+                    # The regex now carries one capturing group per timestamp
+                    # (shared grammar); recompute the interval with the same
+                    # converter so the parser-dropped-cue dedup keeps working.
+                    start_ms = srt_timestamp_to_ms(match.group(1))
+                    end_ms = srt_timestamp_to_ms(match.group(2))
+                    if start_ms is not None and end_ms is not None:
+                        interval = (start_ms, end_ms)
+                        duplicate_parsed_interval = (
+                            invalid_parsed_intervals[interval] > 0
+                        )
+                        if duplicate_parsed_interval:
+                            invalid_parsed_intervals[interval] -= 1
                 if not duplicate_parsed_interval:
                     findings.append(
                         QAFinding(
@@ -663,25 +691,28 @@ class SubtitleQA:
 
     @classmethod
     def _timestamp_components_valid(cls, match, file_format):
+        """Validate a full-line timing match using the shared grammar (D4).
+
+        The SRT/VTT regexes are built from the same component grammar the
+        parser uses, so component bounds are already enforced by the pattern
+        itself; the remaining check is the ordering contract ``end > start``.
+        """
         if file_format == "srt":
-            groups = match.groups()
-            start = tuple(int(value) for value in groups[:3])
-            end = tuple(int(value) for value in groups[4:7])
-            if start[1] > 59 or start[2] > 59 or end[1] > 59 or end[2] > 59:
-                return False
-            start_ms = ((start[0] * 60 + start[1]) * 60 + start[2]) * 1000 + int(
-                groups[3].ljust(3, "0")
-            )
-            end_ms = ((end[0] * 60 + end[1]) * 60 + end[2]) * 1000 + int(
-                groups[7].ljust(3, "0")
-            )
-            return end_ms > start_ms
-        start_ms = cls._clock_to_ms(match.group(1), match.group(2))
-        end_ms = cls._clock_to_ms(match.group(3), match.group(4))
+            start_ms = srt_timestamp_to_ms(match.group(1))
+            end_ms = srt_timestamp_to_ms(match.group(2))
+            return start_ms is not None and end_ms is not None and end_ms > start_ms
+        start_ms = vtt_timestamp_to_ms(match.group(1))
+        end_ms = vtt_timestamp_to_ms(match.group(2))
         return start_ms is not None and end_ms is not None and end_ms > start_ms
 
     @staticmethod
     def _clock_to_ms(clock, fraction):
+        """Legacy two-part helper kept for API compatibility.
+
+        The shared ``timestamps`` module owns the grammar now; this helper
+        delegates to it so any external caller cannot re-introduce a divergent
+        component bound.
+        """
         parts = [int(part) for part in clock.split(":")]
         if len(parts) == 2:
             minutes, seconds = parts
@@ -698,15 +729,8 @@ class SubtitleQA:
 
     @classmethod
     def _ass_time_to_ms(cls, value):
-        match = cls._ASS_TIME.fullmatch(value)
-        if not match:
-            return None
-        hours, minutes, seconds = (int(part) for part in match.groups()[:3])
-        if minutes > 59 or seconds > 59:
-            return None
-        return ((hours * 60 + minutes) * 60 + seconds) * 1000 + int(
-            match.group(4).ljust(2, "0")
-        ) * 10
+        """Legacy ASS conversion; delegates to the shared grammar (D4)."""
+        return ass_timestamp_to_ms(value)
 
     @classmethod
     def _validate_ass_source(cls, content, findings):
@@ -736,13 +760,11 @@ class SubtitleQA:
                     )
                 )
                 continue
-            match = re.match(
-                r"Dialogue:\s*[^,]+,([^,]+),([^,]+),",
-                dialogue_line,
-                re.IGNORECASE,
-            )
-            start = cls._ass_time_to_ms(match.group(1)) if match else None
-            end = cls._ass_time_to_ms(match.group(2)) if match else None
+            timing = ass_dialogue_timing_to_ms(dialogue_line)
+            if timing is None:
+                start = end = None
+            else:
+                start, end = timing
             if start is None or end is None or end <= start:
                 findings.append(
                     QAFinding(

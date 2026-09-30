@@ -148,6 +148,7 @@ def build_ass_document(
     *,
     title: str = "SRT4U Subtitles",
     play_res: Optional[Tuple[int, int]] = None,
+    event_styles: Optional[Sequence[str]] = None,
 ) -> str:
     """Assemble a complete ASS document.
 
@@ -156,6 +157,12 @@ def build_ass_document(
     ``style_definitions`` maps style name -> definition body. Every style that
     appears in the events is guaranteed to be declared in the header, so a
     renderer never has to fall back silently (M2).
+
+    ``event_styles`` optionally carries the per-event style assignment
+    (parallel to ``events``; deep-audit D2). When omitted, every event uses
+    ``Default`` — the historical behaviour. A name that is unsafe or absent
+    from ``style_definitions`` falls back to ``Default``, preserving the
+    never-emit-an-undefined-style guarantee.
     """
     definitions: Dict[str, str] = {}
     if style_definitions:
@@ -163,6 +170,15 @@ def build_ass_document(
             if is_safe_style_name(name) and body.strip():
                 definitions[name] = body.strip()
     definitions.setdefault(DEFAULT_STYLE_NAME, FALLBACK_STYLE_BODY)
+
+    styles: List[str] = []
+    if event_styles is not None:
+        for raw_name in event_styles:
+            name = raw_name or DEFAULT_STYLE_NAME
+            if not is_safe_style_name(name) or name not in definitions:
+                name = DEFAULT_STYLE_NAME
+            styles.append(name)
+    styles.extend([DEFAULT_STYLE_NAME] * (len(events) - len(styles)))
 
     style_lines = "\n".join(
         f"Style: {name},{definitions[name]}" for name in sorted(definitions)
@@ -190,10 +206,10 @@ def build_ass_document(
     )
 
     lines: List[str] = []
-    for start_ms, end_ms, body in events:
+    for (start_ms, end_ms, body), style in zip(events, styles, strict=False):
         lines.append(
             f"Dialogue: 0,{ass_time(start_ms)},{ass_time(end_ms)},"
-            f"{DEFAULT_STYLE_NAME},,0,0,0,,{body}"
+            f"{style},,0,0,0,,{body}"
         )
     return header + "\n".join(lines) + "\n"
 

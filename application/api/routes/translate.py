@@ -214,7 +214,13 @@ async def process(
                 ),
                 qa=result.qa_report.to_dict() if result.qa_report is not None else None,  # type: ignore[arg-type]
             )
-            return payload.model_dump(mode="json")
+            data = payload.model_dump(mode="json")
+            # P1: parser findings ride along as a top-level advisory list
+            # (kind/reason/line/snippet) so API clients can warn their users.
+            data["parse_issues"] = [
+                issue.to_dict() for issue in getattr(result, "parse_issues", [])
+            ]
+            return data
         except (OSError, UnicodeError, ValueError) as exc:
             raise JobError(safe_detail(exc)) from exc
         finally:

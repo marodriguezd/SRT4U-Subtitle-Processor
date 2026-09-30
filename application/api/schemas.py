@@ -74,6 +74,7 @@ class ProcessingMetricsModel(BaseModel):
     processing_time_seconds: float = 0.0
     lines_removed: int = 0
     translation_failures: int = 0
+    parse_issues: int = 0
 
 
 class SubtitleAnalyticsModel(BaseModel):
@@ -167,6 +168,7 @@ class HistoryItemModel(BaseModel):
     translation_failures: Optional[int] = None
     benchmark_id: Optional[str] = None
     run_index: Optional[int] = None
+    parse_issues: Optional[int] = None
 
 
 class HistoryListResponse(BaseModel):

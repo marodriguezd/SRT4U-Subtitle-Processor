@@ -12,6 +12,7 @@ from .subtitle_analytics import SubtitleAnalytics, SubtitleAnalyticsService
 from .subtitle_qa import QAReport, QARules, SubtitleQA
 from .translation_models import TranslationMetrics
 from . import ass_utils
+from . import timestamps
 
 logger = get_logger("subtitles")
 
@@ -77,48 +78,13 @@ class ParseIssue:
 def parse_timestamp_to_ms(time_str: str) -> int:
     """Convert ``HH:MM:SS,mmm`` / ``MM:SS.mmm`` to milliseconds.
 
-    Contract: a well-formed timestamp returns an ``int``; anything else raises
-    :class:`ValueError`. The previous silent ``return 0`` turned garbage into
-    "the cue starts at zero", which quietly moved subtitles; callers must now
-    decide explicitly how to report the problem (see ``ParseIssue``).
-
-    Hours are not capped at two digits, so media longer than 99 hours round
-    trips through SRT. Minutes and seconds must be ``00-59`` per the format.
+    Thin re-export of the shared grammar in :mod:`.timestamps`, which is the
+    single source of truth: the parser and QA validate with the same
+    functions, so their grammars cannot silently diverge again (deep-audit
+    D4). A well-formed timestamp returns an ``int``; anything else raises
+    :class:`ValueError`.
     """
-    if not isinstance(time_str, str):
-        raise ValueError("el timestamp debe ser una cadena")
-    normalized = time_str.strip().replace(",", ".")
-    if not normalized:
-        raise ValueError("timestamp vacío")
-    parts = normalized.split(":")
-    if len(parts) == 3:
-        raw_hours, raw_minutes, raw_seconds = parts
-    elif len(parts) == 2:
-        raw_hours, raw_minutes, raw_seconds = "0", parts[0], parts[1]
-    else:
-        raise ValueError(f"formato de timestamp no soportado: {time_str!r}")
-
-    if not re.fullmatch(r"\d{1,}", raw_hours):
-        raise ValueError(f"horas inválidas: {raw_hours!r}")
-    if not re.fullmatch(r"\d{1,2}", raw_minutes):
-        raise ValueError(f"minutos inválidos: {raw_minutes!r}")
-    if "." in raw_seconds:
-        raw_whole, _, raw_fraction = raw_seconds.partition(".")
-    else:
-        raw_whole, raw_fraction = raw_seconds, ""
-    if not re.fullmatch(r"\d{1,2}", raw_whole):
-        raise ValueError(f"segundos inválidos: {raw_whole!r}")
-    # At most three fraction digits: "00:00:01,1234" is malformed, not 1.123 s.
-    if raw_fraction and not re.fullmatch(r"\d{1,3}", raw_fraction):
-        raise ValueError(f"fracción de segundo inválida: {raw_fraction!r}")
-
-    hours = int(raw_hours)
-    minutes = int(raw_minutes)
-    seconds = int(raw_whole)
-    if minutes > 59 or seconds > 59:
-        raise ValueError(f"minutos/segundos fuera de rango (00-59): {normalized!r}")
-    milliseconds = int(raw_fraction.ljust(3, "0")) if raw_fraction else 0
-    return (hours * 3600 + minutes * 60 + seconds) * 1000 + milliseconds
+    return timestamps.parse_timestamp_to_ms(time_str)
 
 
 @dataclass
@@ -389,8 +355,11 @@ class SubtitleService:
         items: List[SubtitleItem] = []
         lines = (content or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
         # Hours are unbounded so that >99h media round trips through SRT (L5).
+        # The pattern comes from the shared grammar module (D4): the exact
+        # component grammar QA validates with.
         ts_regex = re.compile(
-            r"(\d{1,}:\d{2}:\d{2}[,.]\d{1,3})\s*-->\s*(\d{1,}:\d{2}:\d{2}[,.]\d{1,3})"
+            rf"({timestamps.SRT_TIMESTAMP_PATTERN})\s*-->\s*"
+            rf"({timestamps.SRT_TIMESTAMP_PATTERN})"
         )
 
         def find_timing(value: str):
@@ -464,15 +433,36 @@ class SubtitleService:
         lines = (content or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
         items: List[SubtitleItem] = []
         ts_regex = re.compile(
-            r"((?:\d{1,}:)?\d{2}:\d{2}[.]\d{1,3})\s*-->\s*((?:\d{1,}:)?\d{2}:\d{2}[.]\d{1,3})"
+            rf"({timestamps.VTT_TIMESTAMP_PATTERN})\s*-->\s*"
+            rf"({timestamps.VTT_TIMESTAMP_PATTERN})"
         )
 
         curr_idx = 1
         i = 0
         while i < len(lines):
             line = lines[i].strip()
-            if not line or line.startswith("WEBVTT") or line.startswith("NOTE"):
+            if not line:
                 i += 1
+                continue
+            # D3: WEBVTT metadata blocks (NOTE/STYLE/REGION) run from their
+            # header until the next blank line. Skipping only the header line
+            # re-scanned the body, so a timecode inside a NOTE became a phantom
+            # cue. Consume the whole block instead. STYLE blocks may contain
+            # VTT selectors with '-->' is impossible, but a NOTE body can cite
+            # timestamps, so the block skip is what matters — not the text.
+            if line.startswith(("NOTE", "STYLE", "REGION")) or line.startswith(
+                "WEBVTT"
+            ):
+                if (
+                    line == "WEBVTT"
+                    or line.startswith("WEBVTT ")
+                    or line.startswith("WEBVTT\t")
+                ):
+                    i += 1  # header line only; the file body is still cues
+                    continue
+                i += 1
+                while i < len(lines) and lines[i].strip():
+                    i += 1
                 continue
 
             match = ts_regex.search(line)
@@ -1054,14 +1044,17 @@ class SubtitleService:
         definitions = ass_utils.collect_style_definitions(used_styles, known or {})
         events = []
         for item in items:
-            style = item.style or ass_utils.DEFAULT_STYLE_NAME
-            if style not in definitions:
-                style = ass_utils.DEFAULT_STYLE_NAME
             events.append(
                 (item.start_ms, item.end_ms, ass_utils.to_ass_text(item.text))
             )
+        # D2: the per-cue style assignment travels with each event instead of
+        # collapsing to ``Default``; ``build_ass_document`` keeps the
+        # never-emit-an-undefined-style guarantee by falling back to Default.
         return ass_utils.build_ass_document(
-            events, definitions, title="SRT4U Exported Subtitles"
+            events,
+            definitions,
+            title="SRT4U Exported Subtitles",
+            event_styles=used_styles,
         )
 
     def _format_txt(self, items: List[SubtitleItem]) -> str:

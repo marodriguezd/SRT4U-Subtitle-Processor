@@ -17,7 +17,7 @@ from ..logging_setup import get_logger
 logger = get_logger("history")
 
 #: Current schema revision. ``_MIGRATIONS`` maps version -> DDL applied once.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _MIGRATIONS = {
     1: """
@@ -72,6 +72,9 @@ _MIGRATIONS = {
     2: """
     ALTER TABLE runs ADD COLUMN media_duration_ms INTEGER;
     """,
+    3: """
+    ALTER TABLE runs ADD COLUMN parse_issues INTEGER;
+    """,
 }
 
 _RUN_COLUMNS = (
@@ -106,6 +109,7 @@ _RUN_COLUMNS = (
     "benchmark_id",
     "run_index",
     "media_duration_ms",
+    "parse_issues",
 )
 
 

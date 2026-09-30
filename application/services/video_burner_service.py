@@ -300,6 +300,11 @@ class VideoBurnerService:
             {ass_utils.DEFAULT_STYLE_NAME: style_body},
             title="SRT4U Burn-In Subtitles",
             play_res=(vw, vh),
+            # D2: burn-in renders one calibrated visual style by design (the
+            # dialog exposes font size/colour/box, not per-cue styles), so the
+            # assignment stays uniformly Default here even though the exporter
+            # now preserves source styles.
+            event_styles=[ass_utils.DEFAULT_STYLE_NAME] * len(events),
         )
 
 
@@ -387,6 +392,15 @@ class BurnInWorker(QThread):
         ass_path = os.path.join(temp_dir, ass_filename)
         stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
 
+        # D1: FFmpeg never opens the final destination. It used to receive
+        # ``output_path`` with ``-y``, so any file already at that path was
+        # truncated the moment encoding started and the cancel/failure
+        # branches then deleted it. Encode into a sibling temp file and
+        # promote it with ``os.replace`` only after a clean exit; every other
+        # path removes just the temp.
+        final_path = os.path.abspath(self.output_path)
+        temp_output = f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
+
         try:
             ass_content = VideoBurnerService.generate_ass_script(
                 self.subtitle_items, self.options, video_width=vw, video_height=vh
@@ -419,7 +433,7 @@ class BurnInWorker(QThread):
                 "copy",
                 "-progress",
                 "pipe:1",
-                os.path.abspath(self.output_path),
+                temp_output,
             ]
 
             with open(stderr_log_path, "w", encoding="utf-8") as stderr_file:
@@ -438,14 +452,6 @@ class BurnInWorker(QThread):
 
                 while True:
                     if self._is_cancelled:
-                        if os.path.exists(self.output_path):
-                            try:
-                                os.remove(self.output_path)
-                            except OSError as exc:
-                                logger.warning(
-                                    "No se pudo eliminar el archivo parcial (%s)",
-                                    type(exc).__name__,
-                                )
                         logger.info("Burn-in cancelado por el usuario")
                         self.cancelled.emit()
                         return
@@ -504,19 +510,13 @@ class BurnInWorker(QThread):
                 self._process.wait()
 
             if self._is_cancelled:
-                if os.path.exists(self.output_path):
-                    try:
-                        os.remove(self.output_path)
-                    except OSError as exc:
-                        logger.warning(
-                            "No se pudo eliminar el archivo parcial (%s)",
-                            type(exc).__name__,
-                        )
-
                 self.cancelled.emit()
                 return
 
             if self._process.returncode == 0:
+                # D1: promote the finished encode over the final path only on
+                # success; the previous good file stays intact until this swap.
+                os.replace(temp_output, final_path)
                 logger.info("Burn-in completado: %s", self.output_path)
                 self.progress_updated.emit(100.0, current_speed_str, "00:00")
                 self.finished_success.emit(self.output_path)
@@ -525,11 +525,6 @@ class BurnInWorker(QThread):
                     "FFmpeg terminó con error (código %s); detalles técnicos omitidos",
                     self._process.returncode,
                 )
-                try:
-                    if os.path.exists(self.output_path):
-                        os.remove(self.output_path)
-                except OSError:
-                    logger.warning("No se pudo eliminar el vídeo parcial de FFmpeg")
                 self.failed.emit(
                     t("burn.error_ffmpeg_failed", code=self._process.returncode)
                 )
@@ -539,4 +534,14 @@ class BurnInWorker(QThread):
             if not self._is_cancelled:
                 self.failed.emit(t("burn.error_exception"))
         finally:
+            # D1: only the temporary encode is ever cleaned up. The final
+            # output path is never removed here, so a cancel, a non-zero
+            # FFmpeg exit or an exception leaves any pre-existing file intact.
+            try:
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
+            except OSError as exc:
+                logger.warning(
+                    "No se pudo eliminar el vídeo temporal (%s)", type(exc).__name__
+                )
             shutil.rmtree(temp_dir, ignore_errors=True)

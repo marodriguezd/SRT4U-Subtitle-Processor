@@ -246,6 +246,10 @@ class PipelineResult:
     output_video: Optional[str] = None
     total_duration_ms: int = 0
     media_duration_ms: Optional[int] = None
+    # P1: structural problems the parser could not use (skipped/repaired
+    # blocks). Advisory only — they never flip ``success`` — but they must
+    # survive to the API/CLI/GUI/history instead of dying at the parse stage.
+    parse_issues: List[Dict[str, Any]] = field(default_factory=list)
     errors: List[Dict[str, str]] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
@@ -279,6 +283,7 @@ class PipelineResult:
             "output_video": self.output_video,
             "total_duration_ms": self.total_duration_ms,
             "media_duration_ms": self.media_duration_ms,
+            "parse_issues": list(self.parse_issues),
             "errors": list(self.errors),
             "warnings": list(self.warnings),
         }
@@ -511,6 +516,15 @@ class MediaPipeline:
         if not parsed:
             raise PipelineStageError(
                 STAGE_PARSE, "invalid_file", "el subtítulo no contiene cues"
+            )
+        # P1: keep the parser's structural findings alive for the result,
+        # history and every presentation layer.
+        issues = list(getattr(self.subtitle_service, "last_parse_issues", []) or [])
+        if issues:
+            result.parse_issues = [issue.to_dict() for issue in issues]
+            result.warnings.append(
+                f"parse: {len(issues)} bloque(s) no utilizados "
+                f"({', '.join(sorted({issue.kind for issue in issues}))})"
             )
         return parsed
 
@@ -745,6 +759,15 @@ def run_burn_in_sync(
     duration_sec = duration_ms / 1000.0 if duration_ms else 0.0
     width, height = VideoBurnerService.get_video_dimensions(video_path, ffmpeg_bin)
     temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
+    # D1: FFmpeg must never open the final destination. It used to receive
+    # ``output_path`` directly with ``-y``, so encoding truncated any file
+    # already sitting there and the failure/cancel branches then *deleted*
+    # it — destroying the user's previous good video. Encode into a sibling
+    # temporary file instead and promote it with ``os.replace`` only after
+    # FFmpeg exits 0; every failure path removes the temp and never touches
+    # the final path (same contract as ``atomic_write_text``).
+    final_path = os.path.abspath(output_path)
+    temp_output = f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
     try:
         ass_content = VideoBurnerService.generate_ass_script(
             items, BurnInOptions(), video_width=width, video_height=height
@@ -770,7 +793,7 @@ def run_burn_in_sync(
             "copy",
             "-progress",
             "pipe:1",
-            os.path.abspath(output_path),
+            temp_output,
         ]
         with open(stderr_log_path, "w", encoding="utf-8") as stderr_file:
             process = subprocess.Popen(
@@ -784,54 +807,57 @@ def run_burn_in_sync(
             )
         current_sec = 0.0
         assert process.stdout is not None
-        while True:
-            if cancel_event is not None and cancel_event.is_set():
-                try:
-                    process.terminate()
-                    process.wait(timeout=2)
-                except Exception:
+        try:
+            while True:
+                if cancel_event is not None and cancel_event.is_set():
                     try:
-                        process.kill()
+                        process.terminate()
+                        process.wait(timeout=2)
                     except Exception:
+                        try:
+                            process.kill()
+                        except Exception:
+                            pass
+                    raise TranscriptionCancelledError("pipeline cancelada")
+                line = process.stdout.readline()
+                if not line:
+                    if process.poll() is not None:
+                        break
+                    continue
+                line = line.strip()
+                if line.startswith("out_time_us="):
+                    try:
+                        current_sec = int(line.split("=")[1]) / 1000000.0
+                    except ValueError:
                         pass
-                try:
-                    if os.path.exists(output_path):
-                        os.remove(output_path)
-                except OSError:
-                    pass
-                raise TranscriptionCancelledError("pipeline cancelada")
-            line = process.stdout.readline()
-            if not line:
-                if process.poll() is not None:
-                    break
-                continue
-            line = line.strip()
-            if line.startswith("out_time_us="):
-                try:
-                    current_sec = int(line.split("=")[1]) / 1000000.0
-                except ValueError:
-                    pass
-            if line.startswith("progress=") and duration_sec > 0:
-                if progress_callback is not None:
-                    progress_callback(
-                        {
-                            "ratio": min(1.0, max(0.0, current_sec / duration_sec)),
-                            "current_sec": current_sec,
-                        }
-                    )
-        process.wait()
-        if process.returncode != 0:
+                if line.startswith("progress=") and duration_sec > 0:
+                    if progress_callback is not None:
+                        progress_callback(
+                            {
+                                "ratio": min(1.0, max(0.0, current_sec / duration_sec)),
+                                "current_sec": current_sec,
+                            }
+                        )
+            process.wait()
+            if process.returncode != 0:
+                logger.error("FFmpeg falló (código %s)", process.returncode)
+                raise PipelineStageError(
+                    STAGE_BURN,
+                    "burn_in_error",
+                    "Falló la codificación de vídeo; consulta el registro de la aplicación",
+                )
+            # D1: promote only on success. If the process dies between FFmpeg
+            # finishing and this rename, the final file is untouched and a
+            # ``*.srt4u-burn-tmp.*`` sibling is left behind instead of a
+            # destroyed destination.
+            os.replace(temp_output, final_path)
+        finally:
+            # Every failure/cancel path lands here: remove only the temp.
             try:
-                if os.path.exists(output_path):
-                    os.remove(output_path)
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
             except OSError:
-                logger.warning("No se pudo eliminar el vídeo parcial de la pipeline")
-            logger.error("FFmpeg falló (código %s)", process.returncode)
-            raise PipelineStageError(
-                STAGE_BURN,
-                "burn_in_error",
-                "Falló la codificación de vídeo; consulta el registro de la aplicación",
-            )
+                logger.warning("No se pudo eliminar el vídeo temporal de la pipeline")
     finally:
         import shutil
 
@@ -889,4 +915,5 @@ def record_pipeline_result(
         qa_errors=qa_after.get("error_count", 0),
         qa_warnings=qa_after.get("warning_count", 0),
         translation_failures=result.translation_failures,
+        parse_issues=len(result.parse_issues),
     )

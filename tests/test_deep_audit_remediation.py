@@ -15,7 +15,7 @@ import pytest
 
 from application.services import ass_utils
 from application.services.config_service import ConfigService
-from application.services.history_store import HistoryStore
+from application.services.history_store import HistoryStore, SCHEMA_VERSION
 from application.services.subtitle_service import (
     ParseIssue,
     SubtitleCancelledError,
@@ -805,13 +805,15 @@ def test_migration_from_v1_to_v2(tmp_path):
     conn.commit()
     conn.close()
     with HistoryStore(path) as store:
-        assert store._version() == 2
+        assert store._version() == SCHEMA_VERSION
     conn = sqlite3.connect(path)
     try:
         columns = [r[1] for r in conn.execute("PRAGMA table_info(runs)")]
     finally:
         conn.close()
     assert "media_duration_ms" in columns
+    # P1: v3 carries the parse-issue counter for pipeline/process rows.
+    assert "parse_issues" in columns
 
 
 def test_failed_migration_leaves_version_and_schema_consistent(tmp_path, monkeypatch):

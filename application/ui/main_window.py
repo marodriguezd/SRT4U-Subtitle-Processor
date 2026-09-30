@@ -1208,6 +1208,11 @@ class MainWindow(QMainWindow):
             self.lbl_transcribe_file.setText(os.path.basename(chosen))
 
     def _start_transcription(self):
+        # D6: one transcription at a time; a second start must not replace the
+        # running worker (they would share the stateful TranscriptionService).
+        worker = getattr(self, "transcribe_worker", None)
+        if worker is not None and worker.isRunning():
+            return
         if not self.current_media_path or not os.path.exists(self.current_media_path):
             ThemedMessageBox.warning(
                 self,
@@ -1538,6 +1543,11 @@ class MainWindow(QMainWindow):
             self.pipeline_video_output = chosen
 
     def _start_pipeline(self):
+        # D6: one pipeline at a time (same re-entrancy contract as the other
+        # start handlers).
+        worker = getattr(self, "pipeline_worker", None)
+        if worker is not None and worker.isRunning():
+            return
         if not self.pipeline_input_path or not os.path.exists(self.pipeline_input_path):
             ThemedMessageBox.warning(
                 self,
@@ -2039,6 +2049,12 @@ class MainWindow(QMainWindow):
             self.video_player.load_video(video_path)
 
     def _start_processing(self):
+        # D6: one process job at a time. A second start while the previous
+        # worker runs used to replace ``self.worker`` and run concurrently
+        # against the same stateful ``SubtitleService``.
+        worker = getattr(self, "worker", None)
+        if worker is not None and worker.isRunning():
+            return
         if not self.current_subtitle_path or not os.path.exists(
             self.current_subtitle_path
         ):
@@ -2181,6 +2197,26 @@ class MainWindow(QMainWindow):
                 ),
             )
 
+        # P1: blocks the parser could not use are surfaced, never silently
+        # dropped; the output is still delivered (advisory, not failure).
+        parse_issues = list(getattr(result, "parse_issues", []) or [])
+        if parse_issues:
+            kinds = ", ".join(sorted({issue.kind for issue in parse_issues}))
+            logger.warning(
+                "El parser no pudo usar %s bloque(s): %s",
+                len(parse_issues),
+                kinds,
+            )
+            ThemedMessageBox.warning(
+                self,
+                t("alert.parse_issues_title"),
+                t(
+                    "alert.parse_issues_desc",
+                    count=len(parse_issues),
+                    kinds=kinds,
+                ),
+            )
+
     def _on_processing_failed(self, error_msg: str):
         logger.error("Procesamiento fallido")
         if hasattr(self, "modal") and self.modal.isVisible():
@@ -2199,6 +2235,11 @@ class MainWindow(QMainWindow):
             modal.reject()
 
     def _start_fast_clean(self):
+        # D6: same re-entrancy guard as _start_processing (shared worker
+        # attribute and shared service instance).
+        worker = getattr(self, "worker", None)
+        if worker is not None and worker.isRunning():
+            return
         if not self.current_subtitle_path:
             ThemedMessageBox.warning(
                 self, t("alert.file_req_title"), t("alert.file_req_desc")
@@ -2635,7 +2676,7 @@ class MainWindow(QMainWindow):
         )
 
         self.history_table = QTableWidget()
-        self.history_table.setColumnCount(7)
+        self.history_table.setColumnCount(8)
         self.history_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.history_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch
@@ -2663,6 +2704,7 @@ class MainWindow(QMainWindow):
             t("history.col_duration"),
             t("history.col_status"),
             t("history.col_fallback"),
+            t("history.col_parse_issues"),
         ]
         self.history_table.setHorizontalHeaderLabels(headers)
         try:
@@ -2708,6 +2750,13 @@ class MainWindow(QMainWindow):
                 index,
                 6,
                 QTableWidgetItem("fallback" if row.get("fallback_used") else ""),
+            )
+            # P1: parsed-but-unusable block count is visible, not discarded.
+            parse_issues = row.get("parse_issues")
+            self.history_table.setItem(
+                index,
+                7,
+                QTableWidgetItem(str(parse_issues) if parse_issues else ""),
             )
         self.lbl_history_empty.setVisible(not rows)
 
