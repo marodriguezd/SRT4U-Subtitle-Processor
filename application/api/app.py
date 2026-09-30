@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .jobs import JobManager
+from .schemas import ProcessResultModel
 from .routes import (
     analyze,
     benchmarks,
@@ -55,6 +56,33 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
         jobs,
     ):
         app.include_router(module.router, prefix=API_PREFIX)
+
+    # P1: /process runs as a JobManager job and its result travels inside
+    # JobStatusResponse.result (typed Any), so FastAPI cannot see the field
+    # while generating OpenAPI. Extend the generated schema with the result
+    # model and its ParseIssueModel items so the served contract documents
+    # parse_issues instead of only the runtime payload injection.
+    # (Standard "extending OpenAPI" pattern: wrap the generator, keep its
+    # cache, and only add what is missing.)
+    original_openapi = app.openapi
+
+    def openapi_with_result_models():  # noqa: ANN202
+        schema = original_openapi()
+        components = schema.setdefault("components", {}).setdefault("schemas", {})
+        if (
+            "ProcessResultModel" not in components
+            or "ParseIssueModel" not in components
+        ):
+            result_schema = ProcessResultModel.model_json_schema(
+                ref_template="#/components/schemas/{model}"
+            )
+            definitions = result_schema.pop("$defs", {})
+            components.setdefault("ProcessResultModel", result_schema)
+            for name, sub_schema in definitions.items():
+                components.setdefault(name, sub_schema)
+        return schema
+
+    app.openapi = openapi_with_result_models
     return app
 
 

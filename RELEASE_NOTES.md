@@ -1,10 +1,7 @@
-# Release Notes
+# Release Notes — SRT4U 1.4.9
 
-> **Status: prepared, not published.**
-> These notes describe the current `main` state (version `1.4.9`). No `v1.4.9` tag
-> and no GitHub Release exist yet — the latest published release is still
-> **v1.1.0**. They are kept ready as the body of the future v1.4.9 release; see
-> [CHANGELOG.md](CHANGELOG.md) for the full, dated change list.
+SRT4U Subtitle Processor **1.4.9**. See [CHANGELOG.md](CHANGELOG.md) for the
+full, dated change list.
 
 ## What's New in 1.4.9
 
@@ -50,6 +47,14 @@ hardening pass over translation, history and the build pipeline.
 - **Burn-in rendering hardened**: braces in subtitle text are escaped before the
   renderer generates its own ASS tags, so arbitrary subtitle content can no longer
   inject ASS override or drawing blocks into the burned-in video.
+- **Deep-audit remediation**: failed or cancelled burn-in encodes can no longer
+  destroy a previously valid output (atomic sibling-temp promotion); WebVTT
+  `NOTE`/`STYLE`/`REGION` metadata no longer produces phantom cues; parser and QA
+  share one timestamp grammar so the two layers cannot contradict each other;
+  per-cue ASS styles survive export; the API shows actionable local validation
+  errors while internal failures stay sanitized; GUI start actions guard against
+  double launches; parse issues are reported as advisories across pipeline, API,
+  GUI and history.
 - **i18n coherence**: the six catalogs (English, Spanish, German, Italian,
   Portuguese, Simplified Chinese) carry identical keys and compatible
   placeholders, including the Transcribe and Pipeline pages.

@@ -699,3 +699,47 @@ def test_translation_result_serializes_all_metric_fields(monkeypatch):
     assert expected <= set(payload["metrics"])
     assert payload["metrics"]["input_tokens"] == 4
     assert payload["metrics"]["estimated_cost"] is None
+
+
+def test_default_fallback_policy_is_explicit_and_deepl_to_google(monkeypatch):
+    """Pin the documented explicit fallback policy (release-hardening review).
+
+    docs/providers.md: the historical DeepL/OpenAI-compatible -> Google
+    fallback is kept, now explicit in ``DEFAULT_FALLBACKS``, applies to any
+    normalized provider error (including authentication) and can be disabled
+    with ``fallbacks={}``. Failing over to a *different* provider on auth
+    errors is deliberate compatibility behaviour, not a defect; this test
+    makes any silent semantic drift visible.
+    """
+    providers = {
+        "deepl": FakeProvider(),
+        "google": FakeProvider(),
+    }
+    providers["deepl"].name = "deepl"
+    providers["deepl"].error = ProviderAuthenticationError("deepl auth rejected")
+    providers["google"].name = "google"
+    providers["google"].response = ProviderResponse(
+        "translated by google", model="google-model"
+    )
+    monkeypatch.setattr(
+        ProviderRegistry, "get", lambda name, config_service=None: providers[name]
+    )
+
+    # Default policy: deepl falls back to google (documented, explicit).
+    service = TranslationService(config_service=MemoryConfig())
+    assert service.fallbacks["deepl"] == ("google",)
+    result = service.translate_with_metrics("hello", "es", provider="deepl")
+    assert result.metrics.success is True
+    assert result.metrics.requested_provider == "deepl"
+    assert result.metrics.provider == "google"
+    assert result.metrics.fallback_used is True
+    assert result.metrics.fallback_error_type == "authentication"
+
+    # Strict pinning: no_fallback / fallbacks={} never leaves the requested
+    # provider (the privacy-conscious option documented in providers.md).
+    strict = TranslationService(config_service=MemoryConfig(), fallbacks={})
+    strict_result = strict.translate_with_metrics("hello", "es", provider="deepl")
+    assert strict_result.metrics.success is False
+    assert strict_result.metrics.provider == "deepl"
+    assert strict_result.metrics.fallback_used is False
+    assert strict_result.metrics.error_type == "authentication"

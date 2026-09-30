@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    # El glob es amplio a propósito: Actions no puede filtrar por formato.
+    # La puerta real está en el paso "Validate tag before publishing" del job
+    # release (tools/release_check.py), que exige vMAJOR.MINOR.PATCH y que el
+    # tag coincida con pyproject.toml antes de publicar.
     tags:
       - 'v*'
   pull_request:
@@ -18,6 +22,13 @@ env:
   # la etiqueta móvil `latest` de yt-dlp/FFmpeg-Builds: sus autobuild se purgan
   # a los ~14 días y una URL fijada a uno de ellos acabaría en 404.
   # tests/test_coherence.py::test_ci_pins_static_ffmpeg_version lo vigila.
+  # OJO: `b6.1.1` es el identificador de la release del repositorio que
+  # publica el binario, no el banner semántico del propio FFmpeg; la
+  # documentación lo describe como pin de descarga, nunca como versión
+  # semántica de FFmpeg.
+  # Al publicar: sube pyproject.toml, APP_VERSION, --version, los seis
+  # `about.version_pill` y este comentario a la vez; el job release compara
+  # el tag con pyproject.toml y cancela si hay desajuste.
   FFMPEG_VERSION: "b6.1.1"
   # appimagetool también iba por la etiqueta móvil `continuous`, lo que dejaba
   # el AppImage sin reproducir. Mismo tag estable para todos los builds.
@@ -354,6 +365,43 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate tag before publishing (stable format + version match + provenance)
+        env:
+          TAG: ${{ github.ref_name }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # 1. Formato estable y tag == project.version (pyproject.toml).
+          #    Falla ANTES de publicar: v1.4.8/v1.5.0/v2.0.0 por no coincidir,
+          #    v1.4.9-rc1 por no ser vMAJOR.MINOR.PATCH. El trigger `v*` sigue
+          #    siendo amplio (los globs de Actions no filtran por formato);
+          #    esta puerta es la que decide si se publica.
+          python tools/release_check.py "$TAG"
+
+          # 2. El tag apunta al commit que se está publicando (sin GitHub API:
+          #    git local tras el checkout del ref del tag).
+          TAG_SHA=$(git rev-parse "refs/tags/${TAG}^{commit}")
+          if [ "$TAG_SHA" != "$EXPECTED_SHA" ]; then
+            echo "release cancelada: el tag ${TAG} apunta a ${TAG_SHA}, no al commit construido ${EXPECTED_SHA}" >&2
+            exit 1
+          fi
+
+          # 3. Procedencia: los artefactos deben llevar la versión del tag
+          #    incrustada (la CLI la declara como literal y
+          #    test_single_product_version_everywhere la mantiene igual a
+          #    pyproject.toml, la fuente única).
+          VERSION="${TAG#v}"
+          for artifact in \
+            release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe \
+            release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.AppImage \
+            release-artifacts/SRT4U-macOS/SRT4U-macOS.dmg; do
+            if ! grep -aqF "$VERSION" "$artifact"; then
+              echo "release cancelada: ${artifact} no contiene la versión ${VERSION} (¿artefacto de otro ref?)" >&2
+              exit 1
+            fi
+          done
+          echo "tag ${TAG} (commit ${EXPECTED_SHA}) verificado; artefactos con versión ${VERSION}"
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -376,7 +424,7 @@ jobs:
         with:
           name: "SRT4U ${{ github.ref_name }} — Subtitle Processor & Translator"
           body_path: RELEASE_NOTES.md
-          prerelease: false  # releases ship as stable
+          prerelease: false  # sólo llega aquí vMAJOR.MINOR.PATCH (release_check lo garantiza)
           files: |
             release-dist/SRT4U-Windows-x64.exe
             release-dist/SRT4U-Linux-x86_64.AppImage

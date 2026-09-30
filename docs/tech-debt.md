@@ -79,7 +79,8 @@ cada punto indica por qué no se toca.
   `max_retries` acotado en API (0–10) y no negativo en servicios/CLI.
 - Temporales API siempre eliminados (incluido cancel en cola vía `on_drop`;
   la exportación pipeline usa temporal hermano y no expone rutas internas).
-- SQLite: migraciones v1→v2, `record_safely` nunca rompe ejecución, sin
+- SQLite: migraciones v1→v2→v3 (la v3 añade `parse_issues`), `record_safely`
+  nunca rompe ejecución, sin
   transcript/audio/vídeo/claves (tests lo afirman para transcription y
   pipeline), GUI/CLI/API aíslan errores con `HistoryError`.
 - OpenAPI con 13 paths; jobs con 404/409 y proyección sin campos internos.

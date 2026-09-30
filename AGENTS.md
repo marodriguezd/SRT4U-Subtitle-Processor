@@ -56,7 +56,7 @@ Key services (`application/services/`):
   transcription/parse → cleaning → analytics → QA → optional translation →
   final QA → export → optional burn-in. Reuses the services above; no
   duplicated domain logic.
-- `HistoryStore` (`history_store.py`, schema v2) — SQLite `runs` + `qa_findings`,
+- `HistoryStore` (`history_store.py`, schema v3) — SQLite `runs` + `qa_findings`,
   `user_version` migrations, `record_safely` never breaks execution.
 - `SubtitleQA` + `subtitle_analytics.py` — deterministic rules and grouped
   metrics (content/timing/quality); overlap findings are warnings
@@ -208,7 +208,8 @@ dialog minimums content-derived; layouts must survive German-length strings
 ## 14. History / SQLite
 
 `HistoryStore` records `process/analyze/qa/benchmark/transcription/pipeline`
-with aggregate metrics only. Migrations v1→v2 (`media_duration_ms`);
+with aggregate metrics only. Migrations v1→v2 (`media_duration_ms`) and
+v2→v3 (`parse_issues`);
 `SRT4U_HISTORY_DB` override. NEVER persist: subtitle texts, transcripts,
 audio/video, API keys, headers, secrets (test-enforced). GUI/CLI/API isolate
 storage failures via `HistoryError` — history never breaks execution.

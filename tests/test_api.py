@@ -286,3 +286,57 @@ def test_no_tracebacks_or_keys_in_errors(client):
     )
     assert response.status_code in {200, 400}
     assert "Traceback" not in response.text
+
+
+def test_process_result_contract_declares_parse_issues(client):
+    """P1 contract: /process exposes parse_issues in the OpenAPI schema.
+
+    The field used to be injected into the job payload at runtime without a
+    schema declaration, so OpenAPI clients could not discover it.
+    """
+    from application.api.schemas import ProcessResultModel
+
+    properties = ProcessResultModel.model_json_schema()["properties"]
+    assert "parse_issues" in properties, "parse_issues must be declared"
+    assert properties["parse_issues"]["type"] == "array"
+    items = properties["parse_issues"]["items"]
+    assert "$ref" in items, items
+    ref = items["$ref"].rsplit("/", 1)[-1]
+    schema = ProcessResultModel.model_json_schema()["$defs"][ref]
+    assert set(schema["properties"]) == {"kind", "reason", "line", "snippet"}
+    # The API-wide OpenAPI document must carry the same structure.
+    spec = create_app().openapi()
+    assert "ParseIssueModel" in spec["components"]["schemas"]
+    assert set(spec["components"]["schemas"]["ParseIssueModel"]["properties"]) == {
+        "kind",
+        "reason",
+        "line",
+        "snippet",
+    }
+
+
+def test_process_job_result_carries_parse_issue_structure(client, mock_provider):
+    """A malformed-but-recoverable subtitle yields the documented structure."""
+    content = (
+        "1\n00:00:01,000 --> 00:00:02,000\nHello world\n\n"
+        "2\n00:75:00,000 --> 00:75:01,000\nbad block\n"
+    )
+    response = _upload(client, path="/api/v1/process", content=content)
+    assert response.status_code == 202
+    job = _wait_job(client, response.json()["job_id"])
+    assert job["status"] == "completed"
+    result = job["result"]
+    assert len(result["parse_issues"]) == 1
+    issue = result["parse_issues"][0]
+    assert set(issue) == {"kind", "reason", "line", "snippet"}
+    assert issue["kind"] == "invalid_timestamp"
+    assert issue["line"] == 6
+    assert "00:75:00,000" in issue["snippet"]
+    # Advisory: the run still completed with usable output.
+    assert result["stats"]["parse_issues"] == 1
+    assert result["output_content"].strip()
+    # A clean file produces an empty list, not a missing key.
+    clean = _upload(client, path="/api/v1/process")
+    job = _wait_job(client, clean.json()["job_id"])
+    assert job["status"] == "completed"
+    assert job["result"]["parse_issues"] == []

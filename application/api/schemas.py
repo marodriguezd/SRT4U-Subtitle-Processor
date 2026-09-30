@@ -12,6 +12,15 @@ from pydantic import BaseModel, Field
 APP_VERSION = "1.4.9"
 
 
+class ParseIssueModel(BaseModel):
+    """One block the parser could not use (advisory; never a failure)."""
+
+    kind: str = Field(examples=["invalid_timestamp", "reversed_timing", "empty_cue"])
+    reason: str
+    line: Optional[int] = None
+    snippet: str = ""
+
+
 class HealthResponse(BaseModel):
     status: str = Field(examples=["ok"])
     version: str = Field(examples=[APP_VERSION])
@@ -126,6 +135,13 @@ class ProcessResultModel(BaseModel):
     processed_items_count: int = 0
     translation_metrics: Optional[TranslationMetricsModel] = None
     qa: Optional[QAReportModel] = None
+    # P1: parser findings ride along as a top-level advisory list so API
+    # clients can warn their users. Declared explicitly (instead of the
+    # previous runtime-only `data["parse_issues"]` injection) so the OpenAPI
+    # contract describes the field. The /process route returns plain dicts
+    # (JobStatusResponse.result is Any), so the declaration documents the
+    # shape without changing serialization.
+    parse_issues: List[ParseIssueModel] = Field(default_factory=list)
 
 
 class JobCreatedResponse(BaseModel):

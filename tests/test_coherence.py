@@ -280,3 +280,135 @@ def test_ci_release_is_the_only_job_with_write_permission():
     # Y debe ser el job que publica la release, no otro.
     release_block = workflow.split("\n  release:", 1)[1]
     assert "contents: write" in release_block
+
+
+# ------------------------------------------------------- release hardening --
+
+
+def _release_check_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "release_check", ROOT / "tools" / "release_check.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_release_workflow_gates_publication_on_tag_validation():
+    """The `v*` trigger is wide; the release job must be the real gate."""
+    workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
+    release_block = workflow.split("\n  release:", 1)[1]
+    assert "tools/release_check.py" in release_block, (
+        "el job release debe ejecutar la puerta de tag antes de publicar"
+    )
+    assert "github.ref_name" in release_block
+    # Procedencia: el tag debe apuntar al commit que se publica (sin API).
+    assert "git rev-parse" in release_block and "refs/tags/" in release_block
+    assert "github.sha" in release_block
+    # Sigue publicando desde el cuerpo versionado y como estable.
+    assert "body_path: RELEASE_NOTES.md" in release_block
+    assert "prerelease: false" in release_block
+
+
+def test_release_gate_rejects_wrong_version_and_prerelease_tags():
+    """v<X.Y.Z+1>, prereleases and suffixed tags must never publish."""
+    tool = _release_check_module()
+    pyproject = ROOT / "pyproject.toml"
+    major, minor, patch = (int(part) for part in EXPECTED_VERSION.split("."))
+
+    assert tool.check_tag(f"v{EXPECTED_VERSION}", pyproject) is None
+
+    for bad_tag in (
+        f"v{major}.{minor}.{patch + 1}",  # v1.5.0-style future bump
+        f"v{major}.{minor}.{patch - 1}" if patch else f"v{major}.{minor - 1}.0",
+        f"v{major + 1}.0.0",
+        f"v{EXPECTED_VERSION}-rc1",
+        f"v{EXPECTED_VERSION}-beta1",
+        f"v{EXPECTED_VERSION}+build.7",
+        f"{EXPECTED_VERSION}",  # sin la 'v'
+        f"v{EXPECTED_VERSION}.1",  # cuatro componentes
+    ):
+        reason = tool.check_tag(bad_tag, pyproject)
+        assert reason is not None, f"{bad_tag} debe rechazarse"
+        assert bad_tag in reason, reason
+
+
+def test_release_gate_cli_exit_codes():
+    """The workflow relies on exit codes: 0 publish, 1 refuse."""
+    import subprocess
+    import sys
+
+    tool = ROOT / "tools" / "release_check.py"
+    ok = subprocess.run(
+        [sys.executable, str(tool), f"v{EXPECTED_VERSION}"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    assert ok.returncode == 0, ok.stderr
+    bad = subprocess.run(
+        [sys.executable, str(tool), f"v{EXPECTED_VERSION}-rc1"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    assert bad.returncode == 1
+    assert bad.stderr.strip()
+
+
+def test_release_notes_are_release_facing_not_preparation():
+    """RELEASE_NOTES.md is the GitHub Release body: no pre-release claims."""
+    notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+    for stale_phrase in (
+        "not published",
+        "exist yet",
+        "does not exist",
+        "latest published release",
+        "Status: prepared",
+        "future v",
+        "kept ready",
+    ):
+        assert stale_phrase not in notes, stale_phrase
+    # Describe la versión que publica el tag.
+    assert f"SRT4U {EXPECTED_VERSION}" in notes
+    # macOS sigue documentado como arm64-only, nunca universal.
+    assert "Apple Silicon (arm64)" in notes
+    assert "no x86_64 build is produced" in notes
+    assert "will not launch on Intel Macs" in notes
+
+
+def test_current_docs_describe_history_schema_v3():
+    """Current-state docs must match SCHEMA_VERSION (v3, parse_issues)."""
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert "schema v3" in agents
+    assert "schema v2" not in agents
+    database = (ROOT / "docs/database.md").read_text(encoding="utf-8")
+    assert "## Schema (v3)" in database
+    tech_debt = (ROOT / "docs/tech-debt.md").read_text(encoding="utf-8")
+    assert "v1→v2→v3" in tech_debt
+
+    from application.services import history_store
+
+    assert history_store.SCHEMA_VERSION == 3
+    assert "parse_issues" in history_store._MIGRATIONS[3]
+
+
+def test_api_contract_declares_parse_issues_in_openapi():
+    """The served OpenAPI must document the /process parse_issues payload."""
+    from application.api.app import create_app
+
+    spec = create_app().openapi()
+    schemas = spec["components"]["schemas"]
+    assert "ProcessResultModel" in schemas
+    assert "ParseIssueModel" in schemas
+    assert set(schemas["ParseIssueModel"]["properties"]) == {
+        "kind",
+        "reason",
+        "line",
+        "snippet",
+    }
+    parse_issues = schemas["ProcessResultModel"]["properties"]["parse_issues"]
+    assert parse_issues["type"] == "array"
+    assert parse_issues["items"]["$ref"].endswith("ParseIssueModel")

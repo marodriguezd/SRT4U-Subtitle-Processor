@@ -13,7 +13,7 @@ registra un aviso en el log. JSON/CSV del benchmark coexisten sin cambios.
 para no tocar la BD real). Comandos `process`/`benchmark`/`history` aceptan
 `--db`; `process` admite `--no-history`.
 
-## Schema (v1)
+## Schema (v3)
 
 - `runs`: una fila por ejecución — `timestamp`, `operation`, `file_path`,
   `file_format`, idiomas, `provider`, `requested_provider`, `model`, cues,
@@ -22,6 +22,9 @@ para no tocar la BD real). Comandos `process`/`benchmark`/`history` aceptan
   tokens, `estimated_cost`, `qa_errors`, `qa_warnings`,
   `translation_failures`, `benchmark_id`, `run_index`. Índices en
   `timestamp`, `requested_provider`, `operation`, `benchmark_id`.
+  Añadidos por migración: `media_duration_ms` (v2) y `parse_issues`
+  (v3, contador de bloques que el parser no pudo usar; asesor, nunca
+  altera `success`).
 - `qa_findings`: `run_id → runs`, `severity`, `rule`, `subtitle_index`,
   `message`, `metadata` (JSON).
 
