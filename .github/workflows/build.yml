@@ -191,11 +191,24 @@ jobs:
         run: |
           Move-Item -Path "dist/SRT4U.exe" -Destination "dist/SRT4U-Windows-x64.exe"
 
+      - name: Stamp release version (provenance marker)
+        # El sello va en un fichero de texto junto al binario: los binarios
+        # PyInstaller comprimen todo el código Python (PYZ/zlib), de modo que
+        # un grep del literal de versión sobre el binario nunca puede pasar.
+        # El job release compara este sello con el tag; un artefacto
+        # construido de otro ref no lleva el sello correcto.
+        run: |
+          $v = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          Set-Content -Path dist/RELEASE_VERSION -Value $v -NoNewline
+          Write-Output "RELEASE_VERSION=$v"
+
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SRT4U-Windows-x64
-          path: dist/SRT4U-Windows-x64.exe
+          path: |
+            dist/SRT4U-Windows-x64.exe
+            dist/RELEASE_VERSION
 
   build-linux:
     name: Build Linux (.AppImage)
@@ -299,6 +312,14 @@ jobs:
           tar -czvf SRT4U-Linux-x86_64.tar.gz SRT4U
           cd ..
 
+      - name: Stamp release version (provenance marker)
+        # Ver comentario del paso equivalente en build-windows: el sello va
+        # junto al binario porque el código PyInstaller va comprimido. sed
+        # (no grep -P) para ser portable entre GNU y BSD grep.
+        run: |
+          sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml > dist/RELEASE_VERSION
+          cat dist/RELEASE_VERSION
+
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -306,6 +327,7 @@ jobs:
           path: |
             dist/SRT4U-Linux-x86_64.AppImage
             dist/SRT4U-Linux-x86_64.tar.gz
+            dist/RELEASE_VERSION
 
   build-macos:
     name: Build macOS (.dmg)
@@ -350,11 +372,22 @@ jobs:
         run: |
           hdiutil create -volname "SRT4U" -srcfolder "dist/SRT4U.app" -ov -format UDZO "dist/SRT4U-macOS.dmg"
 
+      - name: Stamp release version (provenance marker)
+        # Ver comentario del paso equivalente en build-windows: el sello va
+        # junto al binario porque el código PyInstaller va comprimido (y un
+        # UDZO no admite bytes añadidos tras su trailer koly). sed (no
+        # grep -P) porque BSD grep en macOS no soporta -P.
+        run: |
+          sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml > dist/RELEASE_VERSION
+          cat dist/RELEASE_VERSION
+
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SRT4U-macOS
-          path: dist/SRT4U-macOS.dmg
+          path: |
+            dist/SRT4U-macOS.dmg
+            dist/RELEASE_VERSION
 
   release:
     name: Publish GitHub Release
@@ -395,17 +428,19 @@ jobs:
             exit 1
           fi
 
-          # 3. Procedencia: los artefactos (ya descargados arriba) deben
-          #    llevar la versión del tag incrustada (la versión se deriva de
-          #    pyproject.toml vía application/version.py;
-          #    test_single_product_version_everywhere mantiene toda la cadena
-          #    igual a la fuente única).
+          # 3. Procedencia: cada artefacto lleva un sello de versión en
+          #    texto plano (dist/RELEASE_VERSION, escrito por los builds a
+          #    partir de pyproject.toml del commit construido). Los binarios
+          #    PyInstaller comprimen el código Python, así que el literal no
+          #    es localizable con grep dentro del ejecutable; el sello junto
+          #    al binario es el marcador de procedencia verificable: un
+          #    artefacto de otro ref no lleva la versión del tag.
           VERSION="${TAG#v}"
           for artifact in \
-            release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe \
-            release-artifacts/SRT4U-Linux-x86_64/SRT4U-Linux-x86_64.AppImage \
-            release-artifacts/SRT4U-macOS/SRT4U-macOS.dmg; do
-            if ! grep -aqF "$VERSION" "$artifact"; then
+            release-artifacts/SRT4U-Windows-x64/RELEASE_VERSION \
+            release-artifacts/SRT4U-Linux-x86_64/RELEASE_VERSION \
+            release-artifacts/SRT4U-macOS/RELEASE_VERSION; do
+            if ! grep -aqxF "$VERSION" "$artifact"; then
               echo "release cancelada: ${artifact} no contiene la versión ${VERSION} (¿artefacto de otro ref?)" >&2
               exit 1
             fi

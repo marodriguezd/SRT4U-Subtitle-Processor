@@ -80,8 +80,13 @@ Hardening final pre-release (sin funcionalidades nuevas):
 - **Workflow de release**: los artefactos se descargan ANTES de validar su
   contenido/procedencia (antes se validaban ficheros aún no descargados;
   cualquier tag habría fallado en ese paso). Se preservan la verificación de
-  formato estable, la coincidencia tag/pyproject, la proveniencia del commit
-  y la comprobación de versión incrustada en los artefactos.
+  formato estable, la coincidencia tag/pyproject y la proveniencia del commit.
+  La comprobación de versión de los artefactos pasa a un sello de texto
+  plano (`RELEASE_VERSION`, escrito por cada build junto al binario): los
+  ejecutables PyInstaller comprimen todo el código Python (PYZ/zlib), de
+  modo que el literal de versión nunca es localizable con `grep` dentro del
+  binario — verificado empíricamente con un build onefile local. Un DMG UDZO,
+  además, no admite bytes añadidos tras su trailer `koly`.
 - **Historial `parse_issues` (schema v3)**: `record_processing_result()` no
   persistía la columna que declara la migración v3; ahora registra el
   contador de `ProcessingStats.parse_issues`, igual que ya hacían

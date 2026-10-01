@@ -325,6 +325,30 @@ def test_release_workflow_gates_publication_on_tag_validation():
     # Procedencia: el tag debe apuntar al commit que se publica (sin API).
     assert "git rev-parse" in release_block and "refs/tags/" in release_block
     assert "github.sha" in release_block
+    # Procedencia de artefactos: cada build escribe un sello de versión en
+    # texto plano (RELEASE_VERSION) y el job release lo compara con el tag.
+    # Los binarios PyInstaller comprimen el código Python, así que el grep
+    # del literal dentro del ejecutable nunca puede pasar.
+    _JOB_ORDER = [
+        "test",
+        "compat-min-pyqt6",
+        "build-windows",
+        "build-linux",
+        "build-macos",
+        "release",
+    ]
+
+    def _job_block(name):
+        start = workflow.split(f"\n  {name}:", 1)[1]
+        nxt = _JOB_ORDER[_JOB_ORDER.index(name) + 1]
+        return start.split(f"\n  {nxt}:", 1)[0]
+
+    for job in ("build-windows", "build-linux", "build-macos"):
+        job_block = _job_block(job)
+        assert "Stamp release version" in job_block, job
+        assert "RELEASE_VERSION" in job_block, job
+    assert "RELEASE_VERSION" in release_block
+    assert "no contiene la versión" in release_block
     # Sigue publicando desde el cuerpo versionado y como estable.
     assert "body_path: RELEASE_NOTES.md" in release_block
     assert "prerelease: false" in release_block
