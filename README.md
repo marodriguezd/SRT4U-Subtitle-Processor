@@ -7,7 +7,9 @@
 
 [**English**](README.md) | [**Español**](README_es.md)
 
-Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`, `.txt`) with a real-time synchronized video player and direct video burn-in export.
+Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) with a real-time synchronized video player and direct video burn-in export.
+
+Current stable release: **[v1.4.9](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.9)** — see [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ![SRT4U Preview](assets/preview_en.png)
 
@@ -40,9 +42,9 @@ Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt
 - **Subtitle Analytics & deterministic QA**: grouped content/timing/quality metrics plus rule-based validation (`analyze`/`qa`, JSON/CSV).
 - **Translation benchmarks**: reproducible provider comparison with JSON/CSV reports and offline analysis notebook.
 - **Local SQLite history**: every execution recorded with aggregate metrics (History page, `history` CLI); no texts, keys, or media stored.
-- **Local REST API** (optional `[api]` extra): `/api/v1` with analyze, QA, translate/process/transcribe/pipeline jobs, history, benchmarks, OpenAPI docs.
-- **Local Whisper transcription** (optional `[transcription]` extra): audio/video → subtitles feeding analytics, QA, cleaning, translation, burn-in.
-- **End-to-end media pipeline**: `srt4u pipeline` / Pipeline page / `POST /api/v1/pipeline` chaining transcription → cleaning → analytics → QA → optional translation → final QA → export → optional burn-in, with per-stage errors and cancellation.
+- **Local REST API** (optional `[api]` extra): `/api/v1` with analyze, QA, translate/process/transcribe/pipeline jobs, history, benchmarks, OpenAPI docs — binds to localhost by default, no authentication.
+- **Local Whisper transcription** (optional `[transcription]` extra): audio/video → subtitles feeding analytics, QA, cleaning, translation, burn-in. Models are not bundled; they download on first use.
+- **End-to-end media pipeline**: `srt4u pipeline` / Pipeline page / `POST /api/v1/pipeline` chaining transcription → cleaning → analytics → QA → optional translation → final QA → export → optional burn-in, with per-stage errors and cooperative (best-effort) cancellation: queued jobs are dropped, running ones finish and their result is discarded.
 - **Headless CLI**: Process batches, analyze subtitle metrics, and run deterministic QA with JSON/CSV exports without starting PyQt6.
 - **Parallel Execution**: Multi-threaded block translation to speed up large subtitle files.
 - **Dark / Light Glass Theme**: Modern Glassmorphism UI with instant theme switching.
@@ -79,7 +81,7 @@ python -m application.cli process input.srt --output output.srt --clean
 ### Optional extras
 
 ```bash
-pip install ".[api]"            # local REST API: srt4u serve (/api/v1, OpenAPI)
+pip install ".[api]"            # local REST API: srt4u serve (/api/v1, OpenAPI; localhost by default, no auth)
 pip install ".[transcription]"  # local Whisper: srt4u transcribe / pipeline media
 pip install ".[dev]"            # pytest + ruff for contributors
 ```
@@ -110,13 +112,21 @@ guides: [docs/cli.md](docs/cli.md), [docs/api.md](docs/api.md),
 [docs/transcription.md](docs/transcription.md), [docs/pipeline.md](docs/pipeline.md),
 [docs/database.md](docs/database.md), [docs/tech-debt.md](docs/tech-debt.md).
 
-### Pre-built Binaries
-GitHub Actions builds release artifacts when a `v*` tag is published. The
-workflow bundles a version-pinned static FFmpeg executable in the Windows,
-Linux, and macOS builds; platform runtime-library requirements still apply, so
-compatibility depends on the target system. Check the release assets for the
-artifacts currently published; the working-tree version is not itself a
-published release.
+### Pre-built Binaries (v1.4.9)
+
+The current stable release is **[v1.4.9](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.9)** (not a prerelease). GitHub Actions builds and attaches these assets for every stable `v*` tag:
+
+| Asset | Platform | Architecture |
+|---|---|---|
+| [`SRT4U-Windows-x64.exe`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-Windows-x64.exe) | Windows 10/11 | x86_64 |
+| [`SRT4U-Linux-x86_64.AppImage`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-Linux-x86_64.AppImage) | Linux | x86_64 |
+| [`SRT4U-Linux-x86_64.tar.gz`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-Linux-x86_64.tar.gz) | Linux | x86_64 |
+| [`SRT4U-macOS.dmg`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-macOS.dmg) | macOS (Apple Silicon) | **arm64 only** — will not launch on Intel Macs |
+| [`checksums.txt`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/checksums.txt) | SHA-256 checksums of the assets above | — |
+
+The CI builds bundle a version-pinned static FFmpeg executable, so burn-in
+works out of the box; platform runtime-library requirements still apply.
+Source installs (previous section) need a usable FFmpeg on `PATH` for burn-in.
 
 ---
 
@@ -130,7 +140,11 @@ The CLI reuses `SubtitleService` to clean, translate, convert formats, and proce
 
 ## Translation providers & metrics
 
-`TranslationService` dispatches through `ProviderRegistry` to `Google`, `DeepL`, or the OpenAI-compatible endpoint (`openai`, `llm`, and `ollama` aliases share the implementation; the requested name is preserved in metrics). Errors are normalized (`error_type`), retries are opt-in, and the historic DeepL/OpenAI→Google fallback is explicit and configurable. `translate_with_metrics()` returns `TranslationResult` with JSON-serializable `TranslationMetrics` (provider, model, languages, cues/chars/words, wall-time duration, retries, fallback, tokens when reported, `estimated_cost` stays `null`); the CLI prints them with `--stats` or `--stats-json`. `benchmark` runs a fixed dataset against several providers over N runs and exports JSON/CSV for offline analysis; `notebooks/benchmark_analysis.ipynb` + `analysis/benchmark_analysis.py` compute descriptive stats, variability, errors/fallback and plots into `reports/benchmark/`. Executions are recorded in a local SQLite history (`history` CLI, History page, `--store` for benchmarks). A local REST API (`srt4u serve`, FastAPI `[api]` extra) exposes analyze, QA, translate/process jobs, history and benchmarks over `/api/v1` with OpenAPI docs. Optional local Whisper transcription (`srt4u transcribe`, Transcribe page, `POST /api/v1/transcribe` jobs; `faster-whisper` `[transcription]` extra) turns audio/video into subtitles feeding Analytics, QA, cleaning, translation and burn-in. A `MediaPipeline` orchestrator (`srt4u pipeline`, Pipeline page, `POST /api/v1/pipeline` jobs) chains transcription/parse → cleaning → analytics → QA → optional translation → final QA → SRT/VTT export → optional burn-in with per-stage errors, cooperative cancellation and one main history record. See [docs/providers.md](docs/providers.md), [docs/benchmarking.md](docs/benchmarking.md), [docs/benchmark_analysis.md](docs/benchmark_analysis.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), [docs/transcription.md](docs/transcription.md) and [docs/pipeline.md](docs/pipeline.md).
+`TranslationService` dispatches through `ProviderRegistry` to `Google`, `DeepL`, or the OpenAI-compatible endpoint (`openai`, `llm`, and `ollama` aliases share the implementation; the requested provider is preserved in metrics). Errors are normalized (`error_type`), retries are opt-in, and fallbacks are explicit, configurable, and cycle-safe. `translate_with_metrics()` returns `TranslationResult` with JSON-serializable `TranslationMetrics`; the CLI prints them with `--stats` or `--stats-json`, and `estimated_cost` stays `null` — no invented tariffs.
+
+`benchmark` runs a versioned dataset against several providers over N runs and exports JSON/CSV for offline analysis (`notebooks/benchmark_analysis.ipynb` + `analysis/benchmark_analysis.py`). Executions are recorded in a local SQLite history (`history` CLI, History page, `--store` for benchmarks): aggregate metrics only — no texts, keys, or media ever stored.
+
+Deep dives: [docs/providers.md](docs/providers.md), [docs/benchmarking.md](docs/benchmarking.md), [docs/benchmark_analysis.md](docs/benchmark_analysis.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), [docs/transcription.md](docs/transcription.md), and [docs/pipeline.md](docs/pipeline.md).
 
 ## Running Tests
 

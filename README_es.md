@@ -7,7 +7,9 @@
 
 [**English**](README.md) | [**Español**](README_es.md)
 
-Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de subtítulos (`.srt`, `.vtt`, `.ass`, `.txt`) con reproductor de vídeo sincronizado en tiempo real e incrustación directa en vídeo (Burn-In / Hardsub).
+Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de subtítulos (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) con reproductor de vídeo sincronizado en tiempo real e incrustación directa en vídeo (Burn-In / Hardsub).
+
+Release estable actual: **[v1.4.9](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.9)** — ver [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ![Vista previa de SRT4U](assets/preview_es.png)
 
@@ -40,9 +42,9 @@ Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de
 - **Analytics y QA determinista**: métricas agrupadas de contenido/tiempos/calidad más validación por reglas (`analyze`/`qa`, JSON/CSV).
 - **Benchmarks de traducción**: comparación reproducible de providers con informes JSON/CSV y notebook de análisis.
 - **Historial local SQLite**: cada ejecución registrada con métricas agregadas; sin textos, claves ni multimedia.
-- **API REST local** (extra `[api]`): `/api/v1` con analyze, QA, jobs, historial, benchmarks y OpenAPI.
-- **Transcripción local Whisper** (extra `[transcription]`): audio/vídeo → subtítulos.
-- **Pipeline audiovisual**: `srt4u pipeline` / página Pipeline / `POST /api/v1/pipeline` (transcripción → limpieza → analytics → QA → traducción opcional → QA final → exportación → burn-in opcional).
+- **API REST local** (extra `[api]`): `/api/v1` con analyze, QA, jobs de translate/process/transcribe/pipeline, historial, benchmarks y OpenAPI — escucha en localhost por defecto, sin autenticación.
+- **Transcripción local Whisper** (extra `[transcription]`): audio/vídeo → subtítulos para analytics, QA, limpieza, traducción y burn-in. Los modelos no se empaquetan: se descargan al primer uso.
+- **Pipeline audiovisual**: `srt4u pipeline` / página Pipeline / `POST /api/v1/pipeline` (transcripción → limpieza → analytics → QA → traducción opcional → QA final → exportación → burn-in opcional), con errores por etapa y cancelación cooperativa (best-effort): los jobs en cola se descartan y los que están en ejecución terminan; su resultado se descarta.
 - **CLI headless**: Limpieza, traducción y conversión por lotes; incluye análisis de métricas y QA determinista con exportación JSON/CSV, sin iniciar PyQt6.
 - **Ejecución multihilo**: Traducción simultánea de bloques de subtítulos para acelerar el procesamiento.
 - **Tema Dark / Light Glassmorphism**: Alternancia instantánea entre modo oscuro y claro con estética moderna translúcida.
@@ -79,7 +81,7 @@ python -m application.cli process input.srt --output output.srt --clean
 ### Extras opcionales
 
 ```bash
-pip install ".[api]"            # API REST local: srt4u serve (/api/v1, OpenAPI)
+pip install ".[api]"            # API REST local: srt4u serve (/api/v1, OpenAPI; localhost por defecto, sin auth)
 pip install ".[transcription]"  # Whisper local: srt4u transcribe / pipeline
 pip install ".[dev]"            # pytest + ruff para contribuir
 ```
@@ -110,14 +112,22 @@ Arquitectura (GUI/CLI/API → servicios → providers/SQLite/FFmpeg) y guías:
 [docs/transcription.md](docs/transcription.md), [docs/pipeline.md](docs/pipeline.md),
 [docs/database.md](docs/database.md), [docs/tech-debt.md](docs/tech-debt.md).
 
-### Binarios precompilados
-GitHub Actions genera artefactos de release cuando se publica un tag `v*`.
-El workflow incluye un ejecutable de FFmpeg estático y fijado por versión en
-las compilaciones de Windows, Linux y macOS; los requisitos de bibliotecas del
-sistema siguen aplicando, por lo que la compatibilidad depende del sistema de
-destino. Consulta los assets para ver qué artefactos están publicados
-actualmente; la versión del árbol de trabajo no constituye por sí misma una
-release publicada.
+### Binarios precompilados (v1.4.9)
+
+La release estable actual es **[v1.4.9](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.9)** (no es una pre-release). GitHub Actions genera y adjunta estos assets para cada tag estable `v*`:
+
+| Asset | Plataforma | Arquitectura |
+|---|---|---|
+| [`SRT4U-Windows-x64.exe`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-Windows-x64.exe) | Windows 10/11 | x86_64 |
+| [`SRT4U-Linux-x86_64.AppImage`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-Linux-x86_64.AppImage) | Linux | x86_64 |
+| [`SRT4U-Linux-x86_64.tar.gz`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-Linux-x86_64.tar.gz) | Linux | x86_64 |
+| [`SRT4U-macOS.dmg`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/SRT4U-macOS.dmg) | macOS (Apple Silicon) | **solo arm64** — no arranca en Macs Intel |
+| [`checksums.txt`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.9/checksums.txt) | Sumas SHA-256 de los assets anteriores | — |
+
+Las compilaciones de CI incluyen un ejecutable de FFmpeg estático fijado por
+versión, así que el burn-in funciona sin pasos extra; los requisitos de
+bibliotecas del sistema siguen aplicando. Una instalación desde código fuente
+(sección anterior) necesita FFmpeg disponible en `PATH` para el burn-in.
 
 ---
 
@@ -131,7 +141,11 @@ La CLI reutiliza `SubtitleService` y permite limpiar, traducir, convertir format
 
 ## Proveedores de traducción y métricas
 
-`TranslationService` delega mediante `ProviderRegistry` en `Google`, `DeepL` o el endpoint OpenAI-compatible (`openai`, `llm` y `ollama` comparten implementación; el nombre solicitado se conserva en las métricas). Los errores están normalizados (`error_type`), los reintentos son opt-in y el fallback histórico DeepL/OpenAI→Google es explícito y configurable. `translate_with_metrics()` devuelve `TranslationResult` con `TranslationMetrics` serializable a JSON (provider, modelo, idiomas, cues/caracteres/palabras, duración wall-time, reintentos, fallback, tokens cuando existen, `estimated_cost` en `null`); la CLI los muestra con `--stats` o `--stats-json`. `benchmark` ejecuta un dataset fijo contra varios providers durante N repeticiones y exporta JSON/CSV para análisis offline; `notebooks/benchmark_analysis.ipynb` + `analysis/benchmark_analysis.py` calculan descriptivos, variabilidad, errores/fallback y gráficos en `reports/benchmark/`. Las ejecuciones se registran en un historial local SQLite (CLI `history`, página History, `--store` para benchmarks). Una API REST local (`srt4u serve`, extra `[api]` de FastAPI) expone analyze, QA, jobs de traducción/procesado, historial y benchmarks en `/api/v1` con docs OpenAPI. Transcripción local opcional con Whisper (`srt4u transcribe`, página Transcribir, jobs `POST /api/v1/transcribe`; extra `[transcription]` de `faster-whisper`) que convierte audio/vídeo en subtítulos para Analytics, QA, limpieza, traducción y burn-in. Un orquestador `MediaPipeline` (`srt4u pipeline`, página Pipeline, jobs `POST /api/v1/pipeline`) encadena transcripción/parse → limpieza → analytics → QA → traducción opcional → QA final → exportación SRT/VTT → burn-in opcional, con errores por etapa, cancelación cooperativa y un registro principal en historial. Ver [docs/providers.md](docs/providers.md), [docs/benchmarking.md](docs/benchmarking.md), [docs/benchmark_analysis.md](docs/benchmark_analysis.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), [docs/transcription.md](docs/transcription.md) y [docs/pipeline.md](docs/pipeline.md).
+`TranslationService` delega mediante `ProviderRegistry` en `Google`, `DeepL` o el endpoint OpenAI-compatible (`openai`, `llm` y `ollama` comparten implementación; el nombre solicitado se conserva en las métricas). Los errores están normalizados (`error_type`), los reintentos son opt-in y los fallbacks son explícitos, configurables y sin ciclos. `translate_with_metrics()` devuelve `TranslationResult` con `TranslationMetrics` serializable a JSON; la CLI los muestra con `--stats` o `--stats-json`, y `estimated_cost` se mantiene en `null` — sin tarifas inventadas.
+
+`benchmark` ejecuta un dataset versionado contra varios providers durante N repeticiones y exporta JSON/CSV para análisis offline (`notebooks/benchmark_analysis.ipynb` + `analysis/benchmark_analysis.py`). Las ejecuciones se registran en un historial local SQLite (CLI `history`, página History, `--store` para benchmarks): solo métricas agregadas — nunca textos, claves ni multimedia.
+
+Guías detalladas: [docs/providers.md](docs/providers.md), [docs/benchmarking.md](docs/benchmarking.md), [docs/benchmark_analysis.md](docs/benchmark_analysis.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), [docs/transcription.md](docs/transcription.md) y [docs/pipeline.md](docs/pipeline.md).
 
 ## Pruebas automatizadas
 
