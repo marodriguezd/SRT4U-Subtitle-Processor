@@ -672,6 +672,29 @@ def test_job_manager_ttl_expires_old_finished_jobs():
         manager.shutdown()
 
 
+def test_job_manager_final_prune_enforces_cap_without_live_jobs():
+    """Retention regression (race flake in v1.4.9 tag CI): the *final* prune of
+    a burst — when no live jobs remain — must still evict oldest finished rows
+    until the dict is within ``max_jobs``. The old condition only pruned while
+    live jobs alone filled the cap, stranding completed rows above it."""
+    from application.api.jobs import JobManager
+
+    manager = JobManager(max_workers=1, max_jobs=3)
+    try:
+        for _ in range(20):
+            manager.submit("t", lambda: "ok")
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and len(manager._jobs) > 3:
+            time.sleep(0.02)
+        # Deterministic end state: submit is done, no job is live anymore, so
+        # one final prune must settle the dict at the cap.
+        manager._prune_locked()
+        assert len(manager._jobs) <= 3
+        assert all(job["status"] == "completed" for job in manager._jobs.values())
+    finally:
+        manager.shutdown()
+
+
 # ---------------------------------------------------------------- L1 history
 
 

@@ -146,6 +146,15 @@ class JobManager:
         Only terminal jobs are ever evicted, and the oldest go first, so a
         client that polls normally always finds its own job. Callers must hold
         ``self._lock``.
+
+        The cap compares the *total* dict size (live + finished minus already
+        dropped) against ``max_jobs``: dropping the oldest finished rows while
+        the total still exceeds the cap. The previous condition compared
+        ``survivors + len(to_drop) >= max_jobs`` (survivors = live jobs), which
+        only pruned while live jobs alone filled the cap — under fast workers
+        the final prune of a burst saw few live jobs and stranded finished
+        rows above the cap (race flake in
+        ``test_job_manager_prunes_completed_jobs``).
         """
         if not self._jobs:
             return
@@ -153,10 +162,9 @@ class JobManager:
             (job for job in self._jobs.values() if job["status"] not in _LIVE_STATES),
             key=lambda job: (job["finished_at"] or job["created_at"], job["job_id"]),
         )
-        survivors = len(self._jobs) - len(finished)
         to_drop: List[str] = []
         for job in finished:
-            over_cap = survivors + len(to_drop) >= self._max_jobs
+            over_cap = len(self._jobs) - len(to_drop) > self._max_jobs
             age = self._age_seconds(job)
             expired = (
                 self._ttl_seconds > 0 and age is not None and age > self._ttl_seconds
