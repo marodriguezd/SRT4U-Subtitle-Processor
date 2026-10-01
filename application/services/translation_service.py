@@ -178,7 +178,7 @@ class TranslationService:
         attempted_providers: List[str] = []
         fallback_used = False
         original_error: Optional[TranslationProviderError] = None
-        fallback_error_type = None
+        fallback_error_type: Optional[str] = None
         last_error: Optional[TranslationProviderError] = None
         response: Optional[ProviderResponse] = None
         translated = text
@@ -248,8 +248,10 @@ class TranslationService:
                 if candidate_position == 0:
                     original_error = exc
                     fallback_error_type = exc.error_type
-                else:
-                    fallback_error_type = exc.error_type
+                # Fallback failed too: keep the *requested* provider's error
+                # category in ``fallback_error_type`` so metrics always answer
+                # "why did the primary fail?" even when the fallback chain
+                # ends in failure.
             except Exception as exc:
                 safe_error = (
                     exc
@@ -261,7 +263,7 @@ class TranslationService:
                 last_error = safe_error
                 if candidate_position == 0:
                     original_error = safe_error
-                fallback_error_type = safe_error.error_type
+                    fallback_error_type = safe_error.error_type
 
         success = last_error is None and bool(translated)
         duration_ms = int((time.perf_counter() - started) * 1000)

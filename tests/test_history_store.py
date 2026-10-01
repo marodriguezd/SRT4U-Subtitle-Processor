@@ -203,6 +203,7 @@ def test_default_path_respects_platform_and_override(tmp_path, monkeypatch):
 
 class _Stats:
     translation_failures = 2
+    parse_issues = 1
 
 
 class _Metrics:
@@ -265,6 +266,7 @@ def test_record_processing_result_end_to_end(tmp_path):
     assert row["providers_used"] == ["ollama"]
     assert row["total_tokens"] == 15
     assert row["translation_failures"] == 2
+    assert row["parse_issues"] == 1
     assert row["qa_errors"] == 1
     assert row["qa_warnings"] == 1
     with HistoryStore(_db(tmp_path, "other.db")) as store:
@@ -274,6 +276,50 @@ def test_record_processing_result_end_to_end(tmp_path):
             "invalid_timecode",
             "overlap",
         ]
+
+
+def test_record_processing_result_defaults_parse_issues_to_zero(tmp_path):
+    """Schema v3: a result whose stats carry no parse_issues still records 0."""
+
+    class _StatsNoIssues:
+        translation_failures = 0
+
+    class _ResultNoIssues:
+        stats = _StatsNoIssues()
+        translation_metrics = None
+        qa_report = None
+
+    with HistoryStore(_db(tmp_path)) as store:
+        run_id = store.record_processing_result(
+            _ResultNoIssues(), operation="process", file_path="clean.srt"
+        )
+        row = store.get_run(run_id)
+    assert row["parse_issues"] == 0
+
+
+def test_normal_process_records_parse_issue_count(tmp_path):
+    """Regression (schema v3): normal ``process`` records the parse_issues
+    count. A file with one unreadable block must land in history with
+    ``parse_issues == 1`` (advisory; ``success`` stays 1)."""
+    from application.services.history_store import record_result_safely
+    from application.services.subtitle_service import SubtitleService
+
+    source = tmp_path / "input.srt"
+    source.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\nHello world\n\n"
+        "2\n00:75:00,000 --> 00:75:01,000\nbad block\n",
+        encoding="utf-8",
+    )
+    db = _db(tmp_path, "process.db")
+    service = SubtitleService()
+    result = service.process_subtitles(str(source), do_clean=False)
+    assert result.stats.parse_issues == 1
+    assert result.success
+    record_result_safely(result, db_path=db, operation="process", file_path="input.srt")
+    with HistoryStore(db) as store:
+        row = store.recent_runs(operation="process")[0]
+    assert row["parse_issues"] == 1
+    assert row["success"] == 1
 
 
 def test_record_benchmark_report(tmp_path):

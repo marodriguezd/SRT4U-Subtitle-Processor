@@ -9,7 +9,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .jobs import JobManager
-from .schemas import ProcessResultModel
+from .schemas import (
+    APP_VERSION,
+    ProcessResultModel,
+    TranscriptionResultModel,
+    TranslationResultModel,
+)
 from .routes import (
     analyze,
     benchmarks,
@@ -33,7 +38,7 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
             "API REST local sobre el núcleo existente de SRT4U: análisis, QA, "
             "traducción, procesamiento e historial. Uso local, sin autenticación."
         ),
-        version="1.4.9",
+        version=APP_VERSION,
     )
     app.state.jobs = job_manager if job_manager is not None else JobManager()
 
@@ -57,29 +62,51 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
     ):
         app.include_router(module.router, prefix=API_PREFIX)
 
-    # P1: /process runs as a JobManager job and its result travels inside
-    # JobStatusResponse.result (typed Any), so FastAPI cannot see the field
-    # while generating OpenAPI. Extend the generated schema with the result
-    # model and its ParseIssueModel items so the served contract documents
-    # parse_issues instead of only the runtime payload injection.
+    # Slow operations (translate/process/transcribe/pipeline) run as
+    # JobManager jobs and their payload travels inside
+    # JobStatusResponse.result, so FastAPI cannot infer the result shape
+    # while generating OpenAPI. Extend the generated schema so `result` is
+    # documented as the union of the job-result models (the routes already
+    # build those payloads with these very models — no business logic is
+    # duplicated), and ProcessResultModel keeps declaring parse_issues.
+    # Runtime responses stay plain dicts (the field is Dict[str, Any]); this
+    # only documents the served contract.
     # (Standard "extending OpenAPI" pattern: wrap the generator, keep its
     # cache, and only add what is missing.)
     original_openapi = app.openapi
+    job_result_models = (
+        ProcessResultModel,
+        TranslationResultModel,
+        TranscriptionResultModel,
+    )
 
     def openapi_with_result_models():  # noqa: ANN202
         schema = original_openapi()
         components = schema.setdefault("components", {}).setdefault("schemas", {})
-        if (
-            "ProcessResultModel" not in components
-            or "ParseIssueModel" not in components
-        ):
-            result_schema = ProcessResultModel.model_json_schema(
-                ref_template="#/components/schemas/{model}"
-            )
-            definitions = result_schema.pop("$defs", {})
-            components.setdefault("ProcessResultModel", result_schema)
-            for name, sub_schema in definitions.items():
-                components.setdefault(name, sub_schema)
+        for model in job_result_models:
+            if model.__name__ not in components:
+                model_schema = model.model_json_schema(
+                    ref_template="#/components/schemas/{model}"
+                )
+                definitions = model_schema.pop("$defs", {})
+                components.setdefault(model.__name__, model_schema)
+                for name, sub_schema in definitions.items():
+                    components.setdefault(name, sub_schema)
+        job_status = components.setdefault("JobStatusResponse", {})
+        job_status.setdefault("properties", {})["result"] = {
+            "description": (
+                "Job payload; shape depends on `operation`: `process` → "
+                "ProcessResultModel (includes `parse_issues`), `translate` → "
+                "TranslationResultModel, `transcription` → "
+                "TranscriptionResultModel, `pipeline` → pipeline result object "
+                "(success/stages/parse_issues/…)."
+            ),
+            "anyOf": [{"type": "null"}]
+            + [
+                {"$ref": f"#/components/schemas/{model.__name__}"}
+                for model in job_result_models
+            ],
+        }
         return schema
 
     app.openapi = openapi_with_result_models

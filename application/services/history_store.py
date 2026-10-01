@@ -370,6 +370,9 @@ class HistoryStore:
         fields["success"] = True if success is None else bool(success)
         if stats is not None:
             fields["translation_failures"] = getattr(stats, "translation_failures", 0)
+            # Schema v3: blocks the parser could not use (advisory count;
+            # mirrors ``ProcessingStats.parse_issues`` / pipeline parity).
+            fields["parse_issues"] = getattr(stats, "parse_issues", 0) or 0
         findings: List[Any] = []
         if qa_report is not None:
             findings = list(getattr(qa_report, "findings", []) or [])

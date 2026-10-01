@@ -75,6 +75,40 @@ filtro `ass`, burn-in real) antes de fijarlo, y `appimagetool` también queda
 fijado porque iba por `continuous`. Un test impide volver a las etiquetas
 móviles. `contents: write` queda limitado al job `release`.
 
+Hardening final pre-release (sin funcionalidades nuevas):
+
+- **Workflow de release**: los artefactos se descargan ANTES de validar su
+  contenido/procedencia (antes se validaban ficheros aún no descargados;
+  cualquier tag habría fallado en ese paso). Se preservan la verificación de
+  formato estable, la coincidencia tag/pyproject, la proveniencia del commit
+  y la comprobación de versión incrustada en los artefactos.
+- **Historial `parse_issues` (schema v3)**: `record_processing_result()` no
+  persistía la columna que declara la migración v3; ahora registra el
+  contador de `ProcessingStats.parse_issues`, igual que ya hacían
+  transcripción y pipeline. Regresiones cubiertas a nivel de servicio, CLI
+  implícito y API (`/process` → fila de historial con `parse_issues`).
+- **Contrato OpenAPI de jobs**: `JobStatusResponse.result` se documenta como
+  unión nullable de `ProcessResultModel` / `TranslationResultModel` /
+  `TranscriptionResultModel` (la pipeline conserva su objeto), de modo que
+  el schema servido describe el payload real —incluido `parse_issues`—
+  sin duplicar lógica de negocio (las rutas ya construían esos modelos).
+- **Métricas de fallback**: cuando el provider solicitado Y el fallback
+  fallan, `fallback_error_type` conserva la categoría del error ORIGINAL
+  (del provider solicitado) en vez de ser sobrescrita por la del fallback.
+- **Versión con fuente única en runtime**: nuevo `application/version.py`
+  (`APP_VERSION`); CLI `--version`, metadatos/OpenAPI de la API, health y
+  los seis `about.version_pill` lo importan en lugar de repetir el literal.
+  `pyproject.toml` sigue siendo la fuente autoridad (release gate), vigilada
+  por `test_single_product_version_everywhere` y un test nuevo que impide
+  literales de versión duplicados en runtime.
+- **CI determinista**: el job `test` ejecuta la suite con `-m "not network"`
+  (igual que la política local y `compat-min-pyqt6`); los tests `network`
+  quedan como integración opt-in. Sin cambios de build.
+- **Cancelación documentada con precisión**: la cancelación de jobs de la
+  API es cooperativa/best-effort (un job en ejecución NO se interrumpe:
+  termina y se descarta su resultado); `docs/api.md` y la entrada de
+  cancellation lo describen ya sin ambigüedad.
+
 ## [Unreleased]
 
 ### Added

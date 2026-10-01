@@ -31,7 +31,7 @@ Versioned under `/api/v1` (versioning belongs to the HTTP interface).
 | `POST /api/v1/pipeline` | Media/subtitle + pipeline options → **job** (202; full chain) |
 | `GET /api/v1/jobs` | Local in-memory jobs |
 | `GET /api/v1/jobs/{id}` | Status + `result` / `error` |
-| `DELETE /api/v1/jobs/{id}` | Best-effort cancel (409 when already terminal) |
+| `DELETE /api/v1/jobs/{id}` | Best-effort cancel: queued jobs are dropped; a **running job is not interrupted** — it finishes in the background and only its result is discarded (409 when already terminal). The OpenAPI documents `result` per operation (`process` → `ProcessResultModel` with `parse_issues`, `translate` → `TranslationResultModel`, `transcription` → `TranscriptionResultModel`). |
 | `GET /api/v1/history` | Filters: `provider`, `operation`, `limit`, `errors_only`, `fallback_only` |
 | `GET /api/v1/history/{id}` | One execution (404 when missing) |
 | `GET /api/v1/benchmarks` | Stored benchmarks grouped by `benchmark_id` |

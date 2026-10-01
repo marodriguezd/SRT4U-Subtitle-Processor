@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .services.atomic_write import atomic_write_text
+from .version import APP_VERSION
 from .services.history_store import record_result_safely, record_safely
 from .services.subtitle_service import SubtitleService
 from .services.translation_providers import ProviderRegistry
@@ -35,7 +36,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="srt4u",
         description="Procesa y analiza subtítulos sin iniciar la interfaz de escritorio.",
     )
-    parser.add_argument("--version", action="version", version="1.4.9")
+    parser.add_argument("--version", action="version", version=APP_VERSION)
     subparsers = parser.add_subparsers(dest="command", required=True)
     process = subparsers.add_parser(
         "process", help="limpia, traduce o convierte uno o varios archivos"

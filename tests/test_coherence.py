@@ -55,9 +55,16 @@ def test_single_product_version_everywhere():
         pyproject_version = tomllib.load(fh)["project"]["version"]
     assert pyproject_version == EXPECTED_VERSION
 
-    from application.api.schemas import APP_VERSION
+    # Single runtime source: application/version.py re-exports the release
+    # version; API schemas, app metadata, the six GUI version pills and the
+    # CLI --version all derive from it instead of repeating the literal.
+    from application.version import APP_VERSION
 
     assert APP_VERSION == EXPECTED_VERSION
+
+    from application.api.schemas import APP_VERSION as SCHEMAS_APP_VERSION
+
+    assert SCHEMAS_APP_VERSION is APP_VERSION
 
     from application.api.app import create_app
 
@@ -77,6 +84,17 @@ def test_single_product_version_everywhere():
         cwd=ROOT,
     )
     assert proc.stdout.strip() == EXPECTED_VERSION
+
+
+def test_runtime_version_literal_lives_only_in_single_source():
+    """The 1.4.9 literal stays in pyproject.toml + application/version.py;
+    every other runtime module derives it via APP_VERSION."""
+    offenders = []
+    for path in (ROOT / "application").rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        if text.count("1.4.9"):
+            offenders.append(str(path.relative_to(ROOT)))
+    assert offenders == ["application/version.py"], offenders
 
 
 def test_no_madrid_references_in_product():
@@ -412,3 +430,34 @@ def test_api_contract_declares_parse_issues_in_openapi():
     parse_issues = schemas["ProcessResultModel"]["properties"]["parse_issues"]
     assert parse_issues["type"] == "array"
     assert parse_issues["items"]["$ref"].endswith("ParseIssueModel")
+
+
+def test_api_contract_documents_job_result_shape():
+    """JobStatusResponse.result must reference the job-result models.
+
+    The slow operations return their payload inside `result`; the served
+    OpenAPI documents it as a nullable union of ProcessResultModel /
+    TranslationResultModel / TranscriptionResultModel instead of an opaque
+    Any, so clients can discover the real shape (including parse_issues).
+    """
+    from application.api.app import create_app
+
+    spec = create_app().openapi()
+    schemas = spec["components"]["schemas"]
+    job_status = schemas["JobStatusResponse"]
+    result = job_status["properties"]["result"]
+    refs = {
+        item["$ref"].rsplit("/", 1)[-1] for item in result["anyOf"] if "$ref" in item
+    }
+    assert {
+        "ProcessResultModel",
+        "TranslationResultModel",
+        "TranscriptionResultModel",
+    } <= refs
+    # Nullable: null carries the running/failed/cancelled states.
+    assert any(item.get("type") == "null" for item in result["anyOf"])
+    # The documented models are really present and ProcessResultModel keeps
+    # exposing parse_issues to OpenAPI clients.
+    for name in refs:
+        assert name in schemas
+    assert "parse_issues" in schemas["ProcessResultModel"]["properties"]

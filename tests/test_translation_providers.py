@@ -314,6 +314,41 @@ def test_translation_service_limits_retries_and_explicit_fallback(monkeypatch, c
     assert "rate limited" not in caplog.text
 
 
+def test_fallback_error_type_preserves_original_provider_error(monkeypatch):
+    """When the requested provider AND the fallback both fail, the metrics keep
+    the *original* provider's error category in ``fallback_error_type``
+    instead of letting the fallback's failure overwrite it."""
+    providers = {
+        "primary": FakeProvider(),
+        "backup": FakeProvider(),
+    }
+    providers["primary"].name = "primary"
+    providers["primary"].error = ProviderRateLimitError("primary rate limited")
+    providers["backup"].name = "backup"
+    providers["backup"].error = ProviderAuthenticationError("backup auth rejected")
+    monkeypatch.setattr(
+        ProviderRegistry, "get", lambda name, config_service=None: providers[name]
+    )
+    service = TranslationService(
+        config_service=MemoryConfig(),
+        fallbacks={"primary": ["backup"]},
+    )
+    result = service.translate_with_metrics("hello", "es", provider="primary")
+
+    assert result.metrics.success is False
+    # The final failure is the fallback's; ``error_type`` reports it.
+    assert result.metrics.error_type == "authentication"
+    # The requested provider's failure survives in ``fallback_error_type``.
+    assert result.metrics.fallback_error_type == "rate_limit"
+    assert result.metrics.requested_provider == "primary"
+    # On total failure ``provider`` keeps the requested name (selected is
+    # only updated on success); the attempted fallback shows in
+    # providers_used/fallback_used.
+    assert result.metrics.provider == "primary"
+    assert result.metrics.providers_used == ["primary", "backup"]
+    assert result.metrics.fallback_used is True
+
+
 def test_translation_service_rejects_fallback_cycle():
     service = TranslationService(
         config_service=MemoryConfig(),

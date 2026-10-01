@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from application.api.app import create_app
 from application.api.jobs import JobManager
-from application.services.history_store import HistoryStore
+from application.services.history_store import HistoryStore  # noqa: F401
 from application.services.translation_providers import (
     ProviderRegistry,
     ProviderResponse,
@@ -340,3 +340,21 @@ def test_process_job_result_carries_parse_issue_structure(client, mock_provider)
     job = _wait_job(client, clean.json()["job_id"])
     assert job["status"] == "completed"
     assert job["result"]["parse_issues"] == []
+
+
+def test_process_job_records_parse_issues_in_history(client):
+    """Schema v3 regression: a /process job persists the parse-issue count to
+    the SQLite history row, matching the pipeline's behaviour."""
+    content = (
+        "1\n00:00:01,000 --> 00:00:02,000\nHello world\n\n"
+        "2\n00:75:00,000 --> 00:75:01,000\nbad block\n"
+    )
+    response = _upload(client, path="/api/v1/process", content=content)
+    assert response.status_code == 202
+    job = _wait_job(client, response.json()["job_id"])
+    assert job["status"] == "completed"
+    with HistoryStore() as store:
+        rows = store.recent_runs(operation="process", limit=1)
+    assert len(rows) == 1
+    assert rows[0]["parse_issues"] == 1
+    assert rows[0]["success"] == 1

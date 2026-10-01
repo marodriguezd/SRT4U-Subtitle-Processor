@@ -17,8 +17,10 @@ cada punto indica por qué no se toca.
    desktop está instalado.
 4. **Exit codes CLI**: fallo de ejecución → 1 (`process`, `pipeline`),
    QA no superado → 1, configuración/uso → 2. Intencional y documentado.
-5. **CI ejecuta la suite completa con red**: los runners la tienen; en local
-   la RC se valida con `-m "not network"`.
+5. **Los tests `network` son integración opt-in**: el job `test` de CI (y la
+   validación local) ejecutan la suite con `-m "not network"`, de modo que
+   la suite primaria es determinista y no depende de servicios externos de
+   traducción. Los tests marcados `network` requieren ejecución explícita.
 6. **Jobs en memoria**: se pierden al reiniciar. Por diseño local (sin broker).
 7. **Descarga única del modelo Whisper**: requiere internet la primera vez,
    siempre anunciada con tamaño. Por diseño.

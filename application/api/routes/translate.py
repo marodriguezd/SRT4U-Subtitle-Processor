@@ -217,6 +217,8 @@ async def process(
             data = payload.model_dump(mode="json")
             # P1: parser findings ride along as a top-level advisory list
             # (kind/reason/line/snippet) so API clients can warn their users.
+            # ProcessResultModel declares the field, so the served OpenAPI
+            # contract matches this runtime payload.
             data["parse_issues"] = [
                 issue.to_dict() for issue in getattr(result, "parse_issues", [])
             ]

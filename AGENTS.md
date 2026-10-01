@@ -142,6 +142,9 @@ without it and transcription reports the optional-extra install hint.
 .venv/bin/python -m ruff format --check application main.py conftest.py tests tools
 ```
 
+CI runs the same selection: the `test` job executes the suite with
+`-m "not network"` (deterministic; `network` tests are opt-in integration).
+
 Relevant smokes: `srt4u --version`, `srt4u <cmd> --help`, API
 `GET /api/v1/health` + OpenAPI path count, GUI offscreen
 (`QT_QPA_PLATFORM=offscreen`, 11 pages × 6 languages). Opt-in extras:
@@ -230,8 +233,10 @@ in `docs/tech-debt.md`.
 ## 17. Current version
 
 **1.4.9** (working tree consolidation; not a published release — no tag/push
-claims). Single source chain: `pyproject.toml` → CLI `--version` → API
-metadata/`schemas.APP_VERSION`/OpenAPI → GUI `about.version_pill`.
+claims). Single source chain: `pyproject.toml` (authoritative) →
+`application/version.py` (`APP_VERSION`) → CLI `--version` → API
+metadata/OpenAPI/health → GUI `about.version_pill` (all six catalogs derive
+it). No runtime module repeats the version literal.
 `AppUserModelID …1.1` is a Windows taskbar identity, not a version display —
 do not "fix" it. Historical `1.1.0` references (CHANGELOG entry, release
 notes, old audits) are legitimate history.

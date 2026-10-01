@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-APP_VERSION = "1.4.9"
+from ..version import APP_VERSION
 
 
 class ParseIssueModel(BaseModel):
@@ -136,11 +136,9 @@ class ProcessResultModel(BaseModel):
     translation_metrics: Optional[TranslationMetricsModel] = None
     qa: Optional[QAReportModel] = None
     # P1: parser findings ride along as a top-level advisory list so API
-    # clients can warn their users. Declared explicitly (instead of the
-    # previous runtime-only `data["parse_issues"]` injection) so the OpenAPI
-    # contract describes the field. The /process route returns plain dicts
-    # (JobStatusResponse.result is Any), so the declaration documents the
-    # shape without changing serialization.
+    # clients can warn their users. Declared explicitly because the /process
+    # route serializes this exact model into the job result (documented via
+    # JobStatusResponse.result in create_app's OpenAPI extension).
     parse_issues: List[ParseIssueModel] = Field(default_factory=list)
 
 
@@ -158,6 +156,9 @@ class JobStatusResponse(BaseModel):
     created_at: str
     finished_at: Optional[str] = None
     error: Optional[str] = None
+    # The concrete payload depends on `operation`; create_app's OpenAPI
+    # extension documents `result` as the union of the job-result models.
+    # Runtime stays tolerant (jobs carry plain dicts built by the routes).
     result: Optional[Any] = None
 
 

@@ -14,6 +14,7 @@ from typing import Dict, Optional
 from PyQt6.QtCore import QObject, pyqtSignal, QLocale
 
 from ..logging_setup import get_logger
+from ..version import APP_VERSION
 from .config_service import ConfigService
 
 logger = get_logger("i18n")
@@ -227,7 +228,7 @@ class I18nService(QObject):
             "completed.sum3": "Output file saved successfully",
             # About Page
             "about.title": "SRT4U - Subtitle Processor",
-            "about.version_pill": "v1.4.9",
+            "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Cross-platform desktop app • FFmpeg required to embed subtitles in video",
             "about.desc": "Desktop app to translate, edit, clean, and burn subtitles into video with real-time synchronization and universal support for .srt, .vtt, .ass, and .txt.",
             "about.author_bio": "Designed and developed to deliver a fast, private and frictionless experience for processing and translating subtitles on Fedora Linux, Windows and macOS.",
@@ -564,7 +565,7 @@ class I18nService(QObject):
             "completed.sum3": "Archivo guardado correctamente",
             # About Page
             "about.title": "SRT4U - Subtitle Processor",
-            "about.version_pill": "v1.4.9",
+            "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Aplicación de escritorio multiplataforma • FFmpeg necesario para incrustar subtítulos en vídeo",
             "about.desc": "Aplicación de escritorio para traducir, editar, limpiar e incrustar subtítulos en vídeo con sincronización en tiempo real y compatibilidad universal con .srt, .vtt, .ass y .txt.",
             "about.author_bio": "Diseñado y desarrollado para ofrecer una experiencia rápida, privada y sin fricciones en el procesamiento y traducción de subtítulos en Fedora Linux, Windows y macOS.",
@@ -901,7 +902,7 @@ class I18nService(QObject):
             "completed.sum3": "Arquivo salvo com sucesso",
             # About Page
             "about.title": "SRT4U - Subtitle Processor",
-            "about.version_pill": "v1.4.9",
+            "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Aplicação de ambiente de trabalho multiplataforma • FFmpeg necessário para incrustar legendas no vídeo",
             "about.desc": "Aplicativo de ambiente de trabalho para traduzir, editar, limpar e incrustar legendas em vídeo com sincronização em tempo real e suporte a .srt, .vtt, .ass e .txt.",
             "about.author_bio": "Projetado e desenvolvido para oferecer uma experiência rápida, privada e sem fricções no processamento e tradução de legendas no Fedora Linux, Windows e macOS.",
@@ -1238,7 +1239,7 @@ class I18nService(QObject):
             "completed.sum3": "Datei erfolgreich gespeichert",
             # About Page
             "about.title": "SRT4U - Subtitle Processor",
-            "about.version_pill": "v1.4.9",
+            "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Plattformübergreifende Desktop-App • FFmpeg zum Einbetten von Untertiteln ins Video erforderlich",
             "about.desc": "Desktop-Anwendung zum Übersetzen, Bearbeiten, Bereinigen und Einbetten von Untertiteln in Videos mit Echtzeitsynchronisation.",
             "about.author_bio": "Entworfen und entwickelt, um eine schnelle, private und reibungslose Erfahrung bei der Verarbeitung und Übersetzung von Untertiteln unter Fedora Linux, Windows und macOS zu bieten.",
@@ -1575,7 +1576,7 @@ class I18nService(QObject):
             "completed.sum3": "File salvato con successo",
             # About Page
             "about.title": "SRT4U - Subtitle Processor",
-            "about.version_pill": "v1.4.9",
+            "about.version_pill": f"v{APP_VERSION}",
             "about.status": "App desktop multipiattaforma • FFmpeg necessario per incorporare i sottotitoli nel video",
             "about.desc": "Applicazione desktop per tradurre, modificare, pulire e incidere sottotitoli su video con sincronizzazione in tempo reale e supporto a .srt, .vtt, .ass e .txt.",
             "about.author_bio": "Progettato e sviluppato per offrire un'esperienza rapida, privata e senza attriti nell'elaborazione e traduzione dei sottotitoli su Fedora Linux, Windows e macOS.",
@@ -1912,7 +1913,7 @@ class I18nService(QObject):
             "completed.sum3": "文件已成功写入磁盘",
             # About Page
             "about.title": "SRT4U - Subtitle Processor",
-            "about.version_pill": "v1.4.9",
+            "about.version_pill": f"v{APP_VERSION}",
             "about.status": "跨平台桌面应用 • 将字幕嵌入视频需要 FFmpeg",
             "about.desc": "专为桌面端设计的字幕处理工具，集翻译、编辑、清理、时间同步以及将字幕嵌入视频于一体，支持 .srt、.vtt、.ass 与 .txt。",
             "about.author_bio": "专为在 Fedora Linux、Windows 和 macOS 上提供快速、私密且流畅的字幕处理与翻译体验而设计开发。",

@@ -26,9 +26,10 @@ env:
   # publica el binario, no el banner semántico del propio FFmpeg; la
   # documentación lo describe como pin de descarga, nunca como versión
   # semántica de FFmpeg.
-  # Al publicar: sube pyproject.toml, APP_VERSION, --version, los seis
-  # `about.version_pill` y este comentario a la vez; el job release compara
-  # el tag con pyproject.toml y cancela si hay desajuste.
+  # Al publicar: sube pyproject.toml y application/version.py a la vez (la
+  # CLI, la API, los seis `about.version_pill` y este comentario se derivan
+  # de ahí); el job release compara el tag con pyproject.toml y cancela si
+  # hay desajuste.
   FFMPEG_VERSION: "b6.1.1"
   # appimagetool también iba por la etiqueta móvil `continuous`, lo que dejaba
   # el AppImage sin reproducir. Mismo tag estable para todos los builds.
@@ -75,10 +76,13 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/test_screenshot_tool.py -v
 
-      - name: Run full test suite
+      - name: Run full deterministic test suite
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -m pytest tests/ -q
+        # `-m "not network"`: la suite primaria es determinista y no depende
+        # de servicios externos de traducción; los tests `network` quedan
+        # como integración opt-in (igual que la política local de README).
+        run: python -m pytest tests/ -q -m "not network"
 
   # Verifica que la cota mínima declarada en requirements.txt sigue funcionando.
   # La versión mínima y el runtime de Qt se resuelven desde requirements.txt,
@@ -365,7 +369,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate tag before publishing (stable format + version match + provenance)
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Validate tag and artifacts before publishing (format + version match + provenance)
         env:
           TAG: ${{ github.ref_name }}
           EXPECTED_SHA: ${{ github.sha }}
@@ -386,10 +395,11 @@ jobs:
             exit 1
           fi
 
-          # 3. Procedencia: los artefactos deben llevar la versión del tag
-          #    incrustada (la CLI la declara como literal y
-          #    test_single_product_version_everywhere la mantiene igual a
-          #    pyproject.toml, la fuente única).
+          # 3. Procedencia: los artefactos (ya descargados arriba) deben
+          #    llevar la versión del tag incrustada (la versión se deriva de
+          #    pyproject.toml vía application/version.py;
+          #    test_single_product_version_everywhere mantiene toda la cadena
+          #    igual a la fuente única).
           VERSION="${TAG#v}"
           for artifact in \
             release-artifacts/SRT4U-Windows-x64/SRT4U-Windows-x64.exe \
@@ -401,11 +411,6 @@ jobs:
             fi
           done
           echo "tag ${TAG} (commit ${EXPECTED_SHA}) verificado; artefactos con versión ${VERSION}"
-
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-artifacts
 
       - name: Prepare Assets & Generate Checksums
         run: |

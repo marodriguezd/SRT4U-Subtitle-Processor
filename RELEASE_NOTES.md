@@ -15,8 +15,10 @@ hardening pass over translation, history and the build pipeline.
 - **Local REST API (optional)**: a thin FastAPI layer over the *existing* services at
   `/api/v1` — `health`, `analyze`, `qa`, job-based `translate`/`process`/`transcribe`/
   `pipeline`, `history` and stored `benchmarks`, with OpenAPI docs at `/docs` and a
-  `srt4u serve` command that binds `127.0.0.1` by default. Slow work runs as
-  cancellable local jobs. **No authentication by design; keep it on loopback.**
+  `srt4u serve` command that binds `127.0.0.1` by default. Slow work runs as local
+  jobs with best-effort cancellation: a queued job is dropped, while a running job
+  finishes in the background and only its result is discarded. **No authentication
+  by design; keep it on loopback.**
 - **Local Whisper transcription (optional)**: audio/video to SRT/VTT with
   `faster-whisper` behind the `[transcription]` extra, via the `srt4u transcribe`
   command, a Transcribe page and `POST /api/v1/transcribe`. Models are never
@@ -25,7 +27,7 @@ hardening pass over translation, history and the build pipeline.
 - **Media pipeline**: `srt4u pipeline`, a Pipeline page and `POST /api/v1/pipeline`
   chain transcription/parse → cleaning → analytics → QA → optional translation →
   final QA → export → optional burn-in, with per-stage status, cooperative
-  cancellation and one history record per run.
+  (between-stage) cancellation and one history record per run.
 - **Translation providers and metrics**: an interchangeable provider registry
   (`google`, `deepl`, `openai`, `ollama`, `llm`), normalized error categories,
   opt-in bounded retries and explicit cycle-safe fallbacks, plus JSON-serializable
