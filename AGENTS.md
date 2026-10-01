@@ -6,7 +6,8 @@ lives in `.agents/` (git-ignored, never committed).
 
 ## 1. Project purpose
 
-SRT4U Subtitle Processor (current version **1.4.9**, working tree) is a
+SRT4U Subtitle Processor (current version **1.4.9**, released as tag
+`v1.4.9`) is a
 local-first desktop + headless tool to translate, clean, convert, analyze and
 burn-in subtitle files (`.srt`, `.vtt`, `.ass`, `.ssa`, `.txt`), with optional
 local Whisper transcription of audio/video and an end-to-end media pipeline.
@@ -232,8 +233,8 @@ in `docs/tech-debt.md`.
 
 ## 17. Current version
 
-**1.4.9** (working tree consolidation; not a published release — no tag/push
-claims). Single source chain: `pyproject.toml` (authoritative) →
+**1.4.9** (published: tag `v1.4.9` → GitHub Release, stable, 2026-10-01).
+Single source chain: `pyproject.toml` (authoritative) →
 `application/version.py` (`APP_VERSION`) → CLI `--version` → API
 metadata/OpenAPI/health → GUI `about.version_pill` (all six catalogs derive
 it). No runtime module repeats the version literal.

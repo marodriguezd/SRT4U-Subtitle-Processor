@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.9] - 2026-09-28 (working tree, sin publicar)
+## [1.4.9] - 2026-10-01
 
 Cierre de la auditoría integral (pre-release cleanup, sin funcionalidades nuevas):
 
@@ -42,8 +42,8 @@ incluye todo lo documentado abajo como `[Unreleased]` (fases 1–11) más la
 auditoría integral de coherencia (fase 12: catálogo i18n completo para las
 páginas Transcribir/Pipeline en los 6 idiomas, ubicación del autor
 Sevilla, España, versión única 1.4.9 en package/CLI/API/GUI, terminología
-burn-in coherente en CLI/API/GUI/documentación). No publicada en PyPI ni en
-GitHub Releases.
+burn-in coherente en CLI/API/GUI/documentación). Publicada en GitHub
+Releases como v1.4.9 (no en PyPI).
 
 Hardening final post-auditoría (sin funcionalidades nuevas): corregido
 `translation_failures` del historial de pipeline (registraba `number_of_cues`
