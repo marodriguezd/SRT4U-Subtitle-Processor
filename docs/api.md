@@ -18,6 +18,18 @@ Listens on localhost by default; bind another interface only on trusted
 networks. Interactive docs at `/docs`, raw schema at `/openapi.json`.
 Versioned under `/api/v1` (versioning belongs to the HTTP interface).
 
+## Trust boundary
+
+No authentication by design: the API is a local-only interface that binds
+`127.0.0.1` by default. Do not expose it to the internet or to untrusted
+networks — anyone who can reach the port can submit jobs, read local history
+aggregates and trigger local FFmpeg/Whisper work. When a non-loopback
+`--host` is required, run it only behind a trusted network boundary. API keys
+and provider secrets are never accepted as request parameters and never
+appear in responses, logs, history rows or error payloads; upload and error
+handling follow the same sanitization contract as the CLI/GUI (no tracebacks,
+no server paths, no stderr contents in client messages).
+
 ## Endpoints
 
 | Method & path | Description |

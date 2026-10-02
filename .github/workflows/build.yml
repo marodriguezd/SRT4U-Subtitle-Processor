@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+# Supply chain: third-party Actions are pinned to immutable commit SHAs (with
+# the human-readable tag kept as a trailing comment). Dependabot
+# (.github/dependabot.yml) proposes the SHA bumps weekly;
+# tests/test_hardening_portfolio.py guards the pinning so a floating tag
+# cannot slip back in.
+
 env:
   # FFmpeg estático fijado por versión: los tres builds usan el MISMO tag de
   # eugeneware/ffmpeg-static, así que los artefactos son reproducibles. No usar
@@ -41,10 +47,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -63,7 +69,7 @@ jobs:
           # CI (incluidos los builds). No duplicar estas dependencias aquí:
           # pyproject.toml es la fuente y requirements.txt su espejo de base.
           pip install -r requirements.txt ".[api]"
-          pip install pytest ruff==0.16.9
+          pip install pytest pytest-cov ruff==0.16.9
 
       - name: "Lint with ruff (ruff.toml: F,E7,E9,B)"
         run: ruff check application main.py conftest.py tests tools
@@ -82,7 +88,9 @@ jobs:
         # `-m "not network"`: la suite primaria es determinista y no depende
         # de servicios externos de traducción; los tests `network` quedan
         # como integración opt-in (igual que la política local de README).
-        run: python -m pytest tests/ -q -m "not network"
+        # La cobertura se exige con el suelo de [tool.coverage.report]
+        # (pyproject.toml); no se infla con aserciones vacías.
+        run: python -m pytest tests/ -q -m "not network" --cov=application --cov-report=term-missing --cov-fail-under=62
 
   # Verifica que la cota mínima declarada en requirements.txt sigue funcionando.
   # La versión mínima y el runtime de Qt se resuelven desde requirements.txt,
@@ -92,10 +100,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -158,10 +166,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -203,7 +211,7 @@ jobs:
           Write-Output "RELEASE_VERSION=$v"
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: SRT4U-Windows-x64
           path: |
@@ -216,7 +224,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install Qt dependencies
         run: |
@@ -244,7 +252,7 @@ jobs:
           ./ffmpeg -version
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -321,7 +329,7 @@ jobs:
           cat dist/RELEASE_VERSION
 
       - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: SRT4U-Linux-x86_64
           path: |
@@ -335,10 +343,10 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -382,7 +390,7 @@ jobs:
           cat dist/RELEASE_VERSION
 
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: SRT4U-macOS
           path: |
@@ -400,10 +408,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: release-artifacts
 
@@ -460,7 +468,7 @@ jobs:
           cat checksums.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: "SRT4U ${{ github.ref_name }} — Subtitle Processor & Translator"
           body_path: RELEASE_NOTES.md

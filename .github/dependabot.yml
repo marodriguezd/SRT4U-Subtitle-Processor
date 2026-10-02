@@ -1,0 +1,12 @@
+# Simplest maintainable supply-chain updates: weekly PRs for Actions (SHA pins
+# in .github/workflows/build.yml) and pip dependencies (pyproject.toml).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"

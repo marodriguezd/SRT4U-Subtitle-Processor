@@ -65,6 +65,12 @@ from ..services.media_pipeline import (
 )
 from ..services.transcription_service import MEDIA_EXTENSIONS, TranscriptionService
 from ..services.i18n_service import t, get_i18n
+from ..version import (
+    APP_AUTHOR_NAME,
+    APP_GITHUB_OWNER,
+    APP_GITHUB_PROFILE_URL,
+    APP_GITHUB_REPO_URL,
+)
 from ..logging_setup import get_logger
 
 logger = get_logger("ui")
@@ -2843,7 +2849,7 @@ class MainWindow(QMainWindow):
         self.lbl_dev_title = dev_title
         d_layout.addWidget(dev_title)
 
-        dev_name = QLabel("Miguel Ángel Rodríguez Dalí")
+        dev_name = QLabel(APP_AUTHOR_NAME)
         dev_name.setStyleSheet("font-size: 18px; font-weight: 800; color: #818CF8;")
         d_layout.addWidget(dev_name)
 
@@ -2865,7 +2871,7 @@ class MainWindow(QMainWindow):
         links_row = QHBoxLayout()
         links_row.setSpacing(12)
 
-        btn_github = QPushButton(t("about.btn_profile") + " (@marodriguezd)")
+        btn_github = QPushButton(t("about.btn_profile") + f" (@{APP_GITHUB_OWNER})")
         btn_github.setStyleSheet(self._btn_link_style())
         btn_github.setIcon(
             Icons.get_icon(
@@ -2877,7 +2883,7 @@ class MainWindow(QMainWindow):
         )
         btn_github.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_github.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://github.com/marodriguezd"))
+            lambda: QDesktopServices.openUrl(QUrl(APP_GITHUB_PROFILE_URL))
         )
         self.btn_github = btn_github
         links_row.addWidget(btn_github)
@@ -2894,9 +2900,7 @@ class MainWindow(QMainWindow):
         )
         btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_repo.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl("https://github.com/marodriguezd/SRT4U-Subtitle-Processor")
-            )
+            lambda: QDesktopServices.openUrl(QUrl(APP_GITHUB_REPO_URL))
         )
         self.btn_repo = btn_repo
         links_row.addWidget(btn_repo)

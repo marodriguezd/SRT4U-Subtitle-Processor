@@ -152,6 +152,7 @@ The test suite covers parsing, cleaning, cross-format conversion, free translati
 
 ```bash
 pytest tests/ -m "not network"  # no network, keys, or Whisper models needed
+pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # same suite with coverage (floor: 62%, see [tool.coverage.report])
 ```
 
 ---

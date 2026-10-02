@@ -153,6 +153,7 @@ La flota de tests evalúa parseo, limpieza, conversiones entre formatos, traducc
 
 ```bash
 pytest tests/ -m "not network"  # sin red, claves ni modelos Whisper
+pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # misma suite con cobertura (mínimo: 62 %, ver [tool.coverage.report])
 ```
 
 ---
