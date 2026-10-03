@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.10] - 2026-10-04
+
+### Fixed
+- **GPL fallback URL**: the About page now falls back to the official GNU GPL v3 page when the bundled `LICENSE` file cannot be opened. No product functionality changes.
+
 ## [1.4.9] - 2026-10-01
 
 Cierre de la auditoría integral (pre-release cleanup, sin funcionalidades nuevas):

@@ -9,7 +9,7 @@ here instead of repeating the literal. Update it together with
 ``pyproject.toml`` when releasing — never separately.
 """
 
-APP_VERSION = "1.4.9"
+APP_VERSION = "1.4.10"
 
 #: Public project identity shown on the About page. Centralized here so the
 #: GUI, docs and coherence tests share one source instead of hardcoding the
