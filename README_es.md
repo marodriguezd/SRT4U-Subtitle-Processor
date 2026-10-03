@@ -1,6 +1,6 @@
 # SRT4U - Subtitle Processor
 
-[![Licencia: CC BY-NC-SA 4.0](https://img.shields.io/badge/Licencia-CC%20BY--NC--SA%204.0-lightgrey.svg)](LICENSE)
+[![Licencia: GPL-3.0-only](https://img.shields.io/badge/Licencia-GPL--3.0--only-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
@@ -201,5 +201,7 @@ Los mensajes propios de Qt también se enrutan ahí (`qWarning`/`qCritical`/`qFa
 ---
 
 ## Licencia
-
-Este proyecto está bajo la [Licencia Creative Commons Atribución-NoComercial-CompartirIgual 4.0 Internacional (CC BY-NC-SA 4.0)](LICENSE).
+ 
+License: GNU General Public License v3.0 only (GPL-3.0-only)
+ 
+Consulta el archivo [LICENSE](LICENSE) para ver el texto completo de la licencia.

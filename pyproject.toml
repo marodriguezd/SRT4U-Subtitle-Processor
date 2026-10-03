@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "srt4u-subtitle-processor"
 version = "1.4.9"
 description = "Desktop and headless subtitle processing tool"
+license = { text = "GPL-3.0-only" }
 requires-python = ">=3.10"
 # Base install is a functional desktop GUI + CLI: PyQt6 renders the interface
 # and deep-translator powers the keyless Google free tier. requirements.txt is

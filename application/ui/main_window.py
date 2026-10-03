@@ -2926,7 +2926,7 @@ class MainWindow(QMainWindow):
 
         lic_badge_row = QHBoxLayout()
         lic_badge_row.setSpacing(10)
-        lic_badge = QLabel("CC BY-NC-SA 4.0")
+        lic_badge = QLabel("GPL-3.0-only")
         lic_badge.setStyleSheet("""
             background: #064E3B;
             color: #34D399;
@@ -2992,7 +2992,7 @@ class MainWindow(QMainWindow):
         btn_cc_web.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_cc_web.clicked.connect(
             lambda: QDesktopServices.openUrl(
-                QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/deed.es")
+                QUrl("https://www.gnu.org/licenses/gpl-3.0.html")
             )
         )
         self.btn_web_deed = btn_cc_web
