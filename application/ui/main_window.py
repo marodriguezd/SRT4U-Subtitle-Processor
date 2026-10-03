@@ -2652,7 +2652,7 @@ class MainWindow(QMainWindow):
                 open_path(lic_path)
                 return
         QDesktopServices.openUrl(
-            QUrl("https://creativecommons.org/licenses/by-nc-sa/4.0/")
+            QUrl("https://www.gnu.org/licenses/gpl-3.0.html")
         )
 
     def _build_history_page(self) -> QWidget:
