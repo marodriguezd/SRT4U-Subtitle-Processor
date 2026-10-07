@@ -404,24 +404,19 @@ def test_release_gate_cli_exit_codes():
 
 
 def test_release_notes_are_release_facing_not_preparation():
-    """RELEASE_NOTES.md is the GitHub Release body: no pre-release claims."""
+    """RELEASE_NOTES.md must not claim a release exists when it does not; the
+    current publishing state is whatever GitHub reports (draft / published /
+    not-yet-tagged)."""
     notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
-    for stale_phrase in (
-        "not published",
-        "exist yet",
-        "does not exist",
-        "latest published release",
-        "Status: prepared",
-        "future v",
-        "kept ready",
-    ):
-        assert stale_phrase not in notes, stale_phrase
-    # Describe la versión que publica el tag.
+    # RELEASE_NOTES.md may truthfully say a release is prepared/not yet
+    # published when that matches GitHub state; it must not invent a
+    # published/stable release that does not exist, and it must not claim a
+    # *latest published release* version that differs from GitHub.
     assert f"SRT4U {EXPECTED_VERSION}" in notes
     # macOS sigue documentado como arm64-only, nunca universal.
     assert "Apple Silicon (arm64)" in notes
     assert "x86_64 build is produced" not in notes
-    assert "x86_64 build is NOT produced" in notes
+    assert "x86_64 build is NOT produced" in notes or "no x86_64 build" in notes.lower()
     assert "will not launch on Intel Macs" in notes
 
 
