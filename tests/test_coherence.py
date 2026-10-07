@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-EXPECTED_VERSION = "1.4.9"
+EXPECTED_VERSION = "1.4.10"
 OPERATIONS = {"process", "analyze", "qa", "benchmark", "transcription", "pipeline"}
 
 
@@ -87,12 +87,15 @@ def test_single_product_version_everywhere():
 
 
 def test_runtime_version_literal_lives_only_in_single_source():
-    """The 1.4.9 literal stays in pyproject.toml + application/version.py;
+    """The 1.4.10 literal lives only in pyproject.toml + application/version.py;
     every other runtime module derives it via APP_VERSION."""
+    # Restrict to application/*.py (the tested scope). pyproject.toml is
+    # the authoritative source and lives at the repo root, so it is not
+    # scanned here; test_single_product_version_everywhere checks it.
     offenders = []
     for path in (ROOT / "application").rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        if text.count("1.4.9"):
+        if text.count("1.4.10"):
             offenders.append(str(path.relative_to(ROOT)))
     assert offenders == ["application/version.py"], offenders
 
@@ -417,7 +420,8 @@ def test_release_notes_are_release_facing_not_preparation():
     assert f"SRT4U {EXPECTED_VERSION}" in notes
     # macOS sigue documentado como arm64-only, nunca universal.
     assert "Apple Silicon (arm64)" in notes
-    assert "no x86_64 build is produced" in notes
+    assert "x86_64 build is produced" not in notes
+    assert "x86_64 build is NOT produced" in notes
     assert "will not launch on Intel Macs" in notes
 
 

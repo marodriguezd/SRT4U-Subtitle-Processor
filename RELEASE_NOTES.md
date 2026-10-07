@@ -21,3 +21,7 @@ The application behavior and feature set are otherwise unchanged from 1.4.9.
 
 The release artifacts are built by the same pinned multiplatform CI pipeline and
 include the bundled `LICENSE` file.
+
+### macOS (Apple Silicon)
+
+The macOS DMG is **Apple Silicon (arm64)** only and will not launch on Intel Macs. x86_64 build is NOT produced.

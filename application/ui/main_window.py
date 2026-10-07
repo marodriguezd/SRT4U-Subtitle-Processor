@@ -2651,9 +2651,7 @@ class MainWindow(QMainWindow):
             if os.path.exists(lic_path):
                 open_path(lic_path)
                 return
-        QDesktopServices.openUrl(
-            QUrl("https://www.gnu.org/licenses/gpl-3.0.html")
-        )
+        QDesktopServices.openUrl(QUrl("https://www.gnu.org/licenses/gpl-3.0.html"))
 
     def _build_history_page(self) -> QWidget:
         page = QWidget()

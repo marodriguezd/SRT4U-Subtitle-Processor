@@ -423,7 +423,7 @@ jobs:
           set -euo pipefail
           # 1. Formato estable y tag == project.version (pyproject.toml).
           #    Falla ANTES de publicar: v1.4.8/v1.5.0/v2.0.0 por no coincidir,
-          #    v1.4.9-rc1 por no ser vMAJOR.MINOR.PATCH. El trigger `v*` sigue
+          #    v1.4.10-rc1 por no ser vMAJOR.MINOR.PATCH. El trigger `v*` sigue
           #    siendo amplio (los globs de Actions no filtran por formato);
           #    esta puerta es la que decide si se publica.
           python tools/release_check.py "$TAG"
