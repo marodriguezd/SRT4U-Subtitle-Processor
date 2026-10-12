@@ -1,6 +1,6 @@
 """
-Punto de entrada de SRT4U. Inicializa el registro (logging), la QApplication,
-crea la ventana principal y arranca el bucle de eventos.
+SRT4U entry point. Initializes logging, QApplication, creates the main window,
+and starts the event loop.
 """
 
 import sys
@@ -50,8 +50,8 @@ def load_app_icon() -> QIcon:
 
 def install_excepthook(log_path: str) -> None:
     """
-    Registra las excepciones no controladas y avisa al usuario indicándole el log,
-    en lugar de dejar que el proceso muera en silencio.
+    Log unhandled exceptions and notify the user with the log file path,
+    preventing silent crashes.
     """
 
     def _hook(exc_type, exc_value, exc_tb):
@@ -62,7 +62,7 @@ def install_excepthook(log_path: str) -> None:
         logger.critical(
             "Excepción no controlada", exc_info=(exc_type, exc_value, exc_tb)
         )
-        # El aviso sólo tiene sentido si ya hay una QApplication viva
+        # Notification only makes sense if a QApplication instance is active
         if QApplication.instance() is None:
             return
         try:
@@ -75,7 +75,7 @@ def install_excepthook(log_path: str) -> None:
                 t("alert.unexpected_error_desc", path=log_path),
             )
         except Exception as exc:
-            # Nunca volver a fallar dentro del propio hook
+            # Never fail inside the exception hook itself
             logger.debug("No se pudo mostrar el aviso de error inesperado: %s", exc)
 
     sys.excepthook = _hook
@@ -83,7 +83,7 @@ def install_excepthook(log_path: str) -> None:
 
 if __name__ == "__main__":
     log_path = setup_logging()
-    # Antes de crear la QApplication, para capturar también los mensajes del arranque
+    # Before creating QApplication, to capture early startup messages as well
     install_qt_message_handler()
     install_excepthook(log_path)
     logger.info("Iniciando SRT4U (log en %s)", log_path)
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     # Optional: Set application-wide font (platform-native family, same size)
     app.setFont(Styles.ui_font(10))
 
-    # Tooltips no heredan QSS de widgets: se tematizan a nivel de aplicación
+    # Tooltips do not inherit widget QSS; styled application-wide
     app.setStyleSheet(Styles.tooltip_qss())
 
     processor = GlassMainWindow()

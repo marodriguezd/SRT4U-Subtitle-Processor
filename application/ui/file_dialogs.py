@@ -1,10 +1,9 @@
 """
-Diálogos de archivo estilizados y coherentes con el tema glass de la app.
+Styled file dialogs consistent with the application's glass theme.
 
-Los diálogos nativos (GTK/Windows) ignoran el QSS de la aplicación y pueden
-romper el contraste con el tema oscuro; aquí se fuerza el diálogo Qt no nativo
-con estilo Fusion, paleta explícita, hoja de estilos propia e iconos SVG
-tematizados (los del tema del escritorio no siguen la paleta de la app).
+Native dialogs (GTK/Windows) ignore application QSS and can break contrast
+in dark mode. Non-native Qt dialogs are configured here using Fusion style,
+an explicit palette, custom stylesheet, and themed SVG icons.
 """
 
 from typing import Optional
@@ -24,7 +23,7 @@ from PyQt6.QtWidgets import (
 from .icons import Icons
 from .styles import Styles
 
-# Botones internos del diálogo no nativo -> icono SVG equivalente
+# Non-native dialog internal buttons -> equivalent SVG icon
 _TOOLBAR_ICONS = {
     "backButton": "arrow_left",
     "forwardButton": "arrow_right",
@@ -34,7 +33,7 @@ _TOOLBAR_ICONS = {
     "detailModeButton": "grid",
 }
 
-# Tipos de icono del sistema de archivos -> icono SVG equivalente
+# File system icon types -> matching SVG icon name
 _PROVIDER_ICONS = {
     QFileIconProvider.IconType.Folder: "folder",
     QFileIconProvider.IconType.File: "file",
@@ -47,7 +46,7 @@ _PROVIDER_ICONS = {
 
 
 class ThemedFileIconProvider(QFileIconProvider):
-    """Sustituye los iconos del tema del escritorio por iconos SVG tematizados."""
+    """Replace native desktop theme file icons with themed SVG icons."""
 
     def __init__(self, dark: bool = True):
         super().__init__()
@@ -68,10 +67,7 @@ class ThemedFileIconProvider(QFileIconProvider):
 
 
 def prepare_dialog(dialog: QFileDialog, dark: Optional[bool] = None) -> QFileDialog:
-    """
-    Aplica el tema de la app a un QFileDialog: estilo Fusion determinista,
-    paleta explícita, QSS, iconos SVG tematizados y botones sin iconos nativos.
-    """
+    """Apply application theme to QFileDialog with deterministic styling."""
     if dark is None:
         dark = Styles.is_dark()
     colors = Styles.dialog_colors(dark)
@@ -102,7 +98,7 @@ def prepare_dialog(dialog: QFileDialog, dark: Optional[bool] = None) -> QFileDia
 
     button_box = dialog.findChild(QDialogButtonBox)
     if button_box is not None:
-        # Los iconos estándar de Qt (carpeta del tema / aspa roja) no siguen la paleta
+        # Standard Qt button icons do not follow the app theme palette
         for button in button_box.buttons():
             button.setIcon(QIcon())
 
@@ -122,7 +118,7 @@ def _new_dialog(
 def ask_open_file(
     parent: QWidget, title: str, name_filter: str, directory: str = ""
 ) -> str:
-    """Diálogo de apertura de un solo archivo; devuelve "" si se cancela."""
+    """Open single-file selection dialog; returns empty string if cancelled."""
     dialog = _new_dialog(parent, title, directory, name_filter)
     dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
     if dialog.exec():
@@ -133,7 +129,7 @@ def ask_open_file(
 def ask_open_files(
     parent: QWidget, title: str, name_filter: str, directory: str = ""
 ) -> list:
-    """Diálogo de apertura múltiple; devuelve [] si se cancela."""
+    """Open multiple-file selection dialog; returns empty list if cancelled."""
     dialog = _new_dialog(parent, title, directory, name_filter)
     dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
     if dialog.exec():
@@ -144,7 +140,7 @@ def ask_open_files(
 def ask_save_file(
     parent: QWidget, title: str, name_filter: str, directory: str = ""
 ) -> str:
-    """Diálogo de guardado; devuelve "" si se cancela."""
+    """Open save-file dialog; returns empty string if cancelled."""
     dialog = _new_dialog(parent, title, directory, name_filter)
     dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
     if dialog.exec():

@@ -1,5 +1,5 @@
 from .main_window import MainWindow, MainWindow as GlassMainWindow
 
-# `GlassMainWindow` se mantiene como alias público histórico de `MainWindow`
-# (usado por el punto de entrada `main.py`).
+# `GlassMainWindow` is preserved as a historical public alias of `MainWindow`
+# (referenced by the `main.py` entry point).
 __all__ = ["MainWindow", "GlassMainWindow"]

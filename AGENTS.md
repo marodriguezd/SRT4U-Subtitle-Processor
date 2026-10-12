@@ -114,6 +114,15 @@ without it and transcription reports the optional-extra install hint.
   keys and compatible placeholders (en es pt de it zh-CN). Never leave a
   hardcoded fallback in another language. Spanish reference is
   es-ES (archivo, vídeo, configuración).
+- Comments and docstrings: write all docstrings (PEP 257), CLI helps, API
+  route metadata, and code comments strictly in professional English. Inline
+  comments (`#`) are reserved exclusively for the "why" (architectural
+  rationale, concurrency contracts, OS/Qt/FFmpeg workarounds, regex logic,
+  deep-audit notes). Redundant/trivial layout markers are prohibited. Never
+  remove linter directives (`# noqa`, `# type: ignore`) or deep-audit tags
+  (`deep-audit H1`, `L9`, `D6`, etc.). User-facing UI catalog translations
+  remain localized in `i18n_service.py`, but its code comments and section
+  headers must remain in English.
 - No emojis in UI (Qt/X11 FreeType limitation); use SVG via
   `application/ui/icons.py`. `♪/♫` in cleaning patterns are functional, not UI.
 - Generated output names are canonical: `*_processed`, `*_transcribed`,
@@ -191,7 +200,7 @@ uploads at 500 MB (subtitle uploads 5 MB).
 Thin routes over services via `create_app()`; slow work
 (translate/process/transcribe/pipeline) runs as `JobManager` jobs (202 +
 `Location`-style id polling, 404/409 semantics). Summaries/descriptions are
-in Spanish (same convention as the CLI). Errors sanitized (`safe_detail`);
+in professional English (same convention as the CLI). Errors sanitized (`safe_detail`);
 temps removed via `remove_temp` + `on_drop` on queued-cancel; stderr-free
 client messages (ffmpeg details go to server logs). Burn-in never runs
 server-side; pipeline exports to a sibling temp and returns
@@ -229,7 +238,8 @@ no secrets. Upload caps enforced; `settings.json` written `0600`.
 Product docs (`README*.md`, `CHANGELOG.md`, `docs/`, `RELEASE_NOTES.md`) stay
 versioned in place — never move them to `.agents/`. Describe exactly the
 current state; no marketing, no invented releases. Known-accepted debt lives
-in `docs/tech-debt.md`.
+in `docs/tech-debt.md`. Code docstrings, CLI helps, and API schemas are
+maintained strictly in professional English.
 
 ## 17. Current version
 

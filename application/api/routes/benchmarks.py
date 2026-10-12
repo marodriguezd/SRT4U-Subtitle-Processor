@@ -46,23 +46,23 @@ def _summaries() -> List[BenchmarkSummaryModel]:
 @router.get(
     "/benchmarks",
     response_model=BenchmarkListResponse,
-    summary="Lista benchmarks almacenados",
-    description="Agregados por `benchmark_id` desde el historial. La ejecución "
-    "de benchmarks no forma parte de la API.",
+    summary="List stored benchmarks",
+    description="Aggregated by `benchmark_id` from execution history. "
+    "Benchmark execution is CLI-only.",
 )
 def list_benchmarks() -> BenchmarkListResponse:
     try:
         return BenchmarkListResponse(items=_summaries())
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="historial no disponible") from exc
+        raise HTTPException(status_code=500, detail="history store unavailable") from exc
 
 
 @router.get(
     "/benchmarks/{benchmark_id}",
     response_model=BenchmarkDetailResponse,
-    summary="Ejecuciones de un benchmark",
-    description="Filas por (provider, run) de un `benchmark_id` concreto.",
-    responses={404: {"description": "Benchmark inexistente"}},
+    summary="Runs for a benchmark",
+    description="Per-(provider, run) records for a specific `benchmark_id`.",
+    responses={404: {"description": "Benchmark not found"}},
 )
 def get_benchmark(benchmark_id: str) -> BenchmarkDetailResponse:
     try:
@@ -73,9 +73,9 @@ def get_benchmark(benchmark_id: str) -> BenchmarkDetailResponse:
                 if (row.get("benchmark_id") or "unknown") == benchmark_id
             ]
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="historial no disponible") from exc
+        raise HTTPException(status_code=500, detail="history store unavailable") from exc
     if not rows:
-        raise HTTPException(status_code=404, detail="benchmark no encontrado")
+        raise HTTPException(status_code=404, detail="benchmark not found")
     return BenchmarkDetailResponse(
         benchmark_id=benchmark_id,
         runs=[

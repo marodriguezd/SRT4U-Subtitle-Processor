@@ -231,9 +231,8 @@ class PipelineResult:
     stages: List[PipelineStage] = field(default_factory=list)
     transcription_result: Optional[TranscriptionResult] = None
     translation_metrics: Optional[Any] = None
-    # Fallos reales de traducción (cues que mantienen el texto original).
-    # Nunca debe confundirse con ``translation_metrics.number_of_cues``,
-    # que cuenta los cues procesados, no los fallidos.
+    # Actual translation failures (cues retaining original source text).
+    # Distinct from translation_metrics.number_of_cues, which counts processed cues.
     translation_failures: int = 0
     analytics_before: Optional[Dict[str, Any]] = None
     qa_before: Optional[Dict[str, Any]] = None

@@ -1,19 +1,19 @@
 """
-Utilidad de desarrollo: regenera las capturas de verificación visual de la UI
-en /tmp/srt4u-shots (ventana principal × páginas/idiomas/temas y los diálogos
-de burn-in, progreso, archivos y mensajes × idiomas).
+Development utility: regenerates visual verification screenshots of the UI
+in /tmp/srt4u-shots (main window across pages/languages/themes and dialogs
+for burn-in, progress, file selection, and message boxes across languages).
 
-Uso:
+Usage:
     .venv/bin/python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
 
-Requiere PyQt6. Si no hay display disponible, fuerza la plataforma offscreen.
+Requires PyQt6. Forces offscreen platform if no display is available.
 """
 
 import argparse
 import os
 import sys
 
-# Permite ejecutar el script desde el raíz del repo sin instalación.
+# Allow running the script from repository root without installation.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
@@ -39,15 +39,15 @@ DIALOG_LANGS = ["en", "es", "pt", "de", "it", "zh-CN"]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Regenera las capturas de UI de SRT4U."
+        description="Regenerate SRT4U UI verification screenshots."
     )
     parser.add_argument(
-        "--out", default="/tmp/srt4u-shots", help="Directorio de salida"
+        "--out", default="/tmp/srt4u-shots", help="Output directory"
     )
     parser.add_argument(
         "--langs",
         default=",".join(DIALOG_LANGS),
-        help="Idiomas para los diálogos (coma-separados)",
+        help="Comma-separated language codes for dialogs",
     )
     return parser.parse_args()
 
@@ -57,7 +57,7 @@ def _save(widget, path: str) -> None:
 
 
 def _shoot_system_dialogs(app, args, langs) -> None:
-    """Captura el diálogo de archivos (claro/oscuro) y un message box por idioma."""
+    """Capture file dialog (light/dark) and warning message box per language."""
     for lang in langs:
         get_i18n().set_language(lang, save_to_config=False)
 
@@ -108,7 +108,7 @@ def main() -> int:
     i18n = get_i18n(ConfigService())
     items = [SubtitleItem(index=1, start_ms=0, end_ms=1000, text="Hello world")]
 
-    # --- Ventana principal: páginas × idiomas × temas ---
+    # Main window: pages x languages x themes
     for lang in WINDOW_LANGS:
         i18n.set_language(lang, save_to_config=False)
         for dark in (True, False):
@@ -125,7 +125,7 @@ def main() -> int:
                 _save(win, os.path.join(args.out, f"{name}_{lang}_{theme}.png"))
             win.close()
 
-    # --- Diálogo de burn-in (mínimo dinámico por idioma) ---
+    # Burn-in dialog (dynamic minimum geometry per language)
     dialog_langs = [lang.strip() for lang in args.langs.split(",") if lang.strip()]
     for lang in dialog_langs:
         i18n.set_language(lang, save_to_config=False)
@@ -139,7 +139,7 @@ def main() -> int:
         )
         dialog.close()
 
-    # --- Modales de progreso (mínimo dinámico; sin FFmpeg real) ---
+    # Progress modals (dynamic minimum geometry; mocked FFmpeg)
     BurnInProgressModal._start_worker = lambda self, *a, **k: None
     for lang in dialog_langs[:2]:
         i18n.set_language(lang, save_to_config=False)
@@ -163,10 +163,10 @@ def main() -> int:
         print(f"burnprogress_{lang}: {burn_modal.width()}x{burn_modal.height()}")
         burn_modal.close()
 
-    # --- Diálogos del sistema (archivos y mensajes) ---
+    # System dialogs (files and messages)
     _shoot_system_dialogs(app, args, dialog_langs)
 
-    print(f"Capturas guardadas en {args.out}")
+    print(f"Screenshots saved to {args.out}")
     return 0
 
 

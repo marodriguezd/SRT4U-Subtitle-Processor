@@ -115,10 +115,9 @@ class ProcessingStats:
     deleted_lines: int = 0
     processed_items_count: int = 0
     elapsed_time: float = 0.0
-    # Bloques que el motor de traducción no pudo traducir (mantienen el texto original)
+    # Cues the translation engine could not translate (retaining original source text)
     translation_failures: int = 0
-    # Bloques que el parser no pudo usar (timestamp inválido, evento mal formado).
-    # Antes se descartaban en silencio; ahora son visibles para el usuario.
+    # Cues the parser could not consume (invalid timestamp, malformed event)
     parse_issues: int = 0
 
 
@@ -158,9 +157,7 @@ class _CueTranslation:
 
 
 class SubtitleService:
-    """
-    Motor de procesamiento de subtítulos para SRT, VTT, ASS y TXT.
-    """
+    """Core subtitle processing engine for SRT, VTT, ASS, SSA, and TXT formats."""
 
     # Spam is detected in two tiers, because "contains a token" and "is spam"
     # are not the same statement (deep-audit H1).

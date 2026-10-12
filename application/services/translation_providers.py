@@ -395,7 +395,7 @@ class OpenAICompatibleProvider(TranslationProvider):
         return api_key
 
     def _payload(self, text, target_language):
-        # Mantener el prompt y los parámetros originales para compatibilidad.
+        # Preserve prompt structure and formatting instructions for compatibility.
         system_prompt = (
             "You are a professional subtitle translator. "
             f"Translate the following subtitle text to language code '{target_language}'. "

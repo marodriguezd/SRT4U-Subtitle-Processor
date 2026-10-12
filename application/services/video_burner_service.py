@@ -1,7 +1,7 @@
-"""
-Servicio de incrustación de subtítulos en vídeo (Hardsub / Burn-In) mediante FFmpeg.
-Soporta detección multiplataforma de binarios, generación de estilos ASS avanzados
-y cálculo de progreso/ETA en tiempo real.
+"""Subtitle video burn-in service (hardsub) using FFmpeg.
+
+Provides cross-platform binary discovery, styled ASS script generation,
+and real-time encoding progress tracking.
 """
 
 import os
@@ -44,7 +44,7 @@ class BurnInOptions:
     box_style: str = "semi"  # "none", "semi", "solid"
     quality_preset: str = "high"  # "high", "fast"
     fix_overlaps: bool = (
-        True  # Ajusta tiempos automáticamente para evitar solapamientos
+        True  # Automatically adjusts timing to prevent visual overlaps
     )
 
 
@@ -62,14 +62,14 @@ class VideoBurnerService:
             )
             return res.returncode == 0
         except Exception as exc:
-            logger.debug("Candidato de FFmpeg descartado (%s)", type(exc).__name__)
+            logger.debug("FFmpeg candidate discarded (%s)", type(exc).__name__)
             return False
 
     @classmethod
     def get_ffmpeg_path(cls) -> Optional[str]:
-        """
-        Localiza un binario de FFmpeg funcional en el sistema o dentro del paquete de la app.
-        Valida que el binario realmente ejecute sin errores de librerías dinámicas.
+        """Locate a functional FFmpeg binary on the system or bundled with the app.
+
+        Validates that the binary executes without shared library errors.
         """
         candidates = []
 
@@ -97,7 +97,7 @@ class VideoBurnerService:
         if system_ffmpeg:
             candidates.append(system_ffmpeg)
 
-        # 4. Fallbacks comunes en Linux/Unix
+        # 4. Common Linux/Unix fallbacks
         for fallback in [
             "/usr/bin/ffmpeg",
             "/usr/local/bin/ffmpeg",
@@ -116,16 +116,14 @@ class VideoBurnerService:
     def get_video_duration_ms(
         video_path: str, ffmpeg_path: Optional[str] = None
     ) -> Optional[int]:
-        """
-        Obtiene la duración total del archivo de vídeo en milisegundos usando ffmpeg -i.
-        """
+        """Retrieve total video duration in milliseconds using ffmpeg -i."""
         ffmpeg = ffmpeg_path or VideoBurnerService.get_ffmpeg_path()
         if not ffmpeg or not os.path.exists(video_path):
             return None
 
         try:
             cmd = [ffmpeg, "-i", video_path]
-            # FFmpeg escribe información del contenedor en stderr
+            # FFmpeg writes container information to stderr
             res = subprocess.run(
                 cmd,
                 stdout=subprocess.DEVNULL,
@@ -135,7 +133,7 @@ class VideoBurnerService:
                 errors="replace",
                 timeout=10,
             )
-            # Buscar "Duration: 00:02:15.34"
+            # Match "Duration: 00:02:15.34"
             match = re.search(
                 r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)", res.stderr
             )
@@ -158,9 +156,9 @@ class VideoBurnerService:
     def get_video_dimensions(
         video_path: str, ffmpeg_path: Optional[str] = None
     ) -> Tuple[int, int]:
-        """
-        Obtiene las dimensiones (ancho, alto) del archivo de vídeo.
-        Si no se detectan, devuelve (1920, 1080) por defecto.
+        """Retrieve video dimensions (width, height) in pixels.
+
+        Falls back to (1920, 1080) if video dimensions cannot be determined.
         """
         ffmpeg = ffmpeg_path or VideoBurnerService.get_ffmpeg_path()
         if not ffmpeg or not os.path.exists(video_path):
@@ -181,12 +179,12 @@ class VideoBurnerService:
             if match:
                 return int(match.group(1)), int(match.group(2))
             logger.warning(
-                "FFmpeg no informó las dimensiones de %s; se asume 1920x1080",
+                "FFmpeg could not parse dimensions for %s; assuming 1920x1080",
                 video_path,
             )
         except Exception as exc:
             logger.warning(
-                "No se pudieron detectar las dimensiones (se asume 1920x1080): %s",
+                "Could not detect video dimensions (assuming 1920x1080): %s",
                 type(exc).__name__,
             )
 
@@ -199,11 +197,12 @@ class VideoBurnerService:
         video_width: int = 1920,
         video_height: int = 1080,
     ) -> str:
+        """Generate an Advanced SubStation Alpha (ASS) script with proportional styling.
+
+        Scales font metrics and margins to the video frame resolution while
+        optionally fixing temporal overlaps.
         """
-        Genera el script ASS (Advanced SubStation Alpha) configurado con las opciones visuales,
-        proporcional a la resolución del vídeo y corrigiendo solapamientos.
-        """
-        # 1. Sanitizar y corregir solapamientos temporales si está habilitado
+        # 1. Sanitize timestamps and resolve temporal overlaps if enabled
         processed_items: List[SubtitleItem] = []
         if items:
             sorted_items = sorted(items, key=lambda x: (x.start_ms, x.end_ms))
@@ -227,25 +226,25 @@ class VideoBurnerService:
                     next_item = processed_items[i + 1]
                     if curr_item.end_ms > next_item.start_ms:
                         if next_item.start_ms > curr_item.start_ms:
-                            # Acortar el actual dejando un respiro de 40ms antes del siguiente
+                            # Shorten current cue leaving a 40ms gap before the next
                             curr_item.end_ms = max(
                                 curr_item.start_ms + 200, next_item.start_ms - 40
                             )
 
-        # 2. Resolución de referencia (PlayResX / PlayResY)
+        # 2. Reference resolution (PlayResX / PlayResY)
         vw = max(320, video_width)
         vh = max(240, video_height)
 
-        # Mapeo de tamaño proporcional a la altura del vídeo (evita subtítulos gigantes en cualquier resolución)
+        # Proportional font size mapping relative to video height
         size_ratios = {
-            "small": 0.035,  # ~38px en 1080p, ~24px en 700p
-            "medium": 0.045,  # ~48px en 1080p, ~31px en 700p (legibilidad óptima estándar)
-            "large": 0.058,  # ~62px en 1080p, ~40px en 700p
+            "small": 0.035,  # ~38px in 1080p, ~24px in 700p
+            "medium": 0.045,  # ~48px in 1080p, ~31px in 700p
+            "large": 0.058,  # ~62px in 1080p, ~40px in 700p
         }
         ratio = size_ratios.get(options.font_size, 0.045)
         fontsize = max(16, int(round(vh * ratio)))
 
-        # Mapeo de color en formato ASS (&HAABBGGRR)
+        # ASS color mapping (&HAABBGGRR)
         color_map = {
             "white": "&H00FFFFFF",
             "yellow": "&H0000FFFF",  # Blue=0, Green=FF, Red=FF
@@ -253,31 +252,31 @@ class VideoBurnerService:
         }
         primary_color = color_map.get(options.font_color, "&H00FFFFFF")
 
-        # Márgenes proporcionales a la pantalla
+        # Screen-proportional margins
         margin_v = max(15, int(round(vh * 0.048)))
         margin_lr = max(20, int(round(vw * 0.04)))
 
-        # Mapeo de estilo de caja / fondo
+        # Box / background style mapping
         if options.box_style == "none":
             # BorderStyle 1 = Outline + Drop Shadow
             border_style = 1
             outline = max(2, int(round(vh * 0.003)))
             shadow = max(1, int(round(vh * 0.002)))
-            outline_color = "&H00000000"  # Contorno negro nítido
-            back_color = "&H80000000"  # Sombra semitransparente
+            outline_color = "&H00000000"  # Opaque black outline
+            back_color = "&H80000000"  # Semi-transparent drop shadow
         elif options.box_style == "solid":
-            # BorderStyle 3 = Opaque Box (OutlineColour define el fondo de la caja)
+            # BorderStyle 3 = Opaque Box (OutlineColour defines box background)
             border_style = 3
             outline = max(2, int(round(vh * 0.004)))
             shadow = 0
-            outline_color = "&H00000000"  # Caja 100% opaca negra
+            outline_color = "&H00000000"  # Fully opaque black box
             back_color = "&H00000000"
         else:
-            # "semi" (50% opacidad &H80000000)
+            # "semi" (50% opacity &H80000000)
             border_style = 3
             outline = max(2, int(round(vh * 0.004)))
             shadow = 0
-            outline_color = "&H80000000"  # Caja semitransparente
+            outline_color = "&H80000000"  # Semi-transparent box
             back_color = "&H80000000"
 
         style_body = (
@@ -387,7 +386,7 @@ class BurnInWorker(QThread):
             self.failed.emit(t("burn.error_prepare"))
             return
 
-        # 2. Generar archivo ASS en directorio temporal
+        # 2. Generate ASS file in temporary directory
         ass_filename = "subtitles.ass"
         ass_path = os.path.join(temp_dir, ass_filename)
         stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
@@ -408,7 +407,7 @@ class BurnInWorker(QThread):
             with open(ass_path, "w", encoding="utf-8") as f:
                 f.write(ass_content)
 
-            # 3. Configurar parámetros de codificación
+            # 3. Configure encoding parameters
             if self.options.quality_preset == "fast":
                 v_preset = "ultrafast"
                 v_crf = "23"

@@ -9,7 +9,7 @@ logger = get_logger("config")
 
 
 class ConfigService:
-    """Gestiona la configuración y credenciales del usuario de manera persistente."""
+    """Manage persistent user configuration and credentials."""
 
     DEFAULT_CONFIG = {
         "deepl_api_key": "",
@@ -48,14 +48,14 @@ class ConfigService:
         return path
 
     def load(self) -> None:
-        """Carga la configuración; conserva el comportamiento de valores por defecto."""
+        """Load configuration from disk, falling back to defaults if absent."""
         if not os.path.exists(self.config_file):
             return
         try:
             with open(self.config_file, "r", encoding="utf-8") as config_file:
                 data = json.load(config_file)
             if not isinstance(data, dict):
-                raise ValueError("el contenido no es un objeto JSON")
+                raise ValueError("configuration payload is not a JSON object")
             self.config.update(data)
             if os.name != "nt":
                 os.chmod(self.config_file, 0o600)
@@ -63,12 +63,12 @@ class ConfigService:
         except Exception as exc:
             self.load_error = type(exc).__name__
             logger.warning(
-                "No se pudo leer la configuración (%s); se usan los valores por defecto",
+                "Could not load configuration (%s); falling back to default values",
                 type(exc).__name__,
             )
 
     def save(self) -> bool:
-        """Escribe configuración y claves de forma atómica y restrictiva.
+        """Write configuration and credentials atomically with restricted permissions.
 
         Deep-audit H4: this used to ``open(path, "w")`` and dump straight into
         the destination, so any interruption left a truncated JSON file and the
@@ -92,13 +92,13 @@ class ConfigService:
             return True
         except Exception as exc:
             self.save_error = type(exc).__name__
-            logger.error("No se pudo guardar la configuración (%s)", type(exc).__name__)
+            logger.error("Could not save configuration (%s)", type(exc).__name__)
             return False
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.config.get(key, self.DEFAULT_CONFIG.get(key, default))
 
     def set(self, key: str, value: Any) -> bool:
-        """Asigna un valor y persiste. Devuelve False si la escritura falló."""
+        """Assign a value and persist. Return False if writing to disk failed."""
         self.config[key] = value
         return self.save()

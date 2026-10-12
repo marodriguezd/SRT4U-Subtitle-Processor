@@ -269,7 +269,7 @@ class PipelineWorker(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        # El título de ventana lo fija `retranslate_ui()` según el idioma activo
+        # Window title is set by retranslate_ui() according to the active language
         self.setMinimumSize(980, 640)
         self._apply_initial_geometry()
 
@@ -303,7 +303,7 @@ class MainWindow(QMainWindow):
             self.i18n.current_language,
         )
         if self.config_service.load_error:
-            # La configuración no se pudo leer y se han restaurado los valores por defecto
+            # Configuration could not be read; defaults were restored
             ThemedMessageBox.warning(
                 self,
                 t("alert.settings_load_error_title"),
@@ -314,7 +314,7 @@ class MainWindow(QMainWindow):
             )
 
     def _apply_initial_geometry(self):
-        """Ajusta el tamaño inicial al espacio disponible de la pantalla."""
+        """Adjust initial window size to available screen geometry."""
         screen = QApplication.primaryScreen()
         if screen is not None:
             available = screen.availableGeometry()
@@ -333,11 +333,11 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        # 1. Sidebar lateral
+        # 1. Sidebar navigation
         self.sidebar = self._build_sidebar()
         root_layout.addWidget(self.sidebar)
 
-        # 2. Main Content Stack
+        # 2. Main content stack
         self.stack = QStackedWidget()
         self.page_home = self._build_home_page()
         self.page_preview = self._build_preview_page()
@@ -513,8 +513,7 @@ class MainWindow(QMainWindow):
 
     def _switch_page(self, page_index: int):
         self.stack.setCurrentIndex(page_index)
-        # Los iconos de la barra lateral también cambian con el tema: los colores
-        # por defecto de `Icons` están calibrados para el fondo oscuro.
+        # Sidebar icons update with theme: default colors in Icons are calibrated for dark background.
         active_color = (
             Styles.NAV_ACTIVE_ICON_DARK
             if self.dark_mode
@@ -545,8 +544,7 @@ class MainWindow(QMainWindow):
         self._apply_theme()
 
     def _apply_theme(self):
-        # El tema activo se registra en Styles para que los diálogos del sistema
-        # (archivos, mensajes, tooltips) se pinten con los mismos colores.
+        # Active theme is registered in Styles so system dialogs and popups share the same colors.
         Styles.set_dark(self.dark_mode)
         self.central_widget.setStyleSheet(Styles.get_main_style(self.dark_mode))
         Styles.retint_inline_text(self.central_widget, self.dark_mode)
@@ -560,26 +558,26 @@ class MainWindow(QMainWindow):
                 )
             )
             self.btn_theme.setIconSize(QSize(18, 18))
-        # Los tooltips se estilizan a nivel de aplicación: se reapuntan al tema activo
+        # Tooltips are styled application-wide to match the active theme.
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(Styles.tooltip_qss(self.dark_mode))
         self._switch_page(self.stack.currentIndex())
 
-    # ------------------ PÁGINA: INICIO ------------------
+    # Home Page
     def _build_home_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Contenedor centrado para evitar estiramiento excesivo en tiling WMs (dwm)
+        # Centered container to avoid excessive stretching in tiling window managers (dwm)
         container = QWidget()
         container.setMaximumWidth(1020)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(16)
 
-        # Header con Theme Toggle y Language Selector
+        # Header with theme toggle and language selector
         header_row = QHBoxLayout()
         header_text = QVBoxLayout()
         header_text.setSpacing(4)
@@ -593,7 +591,7 @@ class MainWindow(QMainWindow):
         header_text.addWidget(self.lbl_home_title)
         header_text.addWidget(self.lbl_home_sub)
 
-        # Selector de idioma global
+        # Global language selector
         self.cb_top_lang = QComboBox()
         self.cb_top_lang.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
@@ -670,14 +668,14 @@ class MainWindow(QMainWindow):
         self.drop_zone.file_dropped.connect(self._on_file_selected)
         layout.addWidget(self.drop_zone)
 
-        # Selector Row (3 columnas: Origen, Destino, Modelo)
+        # Selector row (source language, target language, translation engine)
         selector_card = QFrame()
         selector_card.setObjectName("CardContainer")
         sel_layout = QHBoxLayout(selector_card)
         sel_layout.setContentsMargins(18, 14, 18, 14)
         sel_layout.setSpacing(18)
 
-        # 1. Idioma Origen
+        # 1. Source language
         src_box = QVBoxLayout()
         src_box.setSpacing(6)
         self.lbl_src_lang = QLabel(t("home.source_lang"))
@@ -691,7 +689,7 @@ class MainWindow(QMainWindow):
         src_box.addWidget(self.lbl_src_lang)
         src_box.addWidget(self.cb_source_lang)
 
-        # 2. Idioma Destino
+        # 2. Target language
         tgt_box = QVBoxLayout()
         tgt_box.setSpacing(6)
         self.lbl_tgt_lang = QLabel(t("home.target_lang"))
@@ -704,7 +702,7 @@ class MainWindow(QMainWindow):
         tgt_box.addWidget(self.lbl_tgt_lang)
         tgt_box.addWidget(self.cb_target_lang)
 
-        # 3. Modelo de Traducción
+        # 3. Translation engine
         engine_box = QVBoxLayout()
         engine_box.setSpacing(6)
         self.lbl_engine = QLabel(t("home.engine"))
@@ -723,7 +721,7 @@ class MainWindow(QMainWindow):
         sel_layout.addLayout(engine_box)
         layout.addWidget(selector_card)
 
-        # Cuadrícula 2x2 de Opciones (según mockup)
+        # 2x2 options grid
         grid_layout = QGridLayout()
         grid_layout.setSpacing(14)
 
@@ -751,7 +749,7 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(self.card_parallel, 1, 1)
         layout.addLayout(grid_layout)
 
-        # Botón de Acción Principal
+        # Primary action button
         self.btn_process = QPushButton(t("home.btn_process"))
         self.btn_process.setObjectName("PrimaryBtn")
         self.btn_process.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -764,7 +762,7 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: VISTA PREVIA (STUDIO DE TRADUCCIÓN) ------------------
+    # Translation Studio Page
     def _build_preview_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -954,7 +952,7 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(splitter, stretch=1)
         return page
 
-    # ------------------ PÁGINA: LIMPIAR ------------------
+    # Clean Page
     def _build_clean_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -996,7 +994,7 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: CONVERTIR ------------------
+    # Convert Page
     def _build_convert_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1055,7 +1053,7 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: TRANSCRIPCIÓN ------------------
+    # Transcribe Page
     def _build_transcribe_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1373,7 +1371,7 @@ class MainWindow(QMainWindow):
             t("transcribe.error_generic"),
         )
 
-    # ------------------ PÁGINA: PIPELINE ------------------
+    # Pipeline Page
     def _build_pipeline_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1791,7 +1789,7 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: CONFIGURACIÓN ------------------
+    # Settings Page
     def _build_settings_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1839,8 +1837,7 @@ class MainWindow(QMainWindow):
         )
         l_layout.addWidget(self.cb_settings_lang)
 
-        # Aclara qué idioma se aplicará realmente: con "Automático (Sistema)" no
-        # se veía si seguía al sistema o un idioma guardado de una sesión anterior.
+        # Clarifies which language is effectively active when "Auto (System)" is selected.
         self.lbl_lang_effective = QLabel()
         self.lbl_lang_effective.setStyleSheet(
             f"font-size: 12px; color: {Styles.TEXT_MUTED};"
@@ -1930,7 +1927,7 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ PÁGINA: COMPLETADO ------------------
+    # Completed Page
     def _build_completed_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1965,7 +1962,7 @@ class MainWindow(QMainWindow):
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
-        # 3 Tarjetas de métricas
+        # Metric cards
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(14)
         self.card_lines = MetricCard("file", "0", t("completed.card_lines"))
@@ -1976,7 +1973,7 @@ class MainWindow(QMainWindow):
         cards_layout.addWidget(self.card_time)
         layout.addLayout(cards_layout)
 
-        # Botones de Acción
+        # Action buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
         self.btn_open_file = QPushButton(t("completed.btn_open_file"))
@@ -2018,7 +2015,7 @@ class MainWindow(QMainWindow):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-        # Resumen de cambios
+        # Summary card
         summary_card = QFrame()
         summary_card.setObjectName("CardContainer")
         s_layout = QVBoxLayout(summary_card)
@@ -2045,10 +2042,9 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # ------------------ ACCIONES Y FLUJO ------------------
+    # Actions and Workflow
     def _on_file_selected(self, subtitle_path: str, video_path: str):
-        # El DropZone ya guarda su propio `current_video_path`; MainWindow solo
-        # necesita el subtítulo (el vídeo vive en `self.video_player`).
+        # DropZone tracks its own video path; MainWindow only needs the subtitle.
         self.current_subtitle_path = subtitle_path
 
         if video_path and os.path.exists(video_path):
@@ -2444,7 +2440,7 @@ class MainWindow(QMainWindow):
         if self.saved_output_path and os.path.exists(self.saved_output_path):
             reveal_path(self.saved_output_path)
 
-    # ------------------ LOTE ------------------
+    # Batch Processing
     def _add_batch_files(self):
         files = ask_open_files(self, t("batch.title"), t("preview.sub_filter"))
         for f in files:
@@ -2520,7 +2516,7 @@ class MainWindow(QMainWindow):
             self, t("alert.batch_done_title"), t("alert.batch_done_desc")
         )
 
-    # ------------------ AJUSTES ------------------
+    # Settings Management
     def _load_config_values(self):
         self.txt_deepl_key.setText(self.config_service.get("deepl_api_key", ""))
         is_pro = self.config_service.get("deepl_type", "free") == "pro"
@@ -2535,7 +2531,7 @@ class MainWindow(QMainWindow):
             self.config_service.get("openai_model", "gpt-4o-mini")
         )
 
-        # Restaurar las opciones de la página de inicio
+        # Restore home page options
         self._select_combo_data(
             self.cb_source_lang, self.config_service.get("source_lang", "auto")
         )
@@ -2552,13 +2548,13 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _select_combo_data(combo: QComboBox, value: object) -> None:
-        """Selecciona en un QComboBox el ítem cuyo data coincide con `value`, si existe."""
+        """Select the QComboBox item whose item data matches `value`, if found."""
         index = combo.findData(value)
         if index >= 0:
             combo.setCurrentIndex(index)
 
     def _persist_home_options(self):
-        """Guarda en disco las opciones de la página de inicio elegidas por el usuario."""
+        """Persist home page configuration options selected by the user to disk."""
         saved = [
             self.config_service.set("source_lang", self.cb_source_lang.currentData()),
             self.config_service.set("target_lang", self.cb_target_lang.currentData()),
@@ -2569,7 +2565,7 @@ class MainWindow(QMainWindow):
             ),
         ]
         if not all(saved):
-            # No se interrumpe el procesamiento por esto: sólo se registra.
+            # Do not interrupt processing on settings save failure; log warning only.
             logger.warning(
                 "No se pudieron guardar las opciones de la página de inicio (%s)",
                 self.config_service.save_error,
@@ -2609,7 +2605,7 @@ class MainWindow(QMainWindow):
             self, t("settings.save_success_title"), t("settings.save_success")
         )
 
-    # ------------------ PÁGINA: ACERCA DE ------------------
+    # About Page
     def _btn_link_style(self) -> str:
         return """
             QPushButton {
@@ -2629,7 +2625,7 @@ class MainWindow(QMainWindow):
         """
 
     def _license_file_candidates(self) -> List[str]:
-        """Rutas donde puede encontrarse el LICENSE (repo, bundle PyInstaller, cwd)."""
+        """Candidate paths where LICENSE may be located (repo, PyInstaller bundle, cwd)."""
         repo_root = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
@@ -2780,7 +2776,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(20)
 
-        # 1. Header con Identidad
+        # 1. Header with identity
         header_card = QFrame()
         header_card.setObjectName("CardContainer")
         h_layout = QHBoxLayout(header_card)
@@ -2833,7 +2829,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(header_card)
 
-        # 2. Card: Desarrollador / About Me
+        # 2. Developer card
         dev_card = QFrame()
         dev_card.setObjectName("CardContainer")
         d_layout = QVBoxLayout(dev_card)
@@ -2908,7 +2904,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(dev_card)
 
-        # 3. Card: Licencia y Términos Legales
+        # 3. License and legal terms card
         lic_card = QFrame()
         lic_card.setObjectName("CardContainer")
         l_layout = QVBoxLayout(lic_card)
@@ -3045,11 +3041,11 @@ class MainWindow(QMainWindow):
 
     def _refresh_effective_language(self):
         """
-        Muestra qué idioma está en vigor realmente.
+        Display which interface language is currently effective.
 
-        "Automático (Sistema)" es ambiguo: con él la app sigue al idioma del
-        sistema, pero si el usuario eligió antes un idioma concreto, ése es el
-        guardado en la configuración. Aquí se aclara la diferencia.
+        "Auto (System)" follows the host system language, but if a specific
+        language was configured previously, it takes precedence. This clarifies
+        the active choice for the user.
         """
         configured = self.i18n.get_configured_language()
         if configured == "auto":
@@ -3279,5 +3275,5 @@ class MainWindow(QMainWindow):
             self.lbl_history_empty.setText(t("history.empty"))
             self._refresh_history()
 
-        # Reaplica el tinte de tema por si alguna vista redefinió colores inline al retraducir
+        # Reapply theme tint in case any view redefined inline colors during retranslation
         Styles.retint_inline_text(self.central_widget, self.dark_mode)

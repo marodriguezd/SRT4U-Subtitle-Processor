@@ -1,7 +1,4 @@
-"""
-Utilidades de integración con el sistema operativo para abrir archivos y
-revelarlos en el explorador de archivos de forma multiplataforma.
-"""
+"""Cross-platform operating system utilities for opening and revealing files."""
 
 import os
 import subprocess
@@ -9,7 +6,7 @@ import sys
 
 
 def open_path(path: str) -> None:
-    """Abre un archivo o carpeta con la aplicación predeterminada del sistema."""
+    """Open a file or directory using the system default application."""
     if not path:
         return
     if sys.platform == "win32":
@@ -21,7 +18,7 @@ def open_path(path: str) -> None:
 
 
 def reveal_path(path: str) -> None:
-    """Abre el gestor de archivos resaltando el archivo indicado cuando es posible."""
+    """Open the system file manager highlighting the target file when supported."""
     if not path:
         return
     if sys.platform == "win32":

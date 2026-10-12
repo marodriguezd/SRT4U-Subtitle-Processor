@@ -34,353 +34,353 @@ PIPELINE_OPTIONS = {
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="srt4u",
-        description="Procesa y analiza subtítulos sin iniciar la interfaz de escritorio.",
+        description="Process and analyze subtitles from the command line without launching the desktop UI.",
     )
     parser.add_argument("--version", action="version", version=APP_VERSION)
     subparsers = parser.add_subparsers(dest="command", required=True)
     process = subparsers.add_parser(
-        "process", help="limpia, traduce o convierte uno o varios archivos"
+        "process", help="clean, translate, or convert one or more subtitle files"
     )
     process.add_argument(
-        "input", nargs="+", help="archivo(s) o directorio(s) de entrada"
+        "input", nargs="+", help="input file(s) or directory"
     )
     process.add_argument(
         "-o",
         "--output",
-        help="archivo de salida o directorio para procesamiento por lote",
+        help="output file or directory for batch processing",
     )
     process.add_argument(
-        "--config", help="preset de pipeline declarativo en formato JSON"
+        "--config", help="declarative pipeline preset in JSON format"
     )
     process.add_argument(
         "--clean",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="limpia las líneas promocionales (usar --no-clean para desactivarlo)",
+        help="clean promotional and spam lines (use --no-clean to disable)",
     )
     process.add_argument(
         "--translate",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="traduce los subtítulos (usar --no-translate para desactivarlo)",
+        help="translate subtitles (use --no-translate to disable)",
     )
     process.add_argument(
-        "--source", dest="source_language", help="idioma de origen (por defecto: auto)"
+        "--source", dest="source_language", help="source language code (default: auto)"
     )
     process.add_argument(
         "--target",
         dest="target_language",
-        help="idioma de destino; obligatorio al traducir",
+        help="target language code (required when translating)",
     )
     process.add_argument(
         "--engine",
         choices=TRANSLATION_PROVIDERS,
-        help="motor configurado en SRT4U (Ollama/OpenRouter usan el endpoint compatible OpenAI)",
+        help="translation engine configured in SRT4U (Ollama/OpenRouter use OpenAI-compatible endpoint)",
     )
     process.add_argument(
         "--format",
         dest="target_format",
         choices=("srt", "vtt", "ass", "ssa", "txt"),
-        help="formato de salida; por defecto conserva el formato de cada entrada",
+        help="output format; defaults to preserving each input format",
     )
     process.add_argument(
         "--sequential",
         action="store_true",
         default=None,
-        help="desactiva la traducción paralela",
+        help="disable parallel translation",
     )
     process.add_argument(
         "--stats",
         action="store_true",
-        help="muestra métricas de traducción al final sin cambiar la salida predeterminada",
+        help="print translation metrics summary at the end",
     )
     process.add_argument(
         "--stats-json",
         action="store_true",
-        help="emite las métricas de traducción como JSON sin cambiar la salida predeterminada",
+        help="output translation metrics as JSON",
     )
     process.add_argument(
         "--db",
         default=None,
-        help="ruta de la base de historial (por defecto: historial del usuario)",
+        help="path to history database (default: user history database)",
     )
     process.add_argument(
         "--no-history",
         action="store_true",
-        help="no registra esta ejecución en el historial local",
+        help="do not record this run in local history",
     )
 
     for command, help_text in (
-        ("analyze", "calcula métricas de contenido, tiempo y calidad"),
-        ("qa", "valida reglas deterministas de calidad de subtítulos"),
+        ("analyze", "calculate content, timing, and quality metrics"),
+        ("qa", "validate deterministic subtitle quality rules"),
     ):
         analysis = subparsers.add_parser(command, help=help_text)
-        analysis.add_argument("input", help="archivo de subtítulos")
+        analysis.add_argument("input", help="subtitle file to inspect")
         analysis.add_argument(
-            "--json", action="store_true", help="emite JSON válido en stdout"
+            "--json", action="store_true", help="emit valid JSON to stdout"
         )
         analysis.add_argument(
-            "--csv", action="store_true", help="emite CSV (equivalente a --format csv)"
+            "--csv", action="store_true", help="emit CSV (equivalent to --format csv)"
         )
         if command == "qa":
             analysis.add_argument(
                 "--strict",
                 action="store_true",
-                help="devuelve código 1 si hay errores o advertencias",
+                help="exit with code 1 on errors or warnings",
             )
-        analysis.add_argument("-o", "--output", help="guarda el informe en un archivo")
+        analysis.add_argument("-o", "--output", help="save report to a file")
         analysis.add_argument(
-            "--format", choices=("json", "csv"), help="formato de exportación"
+            "--format", choices=("json", "csv"), help="export format"
         )
 
     benchmark = subparsers.add_parser(
-        "benchmark", help="compara providers sobre un dataset fijo de subtítulos"
+        "benchmark", help="benchmark providers on a fixed subtitle dataset"
     )
     benchmark.add_argument(
         "dataset",
         nargs="?",
         default=None,
-        help="archivo o directorio del dataset (por defecto: dataset interno versionado)",
+        help="dataset file or directory (default: internal versioned dataset)",
     )
     benchmark.add_argument(
         "--providers",
         default="google",
-        help="providers separados por coma (p. ej. google,deepl,ollama)",
+        help="comma-separated provider names (e.g. google,deepl,ollama)",
     )
     benchmark.add_argument(
-        "--source", dest="source_language", default="en", help="idioma de origen"
+        "--source", dest="source_language", default="en", help="source language code"
     )
     benchmark.add_argument(
-        "--target", dest="target_language", default="es", help="idioma de destino"
+        "--target", dest="target_language", default="es", help="target language code"
     )
     benchmark.add_argument(
-        "--runs", type=int, default=1, help="repeticiones por provider (por defecto: 1)"
+        "--runs", type=int, default=1, help="runs per provider (default: 1)"
     )
     benchmark.add_argument(
-        "--output", help="guarda el informe JSON en un archivo (stdout si se omite)"
+        "--output", help="save JSON report to file (stdout if omitted)"
     )
-    benchmark.add_argument("--output-csv", help="guarda las ejecuciones en CSV")
+    benchmark.add_argument("--output-csv", help="save benchmark runs to CSV")
     benchmark.add_argument(
         "--include-texts",
         action="store_true",
-        help="conserva textos de entrada/salida en el informe",
+        help="include input/output cue texts in the report",
     )
     benchmark.add_argument(
         "--max-retries",
         type=int,
         default=0,
-        help="reintentos ante errores transitorios (por defecto: 0)",
+        help="retry attempts on transient errors (default: 0)",
     )
     benchmark.add_argument(
         "--no-fallback",
         action="store_true",
-        help="desactiva el fallback entre providers",
+        help="disable provider fallbacks",
     )
     benchmark.add_argument(
         "--store",
         action="store_true",
-        help="guarda los resultados en el historial local SQLite",
+        help="save results to local SQLite history store",
     )
     benchmark.add_argument(
         "--db",
         default=None,
-        help="ruta de la base de historial (por defecto: historial del usuario)",
+        help="path to history database (default: user history database)",
     )
 
     history = subparsers.add_parser(
-        "history", help="consulta el historial local de ejecuciones"
+        "history", help="inspect local execution history"
     )
-    history.add_argument("--provider", default=None, help="filtra por provider")
+    history.add_argument("--provider", default=None, help="filter by provider")
     history.add_argument(
         "--operation",
         default=None,
         choices=("process", "analyze", "qa", "benchmark", "transcription", "pipeline"),
-        help="filtra por tipo de operación",
+        help="filter by operation type",
     )
     history.add_argument(
-        "--limit", type=int, default=20, help="número máximo de filas (por defecto: 20)"
+        "--limit", type=int, default=20, help="maximum number of rows (default: 20)"
     )
     history.add_argument(
-        "--errors-only", action="store_true", help="solo ejecuciones fallidas"
+        "--errors-only", action="store_true", help="only failed runs"
     )
     history.add_argument(
-        "--fallback-only", action="store_true", help="solo ejecuciones con fallback"
+        "--fallback-only", action="store_true", help="only runs with fallback"
     )
     history.add_argument(
-        "--json", action="store_true", help="emite JSON válido en stdout"
+        "--json", action="store_true", help="emit valid JSON to stdout"
     )
     history.add_argument(
-        "--stats", action="store_true", help="muestra agregados en lugar de filas"
+        "--stats", action="store_true", help="show aggregates instead of individual rows"
     )
     history.add_argument(
         "--db",
         default=None,
-        help="ruta de la base de historial (por defecto: historial del usuario)",
+        help="path to history database (default: user history database)",
     )
 
     transcribe = subparsers.add_parser(
-        "transcribe", help="transcribe audio/vídeo a subtítulos (Whisper local)"
+        "transcribe", help="transcribe audio/video to subtitles using local Whisper"
     )
-    transcribe.add_argument("input", help="archivo de audio o vídeo")
+    transcribe.add_argument("input", help="audio or video input file")
     transcribe.add_argument(
         "-o",
         "--output",
-        help="archivo de salida (.srt/.vtt; por defecto: *_transcribed)",
+        help="output subtitle file (.srt/.vtt; default: *_transcribed)",
     )
     transcribe.add_argument(
         "--model",
         default="small",
         choices=("tiny", "base", "small", "medium", "large-v3", "turbo"),
-        help="modelo Whisper (por defecto: small)",
+        help="Whisper model (default: small)",
     )
     transcribe.add_argument(
         "--language",
         default="auto",
-        help="idioma (código) o auto para detección (por defecto: auto)",
+        help="language code or auto for detection (default: auto)",
     )
     transcribe.add_argument(
         "--format",
         dest="target_format",
         default="srt",
         choices=("srt", "vtt"),
-        help="formato de subtítulos (por defecto: srt)",
+        help="subtitle format (default: srt)",
     )
     transcribe.add_argument(
         "--device",
         default="auto",
         choices=("auto", "cpu", "cuda"),
-        help="dispositivo de inferencia (por defecto: auto)",
+        help="inference device (default: auto)",
     )
     transcribe.add_argument(
         "--db",
         default=None,
-        help="ruta de la base de historial (por defecto: historial del usuario)",
+        help="path to history database (default: user history database)",
     )
     transcribe.add_argument(
         "--no-history",
         action="store_true",
-        help="no registra esta ejecución en el historial local",
+        help="do not record this run in local history",
     )
     transcribe.add_argument(
         "--stats-json",
         action="store_true",
-        help="emite las métricas de transcripción como JSON",
+        help="emit transcription metrics as JSON",
     )
 
     pipeline = subparsers.add_parser(
         "pipeline",
-        help="pipeline audiovisual: transcribe/limpia/QA/traduce/exporta/burn-in",
+        help="media pipeline: transcribe, clean, QA, translate, export, and optional burn-in",
     )
-    pipeline.add_argument("input", help="audio, vídeo o subtítulo de entrada")
+    pipeline.add_argument("input", help="input audio, video, or subtitle file")
     pipeline.add_argument(
-        "-o", "--output", help="subtítulo de salida (por defecto: *_pipeline.srt/vtt)"
+        "-o", "--output", help="output subtitle path (default: *_pipeline.srt/vtt)"
     )
     pipeline.add_argument(
         "--transcribe",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="transcribe la entrada multimedia (por defecto: auto según entrada)",
+        help="transcribe media input (default: auto based on input file)",
     )
     pipeline.add_argument(
         "--model",
         default="small",
         choices=("tiny", "base", "small", "medium", "large-v3", "turbo"),
-        help="modelo Whisper (por defecto: small)",
+        help="Whisper model (default: small)",
     )
     pipeline.add_argument(
         "--language",
         default="auto",
-        help="idioma de transcripción o auto (por defecto: auto)",
+        help="transcription language code or auto (default: auto)",
     )
     pipeline.add_argument(
         "--device",
         default="auto",
         choices=("auto", "cpu", "cuda"),
-        help="dispositivo de inferencia (por defecto: auto)",
+        help="inference device (default: auto)",
     )
     pipeline.add_argument(
         "--clean",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="limpieza (usar --no-clean para desactivarla)",
+        help="cleaning stage (use --no-clean to disable)",
     )
     pipeline.add_argument(
         "--qa",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="QA determinista (usar --no-qa para omitirlo)",
+        help="deterministic QA stage (use --no-qa to skip)",
     )
     pipeline.add_argument(
         "--strict",
         action="store_true",
-        help="el QA estricto detiene la pipeline ante errores o avisos",
+        help="strict QA stops pipeline on errors or warnings",
     )
     pipeline.add_argument(
         "--translate",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="traducción (usar --no-translate para desactivarla)",
+        help="translation stage (use --no-translate to disable)",
     )
     pipeline.add_argument(
-        "--source", dest="source_language", default="auto", help="idioma de origen"
+        "--source", dest="source_language", default="auto", help="source language code"
     )
     pipeline.add_argument(
-        "--target", dest="target_language", help="idioma de destino al traducir"
+        "--target", dest="target_language", help="target language code for translation"
     )
     pipeline.add_argument(
         "--provider",
         default="google",
         choices=TRANSLATION_PROVIDERS,
-        help="provider de traducción (por defecto: google)",
+        help="translation provider (default: google)",
     )
     pipeline.add_argument(
         "--max-retries",
         type=int,
         default=0,
-        help="reintentos ante errores transitorios (por defecto: 0)",
+        help="retry attempts on transient errors (default: 0)",
     )
     pipeline.add_argument(
         "--no-fallback",
         action="store_true",
-        help="desactiva el fallback entre providers",
+        help="disable provider fallback",
     )
     pipeline.add_argument(
         "--format",
         dest="target_format",
         default="srt",
         choices=("srt", "vtt"),
-        help="formato de subtítulos (por defecto: srt)",
+        help="output subtitle format (default: srt)",
     )
     pipeline.add_argument(
         "--burn-in",
         action="store_true",
-        help="burn-in del subtítulo final en el vídeo (requiere --video-output)",
+        help="burn final subtitles into video (requires --video-output)",
     )
-    pipeline.add_argument("--video-output", help="vídeo de salida con subtítulos")
+    pipeline.add_argument("--video-output", help="output video path with burned-in subtitles")
     pipeline.add_argument(
         "--db",
         default=None,
-        help="ruta de la base de historial (por defecto: historial del usuario)",
+        help="path to history database (default: user history database)",
     )
     pipeline.add_argument(
         "--no-history",
         action="store_true",
-        help="no registra esta ejecución en el historial local",
+        help="do not record this run in local history",
     )
     pipeline.add_argument(
         "--stats-json",
         action="store_true",
-        help="emite el resultado estructurado como JSON",
+        help="emit structured result as JSON",
     )
 
-    serve = subparsers.add_parser("serve", help="inicia la API REST local (FastAPI)")
+    serve = subparsers.add_parser("serve", help="launch local REST API server (FastAPI)")
     serve.add_argument(
         "--host",
         default="127.0.0.1",
-        help="interfaz de escucha (por defecto: 127.0.0.1, solo local)",
+        help="listening interface (default: 127.0.0.1, localhost only)",
     )
     serve.add_argument(
-        "--port", type=int, default=8000, help="puerto de escucha (por defecto: 8000)"
+        "--port", type=int, default=8000, help="listening port (default: 8000)"
     )
     return parser
 

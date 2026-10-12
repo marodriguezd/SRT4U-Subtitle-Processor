@@ -21,8 +21,8 @@ from ...services.translation_service import TranslationService
 router = APIRouter(tags=["translate"])
 
 _translate_note = (
-    "La traducción puede tardar (providers remotos): se encola un job local "
-    "y el resultado se consulta en /jobs/{id}. Nunca se exponen API keys."
+    "Translation can take time with remote providers: queues a local job "
+    "polled at /jobs/{id}. API keys and provider secrets are never exposed."
 )
 
 
@@ -45,29 +45,29 @@ def _empty_metrics(provider: str, target_language: str) -> dict:
     "/translate",
     response_model=JobCreatedResponse,
     status_code=202,
-    summary="Traduce un archivo (job)",
+    summary="Translate a subtitle file (job)",
     description=_translate_note,
 )
 async def translate(
     request: Request,
-    file: UploadFile = File(description="Archivo .srt/.vtt/.ass/.ssa/.txt"),  # noqa: B008
-    source_language: Annotated[str, Form(description="Idioma de origen")] = "auto",  # noqa: B008
-    target_language: Annotated[str, Form(description="Idioma de destino")] = "es",  # noqa: B008
+    file: UploadFile = File(description="Subtitle file (.srt/.vtt/.ass/.ssa/.txt)"),  # noqa: B008
+    source_language: Annotated[str, Form(description="Source language code")] = "auto",  # noqa: B008
+    target_language: Annotated[str, Form(description="Target language code")] = "es",  # noqa: B008
     provider: Annotated[
         str, Form(description="google, deepl, openai, ollama, llm")
     ] = "google",  # noqa: B008
     max_retries: Annotated[
-        int, Form(description="Reintentos ante errores transitorios")
+        int, Form(description="Retry attempts on transient errors")
     ] = 0,  # noqa: B008
-    no_fallback: Annotated[bool, Form(description="Desactiva el fallback")] = False,  # noqa: B008
+    no_fallback: Annotated[bool, Form(description="Disable fallback")] = False,  # noqa: B008
 ) -> JobCreatedResponse:
     suffix = validate_extension(file.filename)
     provider = validate_provider(provider)
     if not target_language or not target_language.strip():
-        raise HTTPException(status_code=422, detail="target_language es obligatorio")
+        raise HTTPException(status_code=422, detail="target_language is required")
     if max_retries < 0 or max_retries > 10:
         raise HTTPException(
-            status_code=422, detail="max_retries debe estar entre 0 y 10"
+            status_code=422, detail="max_retries must be between 0 and 10"
         )
     tmp_path = await save_upload(file, suffix)
     filename = file.filename or f"input{suffix}"
@@ -130,19 +130,19 @@ async def translate(
     "/process",
     response_model=JobCreatedResponse,
     status_code=202,
-    summary="Procesa un archivo: limpieza + traducción + QA (job)",
-    description="Reutiliza `SubtitleService.process_subtitles` (leer → analizar → "
-    "limpiar → traducir → formatear) y registra el historial. El resultado "
-    "completo se consulta en /jobs/{id}.",
+    summary="Process a file: clean + translate + QA (job)",
+    description="Reuses `SubtitleService.process_subtitles` (read → analyze → "
+    "clean → translate → format) and records history. Full outcome "
+    "polled at /jobs/{id}.",
 )
 async def process(
     request: Request,
-    file: UploadFile = File(description="Archivo .srt/.vtt/.ass/.ssa/.txt"),  # noqa: B008
-    clean: Annotated[bool, Form(description="Limpia líneas promocionales")] = True,  # noqa: B008
-    translate: Annotated[bool, Form(description="Traduce los subtítulos")] = False,  # noqa: B008
-    source_language: Annotated[str, Form(description="Idioma de origen")] = "auto",  # noqa: B008
+    file: UploadFile = File(description="Subtitle file (.srt/.vtt/.ass/.ssa/.txt)"),  # noqa: B008
+    clean: Annotated[bool, Form(description="Clean promotional and spam lines")] = True,  # noqa: B008
+    translate: Annotated[bool, Form(description="Translate subtitles")] = False,  # noqa: B008
+    source_language: Annotated[str, Form(description="Source language code")] = "auto",  # noqa: B008
     target_language: Annotated[
-        Optional[str], Form(description="Idioma de destino")
+        Optional[str], Form(description="Target language code")
     ] = None,  # noqa: B008
     provider: Annotated[
         str, Form(description="google, deepl, openai, ollama, llm")
@@ -151,15 +151,15 @@ async def process(
         Optional[str], Form(description="srt, vtt, ass, ssa, txt")
     ] = None,  # noqa: B008
     max_retries: Annotated[
-        int, Form(description="Reintentos ante errores transitorios")
+        int, Form(description="Retry attempts on transient errors")
     ] = 0,  # noqa: B008
-    no_fallback: Annotated[bool, Form(description="Desactiva el fallback")] = False,  # noqa: B008
+    no_fallback: Annotated[bool, Form(description="Disable fallback")] = False,  # noqa: B008
 ) -> JobCreatedResponse:
     suffix = validate_extension(file.filename)
     provider = validate_provider(provider)
     if translate and not (target_language or "").strip():
         raise HTTPException(
-            status_code=422, detail="target_language es obligatorio al traducir"
+            status_code=422, detail="target_language is required when translating"
         )
     if target_format is not None and target_format not in {
         "srt",
@@ -168,10 +168,10 @@ async def process(
         "ssa",
         "txt",
     }:
-        raise HTTPException(status_code=422, detail="target_format no soportado")
+        raise HTTPException(status_code=422, detail="target_format not supported")
     if max_retries < 0 or max_retries > 10:
         raise HTTPException(
-            status_code=422, detail="max_retries debe estar entre 0 y 10"
+            status_code=422, detail="max_retries must be between 0 and 10"
         )
     tmp_path = await save_upload(file, suffix)
     filename = file.filename or f"input{suffix}"

@@ -1,10 +1,8 @@
-"""
-Configuración central del registro (logging) de SRT4U.
+"""Central logging configuration for SRT4U.
 
-Los fallos que antes se silenciaban (`except ...: pass`, `print()`) se registran
-aquí en un archivo rotativo dentro del directorio de configuración del usuario,
-de modo que un problema (configuración ilegible, motor de traducción caído,
-FFmpeg sin permisos, …) se pueda diagnosticar sin instrumentar la app a mano.
+Operational errors and warnings are recorded to a rotating file in the
+user configuration directory so issues can be diagnosed reliably without manual
+instrumentation.
 """
 
 import logging
@@ -25,14 +23,14 @@ _qt_handler_state = threading.local()
 
 
 def get_logger(name: str = "") -> logging.Logger:
-    """Devuelve el logger de la aplicación, o un logger hijo con el nombre dado."""
+    """Return the application root logger or a named child logger."""
     return logging.getLogger(f"{LOGGER_NAME}.{name}" if name else LOGGER_NAME)
 
 
 def get_log_path(config_dir: Optional[str] = None) -> str:
-    """Ruta del archivo de log (por defecto, dentro del directorio de configuración)."""
+    """Return the path to the log file within the configuration directory."""
     if config_dir is None:
-        # Import diferido para no crear dependencias circulares con los servicios
+        # Deferred import to prevent circular dependencies with services
         from .services.config_service import ConfigService
 
         config_dir = ConfigService().config_dir
@@ -40,14 +38,11 @@ def get_log_path(config_dir: Optional[str] = None) -> str:
 
 
 def install_qt_message_handler() -> None:
-    """
-    Redirige los mensajes de Qt (`qDebug`/`qInfo`/`qWarning`/`qCritical`/`qFatal`)
-    al logger `srt4u.qt`, para que los avisos de Qt Multimedia (códecs, FFmpeg,
-    audio), de los plugins de plataforma o de QSS queden junto al resto del
-    diagnóstico en lugar de perderse en stderr.
+    """Redirect Qt runtime messages to the 'srt4u.qt' logger.
 
-    Idempotente. Debe llamarse antes de crear la `QApplication` para capturar
-    también los mensajes del arranque.
+    Captures notices from Qt Multimedia, platform plugins, or stylesheets
+    to the diagnostic log file instead of losing them on stderr.
+    Idempotent. Must be invoked before QApplication instantiation.
     """
     global _qt_handler_installed
     if _qt_handler_installed:
@@ -55,15 +50,14 @@ def install_qt_message_handler() -> None:
 
     try:
         from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
-    except ImportError as exc:  # Qt no disponible (p. ej. utilidades de consola)
-        get_logger("qt").debug("PyQt6 no disponible: %s", exc)
+    except ImportError as exc:
+        get_logger("qt").debug("PyQt6 not available: %s", exc)
         return
 
     logger = get_logger("qt")
     levels = {
         QtMsgType.QtDebugMsg: logging.DEBUG,
-        # Qt usa QtInfoMsg para avisos informativos muy ruidosos (p. ej. la versión
-        # de FFmpeg de Qt Multimedia): se registran sólo en modo DEBUG.
+        # Qt uses QtInfoMsg for noisy notices (e.g. FFmpeg multimedia version info)
         QtMsgType.QtInfoMsg: logging.DEBUG,
         QtMsgType.QtWarningMsg: logging.WARNING,
         QtMsgType.QtCriticalMsg: logging.ERROR,
@@ -71,8 +65,7 @@ def install_qt_message_handler() -> None:
     }
 
     def _handler(msg_type, context, message):
-        # Guarda contra recursión: nada de lo que ocurra al registrar debe volver a
-        # entrar en el handler de Qt.
+        # Recursion guard: prevent logging operations from re-entering the Qt handler
         if getattr(_qt_handler_state, "busy", False):
             return
         _qt_handler_state.busy = True
@@ -82,18 +75,18 @@ def install_qt_message_handler() -> None:
             logger.log(levels.get(msg_type, logging.INFO), "%s%s", prefix, message)
         except Exception as exc:
             logger.debug(
-                "No se pudo registrar un mensaje de Qt (%s)", type(exc).__name__
+                "Failed to log Qt message (%s)", type(exc).__name__
             )
         finally:
             _qt_handler_state.busy = False
 
     qInstallMessageHandler(_handler)
     _qt_handler_installed = True
-    logger.debug("Message handler de Qt instalado")
+    logger.debug("Qt message handler installed")
 
 
 def uninstall_qt_message_handler() -> None:
-    """Restaura el manejador de mensajes por defecto de Qt (devuelve los avisos a stderr)."""
+    """Restore the default Qt message handler, routing messages back to stderr."""
     global _qt_handler_installed
     if not _qt_handler_installed:
         return
@@ -102,7 +95,7 @@ def uninstall_qt_message_handler() -> None:
 
         qInstallMessageHandler(None)
     except ImportError as exc:
-        get_logger("qt").debug("PyQt6 no disponible al desinstalar: %s", exc)
+        get_logger("qt").debug("PyQt6 not available during uninstall: %s", exc)
     _qt_handler_installed = False
 
 
@@ -112,11 +105,10 @@ def setup_logging(
     console: Optional[bool] = None,
     force: bool = False,
 ) -> str:
-    """
-    Configura el logger raíz de la aplicación.
+    """Configure the application root logger.
 
-    Es idempotente: la primera llamada manda (salvo `force=True`, que reconstruye
-    los handlers). Devuelve la ruta del archivo de log, aunque no se pueda crear.
+    Idempotent: the first call configures handlers unless force=True.
+    Returns the log file path even if file creation encounters permission errors.
     """
     global _configured_path
     log_path = get_log_path(config_dir)
@@ -150,8 +142,8 @@ def setup_logging(
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     except OSError as exc:
-        # No poder escribir el log nunca debe impedir que la app arranque
-        logger.warning("No se pudo abrir el archivo de log (%s)", type(exc).__name__)
+        # File logging failure must never prevent application startup
+        logger.warning("Could not open log file (%s)", type(exc).__name__)
 
     _configured_path = log_path
     return log_path

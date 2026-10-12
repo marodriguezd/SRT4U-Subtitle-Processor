@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-# Asegurar que el directorio raíz del proyecto esté en sys.path para los tests
+# Ensure project root directory is in sys.path for test imports
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from PyQt6.QtWidgets import QApplication, QMessageBox  # noqa: E402
@@ -15,16 +15,15 @@ from application.ui.message_boxes import ThemedMessageBox  # noqa: E402
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
-        "network: test que requiere acceso a Internet (se omite si no hay red)",
+        "network: test requiring internet access (skipped offline)",
     )
 
 
 @pytest.fixture(autouse=True)
 def _isolated_history(monkeypatch, tmp_path):
     """
-    Aísla el historial SQLite: los tests escriben en una BD temporal en
-    lugar de `~/.config/SRT4U/history.db`, evitando que la suite modifique
-    el historial real del usuario.
+    Isolate SQLite history: tests write to a temporary database instead
+    of `~/.config/SRT4U/history.db`, preventing state pollution.
     """
     monkeypatch.setenv("SRT4U_HISTORY_DB", str(tmp_path / "history.db"))
 
@@ -32,9 +31,8 @@ def _isolated_history(monkeypatch, tmp_path):
 @pytest.fixture(autouse=True)
 def _isolated_config(monkeypatch, tmp_path):
     """
-    Aísla la configuración de usuario: los tests escriben en un directorio temporal
-    en lugar de `~/.config/SRT4U/settings.json`, evitando que la suite modifique
-    las preferencias reales del usuario o dependa del estado previo en disco.
+    Isolate user configuration: tests write to a temporary directory instead
+    of `~/.config/SRT4U/settings.json`, ensuring deterministic clean state.
     """
     config_dir = tmp_path / "SRT4U"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -43,13 +41,13 @@ def _isolated_config(monkeypatch, tmp_path):
 
 @pytest.fixture(autouse=True)
 def _silence_message_boxes(monkeypatch):
-    """Evita que los QMessageBox de la UI bloqueen la ejecución de los tests."""
+    """Prevent UI QMessageBox dialogs from blocking automated test execution."""
     ok = QMessageBox.StandardButton.Ok
-    # Envoltorio tematizado usado por la aplicación
+    # Themed wrapper used by the application
     monkeypatch.setattr(ThemedMessageBox, "information", lambda *args, **kwargs: ok)
     monkeypatch.setattr(ThemedMessageBox, "warning", lambda *args, **kwargs: ok)
     monkeypatch.setattr(ThemedMessageBox, "critical", lambda *args, **kwargs: ok)
-    # QMessageBox estático directo (por si algún test lo usa explícitamente)
+    # Direct static QMessageBox (in case tests invoke it directly)
     monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: ok)
     monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: ok)
     monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: ok)

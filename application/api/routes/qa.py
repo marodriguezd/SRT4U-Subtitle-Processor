@@ -18,15 +18,15 @@ router = APIRouter(tags=["qa"])
 @router.post(
     "/qa",
     response_model=QAReportModel,
-    summary="Valida reglas deterministas de calidad",
-    description="Mismo motor `SubtitleQA` que la CLI: errores, avisos, "
-    "hallazgos y política estricta opcional.",
+    summary="Validate deterministic quality rules",
+    description="Same `SubtitleQA` engine as the CLI: errors, warnings, "
+    "findings, and optional strict gating.",
 )
 async def qa(
-    file: UploadFile = File(description="Archivo .srt/.vtt/.ass/.ssa/.txt"),  # noqa: B008
+    file: UploadFile = File(description="Subtitle file (.srt/.vtt/.ass/.ssa/.txt)"),  # noqa: B008
     strict: Annotated[
         Optional[bool],
-        Form(description="Falla también ante cualquier aviso"),  # noqa: B008
+        Form(description="Fail on warnings as well as errors"),  # noqa: B008
     ] = False,
 ) -> QAReportModel:
     suffix = validate_extension(file.filename)
@@ -37,7 +37,7 @@ async def qa(
             qa_report = service.qa_file(str(tmp_path))
         except FileNotFoundError as exc:
             raise HTTPException(
-                status_code=400, detail="archivo no encontrado"
+                status_code=400, detail="file not found"
             ) from exc
         except (OSError, UnicodeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=safe_detail(exc)) from exc
@@ -46,8 +46,8 @@ async def qa(
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    f"QA estricto: {payload['error_count']} errores, "
-                    f"{payload['warning_count']} avisos"
+                    f"Strict QA: {payload['error_count']} errors, "
+                    f"{payload['warning_count']} warnings"
                 ),
             )
         return QAReportModel(**payload)

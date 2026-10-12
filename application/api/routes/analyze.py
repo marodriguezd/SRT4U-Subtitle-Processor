@@ -17,13 +17,13 @@ router = APIRouter(tags=["analyze"])
 @router.post(
     "/analyze",
     response_model=AnalyzeResponse,
-    summary="Analiza un archivo de subtítulos",
-    description="Devuelve métricas agrupadas de contenido, tiempos, calidad y "
-    "procesamiento junto al informe QA, con el mismo motor que la CLI.",
+    summary="Analyze a subtitle file",
+    description="Return grouped content, timing, quality, and "
+    "processing metrics along with the deterministic QA report.",
 )
 async def analyze(
     file: UploadFile = File(  # noqa: B008
-        description="Archivo .srt/.vtt/.ass/.ssa/.txt"
+        description="Subtitle file (.srt/.vtt/.ass/.ssa/.txt)"
     ),
 ) -> AnalyzeResponse:
     suffix = validate_extension(file.filename)
@@ -34,7 +34,7 @@ async def analyze(
             analytics, qa_report = service.analyze_file(str(tmp_path))
         except FileNotFoundError as exc:
             raise HTTPException(
-                status_code=400, detail="archivo no encontrado"
+                status_code=400, detail="file not found"
             ) from exc
         except (OSError, UnicodeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=safe_detail(exc)) from exc

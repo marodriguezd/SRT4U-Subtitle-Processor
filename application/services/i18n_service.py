@@ -1,12 +1,12 @@
-"""
-Servicio centralizado de internacionalización (i18n) para SRT4U.
-Soporta detección automática del idioma del sistema y cambio dinámico entre:
-- Español (es)
+"""Centralized internationalization (i18n) service for SRT4U.
+
+Supports automatic system locale detection and dynamic language switching between:
 - English (en)
-- Português (pt)
-- Deutsch (de)
-- Italiano (it)
-- 简体中文 (zh-CN)
+- Spanish (es)
+- Portuguese (pt)
+- German (de)
+- Italian (it)
+- Simplified Chinese (zh-CN)
 """
 
 import os
@@ -21,9 +21,7 @@ logger = get_logger("i18n")
 
 
 class I18nService(QObject):
-    """
-    Gestor reactivo de idioma y catálogo de traducciones de la interfaz.
-    """
+    """Reactive language manager and UI translation catalogue."""
 
     language_changed = pyqtSignal(str)
 
@@ -451,9 +449,9 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volumen",
             "preview.video_filter": "Vídeos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos los archivos (*.*)",
             "preview.save_dialog_title": "Guardar subtítulo editado",
-            # Diálogos de archivo
+            # File dialogs
             "dialog.all_files": "Todos los archivos (*.*)",
-            # Página Transcribir
+            # Transcribe Page
             "transcribe.title": "Transcribir multimedia",
             "transcribe.subtitle": "Convierte audio o vídeo en subtítulos con Whisper local. El resultado alimenta Analytics, QA, limpieza y traducción.",
             "transcribe.no_file": "Ningún archivo seleccionado",
@@ -477,7 +475,7 @@ class I18nService(QObject):
             "transcribe.error_desc": "No se pudo transcribir: {err}",
             "transcribe.error_generic": "Comprueba que el archivo multimedia sea legible y que Whisper esté disponible; después, inténtalo de nuevo.",
             "transcribe.cancelled": "Transcripción cancelada",
-            # Página Pipeline
+            # Pipeline Page
             "pipeline.title": "Pipeline audiovisual",
             "pipeline.subtitle": "Transcripción → limpieza → analítica → QA → traducción opcional → QA final → exportación → incrustación opcional en vídeo.",
             "pipeline.no_file": "Ningún archivo seleccionado",
@@ -788,9 +786,9 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volume",
             "preview.video_filter": "Vídeos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos os arquivos (*.*)",
             "preview.save_dialog_title": "Salvar legenda editada",
-            # Diálogos de arquivo
+            # File dialogs
             "dialog.all_files": "Todos os arquivos (*.*)",
-            # Página Transcrever
+            # Transcribe Page
             "transcribe.title": "Transcrever multimédia",
             "transcribe.subtitle": "Converta áudio ou vídeo em legendas com o Whisper local. O resultado alimenta Analytics, QA, limpeza e tradução.",
             "transcribe.no_file": "Nenhum arquivo selecionado",
@@ -814,7 +812,7 @@ class I18nService(QObject):
             "transcribe.error_desc": "Não foi possível transcrever: {err}",
             "transcribe.error_generic": "Verifique se a mídia pode ser lida e se o Whisper está disponível; depois, tente novamente.",
             "transcribe.cancelled": "Transcrição cancelada",
-            # Página Pipeline
+            # Pipeline Page
             "pipeline.title": "Pipeline audiovisual",
             "pipeline.subtitle": "Transcrição → limpeza → análise → QA → tradução opcional → QA final → exportação → incrustação opcional no vídeo.",
             "pipeline.no_file": "Nenhum arquivo selecionado",
@@ -1125,9 +1123,9 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Lautstärke",
             "preview.video_filter": "Videos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Alle Dateien (*.*)",
             "preview.save_dialog_title": "Bearbeiteten Untertitel speichern",
-            # Dateidialoge
+            # File dialogs
             "dialog.all_files": "Alle Dateien (*.*)",
-            # Seite Transkribieren
+            # Transcribe Page
             "transcribe.title": "Medien transkribieren",
             "transcribe.subtitle": "Audio oder Video mit lokalem Whisper in Untertitel umwandeln. Das Ergebnis fließt in Analytics, QA, Bereinigung und Übersetzung ein.",
             "transcribe.no_file": "Keine Datei ausgewählt",
@@ -1151,7 +1149,7 @@ class I18nService(QObject):
             "transcribe.error_desc": "Konnte nicht transkribieren: {err}",
             "transcribe.error_generic": "Prüfen Sie, ob die Mediendatei lesbar und Whisper verfügbar ist, und versuchen Sie es erneut.",
             "transcribe.cancelled": "Transkription abgebrochen",
-            # Seite Pipeline
+            # Pipeline Page
             "pipeline.title": "Medien-Pipeline",
             "pipeline.subtitle": "Transkription → Bereinigung → Analytics → QA → optionale Übersetzung → finales QA → Export → optionales Burn-in.",
             "pipeline.no_file": "Keine Datei ausgewählt",
@@ -1462,9 +1460,9 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volume",
             "preview.video_filter": "Video (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Tutti i file (*.*)",
             "preview.save_dialog_title": "Salva sottotitolo modificato",
-            # Finestre di dialogo file
+            # File dialogs
             "dialog.all_files": "Tutti i file (*.*)",
-            # Pagina Trascrivi
+            # Transcribe Page
             "transcribe.title": "Trascrivi contenuti multimediali",
             "transcribe.subtitle": "Converti audio o video in sottotitoli con Whisper locale. Il risultato alimenta Analytics, QA, pulizia e traduzione.",
             "transcribe.no_file": "Nessun file selezionato",
@@ -1488,7 +1486,7 @@ class I18nService(QObject):
             "transcribe.error_desc": "Impossibile trascrivere: {err}",
             "transcribe.error_generic": "Verifica che il file multimediale sia leggibile e che Whisper sia disponibile, quindi riprova.",
             "transcribe.cancelled": "Trascrizione annullata",
-            # Pagina Pipeline
+            # Pipeline Page
             "pipeline.title": "Pipeline audiovisiva",
             "pipeline.subtitle": "Trascrizione → pulizia → analisi → QA → traduzione opzionale → QA finale → esportazione → sottotitoli opzionali incorporati nel video.",
             "pipeline.no_file": "Nessun file selezionato",
@@ -1799,9 +1797,9 @@ class I18nService(QObject):
             "preview.volume_tooltip": "音量",
             "preview.video_filter": "视频文件 (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;所有文件 (*.*)",
             "preview.save_dialog_title": "保存已编辑的字幕",
-            # 文件对话框
+            # File dialogs
             "dialog.all_files": "所有文件 (*.*)",
-            # 转录页
+            # Transcribe Page
             "transcribe.title": "转录音视频",
             "transcribe.subtitle": "使用本地 Whisper 将音频或视频转换为字幕，结果可用于分析、质检、清理与翻译。",
             "transcribe.no_file": "未选择文件",
@@ -1825,7 +1823,7 @@ class I18nService(QObject):
             "transcribe.error_desc": "转录失败：{err}",
             "transcribe.error_generic": "请确认媒体文件可读取且 Whisper 可用，然后重试。",
             "transcribe.cancelled": "转录已取消",
-            # 流水线页
+            # Pipeline Page
             "pipeline.title": "音视频流水线",
             "pipeline.subtitle": "转录 → 清理 → 分析 → 质检 → 可选翻译 → 终检 → 导出 → 可选压制。",
             "pipeline.no_file": "未选择文件",
@@ -2078,17 +2076,17 @@ class I18nService(QObject):
         return cls._instance
 
     def detect_system_language(self) -> str:
-        """
-        Detecta el idioma del sistema operativo usando QLocale y variables de entorno.
-        Retorna uno de los códigos soportados ('es', 'en', 'pt', 'de', 'it', 'zh-CN').
-        Si no coincide, usa 'en' como fallback internacional.
+        """Detect system language using QLocale and environment variables.
+
+        Returns one of the supported codes ('es', 'en', 'pt', 'de', 'it', 'zh-CN').
+        Falls back to 'en' when unrecognized.
         """
         locale_str = ""
         try:
             locale_str = QLocale.system().name().lower()
         except Exception as exc:
             logger.debug(
-                "QLocale no disponible (%s); se usan las variables de entorno", exc
+                "QLocale unavailable (%s); checking environment variables", exc
             )
 
         if not locale_str:
@@ -2131,13 +2129,11 @@ class I18nService(QObject):
         return self._current_lang
 
     def get_configured_language(self) -> str:
-        """Retorna 'auto' o el código específico guardado en config."""
+        """Return 'auto' or the specific language code stored in config."""
         return self.config_service.get("ui_language", "auto")
 
     def set_language(self, lang_code: str, save_to_config: bool = True):
-        """
-        Establece el idioma activo ('auto' o código específico) y emite language_changed.
-        """
+        """Set active language ('auto' or specific code) and emit language_changed."""
         if lang_code == "auto":
             active = self.detect_system_language()
             if save_to_config:
@@ -2155,9 +2151,9 @@ class I18nService(QObject):
             self.language_changed.emit(active)
 
     def t(self, key: str, default: Optional[str] = None, **kwargs) -> str:
-        """
-        Obtiene la traducción para una clave dada en el idioma activo.
-        Fallback en cascada: idioma activo -> inglés (en) -> español (es) -> default -> key.
+        """Retrieve translation for key in active language.
+
+        Cascading fallback: active language -> English (en) -> Spanish (es) -> default -> key.
         """
         catalog = self.TRANSLATIONS.get(self._current_lang, {})
         val = catalog.get(key)
@@ -2176,7 +2172,7 @@ class I18nService(QObject):
                 return val.format(**kwargs)
             except Exception as exc:
                 logger.warning(
-                    "No se pudo formatear la traducción '%s' con %s: %s",
+                    "Could not format translation key '%s' with %s: %s",
                     key,
                     kwargs,
                     exc,
@@ -2187,10 +2183,10 @@ class I18nService(QObject):
 
 
 def get_i18n(config_service: Optional[ConfigService] = None) -> I18nService:
-    """Función de acceso global al servicio de i18n."""
+    """Global accessor for the singleton I18nService instance."""
     return I18nService.get_instance(config_service=config_service)
 
 
 def t(key: str, default: Optional[str] = None, **kwargs) -> str:
-    """Acceso rápido a traducción i18n."""
+    """Convenience accessor for i18n translation lookup."""
     return get_i18n().t(key, default, **kwargs)

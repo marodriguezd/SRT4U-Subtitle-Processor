@@ -1,12 +1,8 @@
-"""
-QMessageBox tematizado y coherente con el tema glass de la app.
+"""Themed QMessageBox wrapper consistent with the application theme.
 
-Los QMessageBox nativos ignoran el QSS de la aplicación y rompen el contraste
-con el tema oscuro; este envoltorio fuerza el diálogo Qt no nativo con estilo
-Fusion, paleta explícita y una hoja de estilos propia derivada de la paleta
-central. La API estática replica la de `QMessageBox`
-(information/warning/critical) para que el reemplazo sea literal en los puntos
-de llamada.
+Native message boxes bypass application stylesheets and break contrast;
+this wrapper forces non-native Qt dialogs with Fusion style, explicit palette,
+and styling derived from the central design system.
 """
 
 from PyQt6.QtWidgets import QMessageBox, QStyleFactory, QWidget
@@ -15,7 +11,7 @@ from .styles import Styles
 
 
 class ThemedMessageBox:
-    """Envoltorio estático de QMessageBox con el QSS glass aplicado."""
+    """Static QMessageBox factory with custom styling applied."""
 
     @staticmethod
     def build(
@@ -26,14 +22,14 @@ class ThemedMessageBox:
         buttons: QMessageBox.StandardButton,
         default_button: QMessageBox.StandardButton,
     ) -> QMessageBox:
-        """Construye (sin mostrar) un QMessageBox ya tematizado."""
+        """Construct (without showing) a styled QMessageBox instance."""
         box = QMessageBox(parent)
         box.setIcon(icon)
         box.setWindowTitle(title)
         box.setText(text)
         box.setStandardButtons(buttons)
         box.setDefaultButton(default_button)
-        # `QMessageBox.Option`/`setOption()` requieren PyQt6 >= 6.6.1 (cota mínima declarada)
+        # QMessageBox.Option / setOption() require PyQt6 >= 6.6.1
         box.setOption(QMessageBox.Option.DontUseNativeDialog, True)
 
         fusion = QStyleFactory.create("Fusion")

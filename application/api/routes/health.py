@@ -10,8 +10,8 @@ router = APIRouter(tags=["health"])
 @router.get(
     "/health",
     response_model=HealthResponse,
-    summary="Estado del servicio",
-    description="Sonda de vida sin comprobaciones pesadas.",
+    summary="Service health status",
+    description="Liveness probe without heavy dependency checks.",
 )
 def health() -> HealthResponse:
     return HealthResponse(status="ok", version=APP_VERSION)

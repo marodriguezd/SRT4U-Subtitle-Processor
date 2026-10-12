@@ -1,5 +1,5 @@
 """
-Componentes visuales Glassmorphism según el mockup de SRT4U con alto contraste y diseño responsivo.
+Glassmorphism visual components matching the SRT4U mockup with high contrast and responsive layout.
 """
 
 import os
@@ -30,9 +30,7 @@ from ..services.i18n_service import t
 
 
 class ModernToggle(QAbstractButton):
-    """
-    Switch redondeado moderno estilo iOS / macOS con acento índigo y alto contraste.
-    """
+    """Modern rounded toggle switch in iOS/macOS style with indigo accent and high contrast."""
 
     def __init__(self, parent=None, checked=False):
         super().__init__(parent)
@@ -71,9 +69,7 @@ class ModernToggle(QAbstractButton):
 
 
 class LogoBadge(QWidget):
-    """
-    Insignia de logo violeta con icono de documento y texto SRT.
-    """
+    """Violet logo badge with document icon and SRT label."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -95,9 +91,7 @@ class LogoBadge(QWidget):
 
 
 class CircularProgress(QWidget):
-    """
-    Indicador de progreso circular con porcentaje central y tiempo estimado.
-    """
+    """Circular progress indicator with central percentage and estimated time."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -136,9 +130,7 @@ class CircularProgress(QWidget):
 
 
 class ProgressModal(QDialog):
-    """
-    Modal de 'Procesamiento en curso' con gráfico circular y lista de etapas.
-    """
+    """In-progress modal dialog with circular progress chart and stage checklist."""
 
     cancelled = pyqtSignal()
 
@@ -158,7 +150,6 @@ class ProgressModal(QDialog):
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(16)
 
-        # Header
         h_layout = QHBoxLayout()
         title = QLabel(t("progress.title"))
         title.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {Styles.TEXT};")
@@ -166,7 +157,6 @@ class ProgressModal(QDialog):
         h_layout.addStretch()
         layout.addLayout(h_layout)
 
-        # Body: Checklist (Left) & Circular Progress (Right)
         body_layout = QHBoxLayout()
         body_layout.setSpacing(20)
 
@@ -239,9 +229,7 @@ class ProgressModal(QDialog):
 
 
 class DropZone(QFrame):
-    """
-    Área interactiva para arrastrar y soltar subtítulos con alto contraste y feedback visual.
-    """
+    """Interactive drag-and-drop area for subtitles and media with visual feedback."""
 
     file_dropped = pyqtSignal(str, str)
 
@@ -261,7 +249,6 @@ class DropZone(QFrame):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(6)
 
-        # Icono de carpeta estilizado
         self.icon_badge = QLabel()
         self.icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_badge.setStyleSheet("background: transparent;")
@@ -373,9 +360,7 @@ class DropZone(QFrame):
 
 
 class OptionCard(QFrame):
-    """
-    Tarjeta de opción compacta para cuadrícula 2x2 con colores nítidos.
-    """
+    """Compact option card with toggle switch for grid layouts."""
 
     def __init__(self, title: str, description: str, toggle: ModernToggle, parent=None):
         super().__init__(parent)
@@ -505,12 +490,10 @@ class SubtitleCard(QFrame):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(6)
 
-        # Header / Meta row
         meta_layout = QHBoxLayout()
         meta_layout.setContentsMargins(0, 0, 0, 0)
         meta_layout.setSpacing(8)
 
-        # Index badge
         idx_lbl = QLabel(f"#{self.edited_item.index}")
         idx_lbl.setStyleSheet(f"""
             QLabel {{
@@ -525,7 +508,6 @@ class SubtitleCard(QFrame):
         """)
         meta_layout.addWidget(idx_lbl)
 
-        # Time range
         time_str = self.edited_item.get_srt_time()
         time_lbl = QLabel(time_str)
         time_lbl.setStyleSheet(
@@ -533,7 +515,6 @@ class SubtitleCard(QFrame):
         )
         meta_layout.addWidget(time_lbl)
 
-        # Duration
         dur_s = max(0.0, (self.edited_item.end_ms - self.edited_item.start_ms) / 1000.0)
         dur_lbl = QLabel(f"({dur_s:.1f}s)")
         dur_lbl.setStyleSheet(f"font-size: 11px; color: {Styles.TEXT_FAINT};")
@@ -541,7 +522,6 @@ class SubtitleCard(QFrame):
 
         meta_layout.addStretch()
 
-        # Jump button
         self.btn_jump = QPushButton(t("preview.btn_jump"))
         self.btn_jump.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_jump.setStyleSheet(f"""
@@ -567,12 +547,10 @@ class SubtitleCard(QFrame):
 
         layout.addLayout(meta_layout)
 
-        # Body row (Paired horizontally: Original left, Editable right)
         body_layout = QHBoxLayout()
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(10)
 
-        # Left column (Original)
         left_col = QVBoxLayout()
         left_col.setSpacing(3)
         self.lbl_orig_tag = QLabel(t("preview.tag_orig"))
@@ -601,7 +579,6 @@ class SubtitleCard(QFrame):
         left_col.addWidget(self.lbl_orig, stretch=1)
         body_layout.addLayout(left_col, stretch=1)
 
-        # Right column (Editable translation)
         right_col = QVBoxLayout()
         right_col.setSpacing(3)
         self.lbl_edit_tag = QLabel(t("preview.tag_edit"))
@@ -909,9 +886,7 @@ class VideoPreviewPlayer(QFrame):
 
         self.btn_load_video = QPushButton(t("preview.btn_load_video"))
         self.btn_load_video.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Nombre accesible desde la construcción: `retranslate()` no se llama en
-        # __init__, así que esperarlo dejaba el control sin nombrar hasta que
-        # el usuario cambiara de idioma.
+        # Accessible name set on creation: retranslate() is deferred, so set early to avoid unnamed controls.
         self.btn_load_video.setAccessibleName(t("preview.btn_load_video"))
         self.btn_load_video.setStyleSheet("""
             QPushButton {
@@ -994,8 +969,7 @@ class VideoPreviewPlayer(QFrame):
     def _on_volume_changed(self, val: int):
         vol = val / 100.0
         self.audio_output.setVolume(vol)
-        # Arrastrar el volumen implica intención de escuchar: salir de mute,
-        # salvo que el nuevo valor siga siendo silencio total.
+        # Adjusting volume implies intent to listen: unmute unless volume is set to zero
         if val > 0 and self.audio_output.isMuted():
             self.audio_output.setMuted(False)
         elif val == 0:
@@ -1102,7 +1076,7 @@ class VideoPreviewPlayer(QFrame):
             self._reposition_overlay()
             self.sub_overlay.show()
             self.sub_overlay.raise_()
-            # Nuevo medio: el estado visual vuelve a reposo.
+            # New media loaded: reset visual controls to idle state
             self.time_slider.setRange(0, 0)
             self.time_slider.setValue(0)
             self._update_time_label(0, 0)
@@ -1111,7 +1085,7 @@ class VideoPreviewPlayer(QFrame):
 
     def set_subtitles(self, subtitles: List[SubtitleItem]):
         self.current_subtitles = subtitles
-        # Update current overlay text based on current position
+        # Update overlay text based on current playback position
         if self.player.position() > 0:
             self._on_position_changed(self.player.position())
 
@@ -1127,7 +1101,7 @@ class VideoPreviewPlayer(QFrame):
             self.player.play()
 
     def _sync_play_icon(self, _state=None):
-        """El icono play/pause siempre refleja `playbackState` (incl. EOS/error)."""
+        """Ensure play/pause icon reliably reflects playbackState (including EOS/error)."""
         playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
         self.play_btn.setIcon(
             Icons.get_icon(

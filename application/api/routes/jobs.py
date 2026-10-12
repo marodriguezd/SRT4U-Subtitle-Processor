@@ -32,8 +32,8 @@ def _public(job: dict) -> dict:
 @router.get(
     "/jobs",
     response_model=List[JobStatusResponse],
-    summary="Lista jobs",
-    description="Jobs locales en memoria (no persistentes).",
+    summary="List jobs",
+    description="In-memory local jobs (not persistent across restarts).",
 )
 def list_jobs(request: Request, limit: int = 50) -> List[JobStatusResponse]:
     return [
@@ -44,36 +44,36 @@ def list_jobs(request: Request, limit: int = 50) -> List[JobStatusResponse]:
 @router.get(
     "/jobs/{job_id}",
     response_model=JobStatusResponse,
-    summary="Estado de un job",
-    description="Incluye `result` al completarse o `error` al fallar.",
-    responses={404: {"description": "Job inexistente"}},
+    summary="Get job status",
+    description="Includes `result` on completion or `error` on failure.",
+    responses={404: {"description": "Job not found"}},
 )
 def get_job(job_id: str, request: Request) -> JobStatusResponse:
     job = _jobs_from(request).get(job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="job no encontrado")
+        raise HTTPException(status_code=404, detail="job not found")
     return JobStatusResponse(**_public(job))
 
 
 @router.delete(
     "/jobs/{job_id}",
     response_model=JobStatusResponse,
-    summary="Cancela un job",
-    description="Best-effort: encolado se descarta; en ejecución termina y se "
-    "descarta el resultado. Terminados devuelven 409.",
+    summary="Cancel a job",
+    description="Best-effort: queued jobs are dropped; running jobs finish and "
+    "their result is discarded. Finished jobs return 409.",
     responses={
-        404: {"description": "Job inexistente"},
-        409: {"description": "Job ya terminado"},
+        404: {"description": "Job not found"},
+        409: {"description": "Job already finished"},
     },
 )
 def cancel_job(job_id: str, request: Request) -> JobStatusResponse:
     manager = _jobs_from(request)
     job = manager.get(job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="job no encontrado")
+        raise HTTPException(status_code=404, detail="job not found")
     if job["status"] in {"completed", "failed", "cancelled"}:
         raise HTTPException(
-            status_code=409, detail=f"job ya terminado: {job['status']}"
+            status_code=409, detail=f"job already finished: {job['status']}"
         )
     manager.cancel(job_id)
     updated = manager.get(job_id)

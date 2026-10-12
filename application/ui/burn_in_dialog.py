@@ -1,6 +1,6 @@
 """
-Diálogos de configuración visual y progreso en tiempo real para la incrustación
-de subtítulos en vídeo (Burn-In / Hardsub) con diseño Glassmorphism.
+Visual configuration dialogs and real-time progress modal for subtitle burn-in
+(hardsub) with glassmorphism design.
 """
 
 import os
@@ -76,7 +76,6 @@ class BurnInDialog(QDialog):
         layout.setContentsMargins(26, 22, 26, 22)
         layout.setSpacing(16)
 
-        # 1. Header
         header = QVBoxLayout()
         header.setSpacing(4)
         title = QLabel(t("burn.dialog_title"))
@@ -88,7 +87,6 @@ class BurnInDialog(QDialog):
         header.addWidget(sub)
         layout.addLayout(header)
 
-        # 2. File Selection Card
         file_card = QFrame()
         file_card.setObjectName("FileCard")
         file_card.setStyleSheet(f"""
@@ -102,7 +100,6 @@ class BurnInDialog(QDialog):
         f_layout.setContentsMargins(12, 12, 12, 12)
         f_layout.setSpacing(10)
 
-        # Video origen
         v_box = QVBoxLayout()
         v_box.setSpacing(4)
         lbl_v = QLabel(t("burn.lbl_video_source"))
@@ -135,7 +132,6 @@ class BurnInDialog(QDialog):
         v_box.addLayout(v_row)
         f_layout.addLayout(v_box)
 
-        # Vídeo destino
         o_box = QVBoxLayout()
         o_box.setSpacing(4)
         lbl_o = QLabel(t("burn.lbl_output_file"))
@@ -174,7 +170,6 @@ class BurnInDialog(QDialog):
         o_box.addLayout(o_row)
         f_layout.addLayout(o_box)
 
-        # Badge conteo de subtítulos
         self.lbl_sub_badge = QLabel(t("burn.sub_badge", count=len(self.subtitle_items)))
         self.lbl_sub_badge.setStyleSheet(f"""
             background: #1E1B4B;
@@ -189,7 +184,6 @@ class BurnInDialog(QDialog):
 
         layout.addWidget(file_card)
 
-        # 3. Visual Configuration Grid
         opt_card = QFrame()
         opt_card.setObjectName("OptCard")
         opt_card.setStyleSheet(f"""
@@ -204,7 +198,6 @@ class BurnInDialog(QDialog):
         opt_layout.setHorizontalSpacing(14)
         opt_layout.setVerticalSpacing(8)
 
-        # Tamaño
         opt_layout.addWidget(QLabel(t("burn.lbl_font_size")), 0, 0)
         self.cb_size = QComboBox()
         self.cb_size.addItem(t("burn.size_small"), "small")
@@ -215,7 +208,6 @@ class BurnInDialog(QDialog):
         self.cb_size.currentIndexChanged.connect(self._update_preview)
         opt_layout.addWidget(self.cb_size, 0, 1)
 
-        # Color
         opt_layout.addWidget(QLabel(t("burn.lbl_font_color")), 0, 2)
         self.cb_color = QComboBox()
         self.cb_color.addItem(t("burn.color_white"), "white")
@@ -226,7 +218,6 @@ class BurnInDialog(QDialog):
         self.cb_color.currentIndexChanged.connect(self._update_preview)
         opt_layout.addWidget(self.cb_color, 0, 3)
 
-        # Fondo / Caja
         opt_layout.addWidget(QLabel(t("burn.lbl_bg_box")), 1, 0)
         self.cb_box = QComboBox()
         self.cb_box.addItem(t("burn.box_trans"), "semi")
@@ -237,7 +228,6 @@ class BurnInDialog(QDialog):
         self.cb_box.currentIndexChanged.connect(self._update_preview)
         opt_layout.addWidget(self.cb_box, 1, 1)
 
-        # Calidad
         opt_layout.addWidget(QLabel(t("burn.lbl_quality")), 1, 2)
         self.cb_quality = QComboBox()
         self.cb_quality.addItem(t("burn.quality_high"), "high")
@@ -246,7 +236,6 @@ class BurnInDialog(QDialog):
         self.cb_quality.setStyleSheet(self._combo_style())
         opt_layout.addWidget(self.cb_quality, 1, 3)
 
-        # Sincronización / Corrección de tiempos
         self.chk_fix_overlaps = QCheckBox(t("burn.chk_fix_overlaps"))
         self.chk_fix_overlaps.setChecked(True)
         self.chk_fix_overlaps.setStyleSheet(f"""
@@ -272,7 +261,6 @@ class BurnInDialog(QDialog):
 
         layout.addWidget(opt_card)
 
-        # 4. Live Preview Area
         prev_container = QFrame()
         prev_container.setFixedHeight(75)
         prev_container.setStyleSheet(f"""
@@ -293,7 +281,6 @@ class BurnInDialog(QDialog):
 
         layout.addStretch()
 
-        # 5. Bottom Actions
         btn_bar = QHBoxLayout()
         btn_bar.setSpacing(10)
         btn_bar.addStretch()
@@ -495,9 +482,7 @@ class BurnInDialog(QDialog):
 
 
 class BurnInProgressModal(QDialog):
-    """
-    Modal de progreso en tiempo real durante la incrustación de vídeo por FFmpeg.
-    """
+    """Real-time progress modal during video subtitle burn-in via FFmpeg."""
 
     def __init__(
         self,
@@ -563,7 +548,6 @@ class BurnInProgressModal(QDialog):
         """)
         layout.addWidget(self.progress_bar)
 
-        # Info de velocidad y tiempo
         self.info_layout = QHBoxLayout()
         self.lbl_speed = QLabel(t("burn.speed", speed="--"))
         self.lbl_speed.setStyleSheet(
@@ -580,7 +564,6 @@ class BurnInProgressModal(QDialog):
 
         layout.addStretch()
 
-        # Botonera
         self.btn_box = QHBoxLayout()
         self.btn_box.setSpacing(10)
         self.btn_box.addStretch()
@@ -605,7 +588,6 @@ class BurnInProgressModal(QDialog):
         self.btn_cancel.clicked.connect(self._cancel_task)
         self.btn_box.addWidget(self.btn_cancel)
 
-        # Botones post-éxito
         self.btn_play = QPushButton(t("burn.btn_play"))
         self.btn_play.setStyleSheet(f"""
             QPushButton {{

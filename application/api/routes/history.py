@@ -14,21 +14,21 @@ router = APIRouter(tags=["history"])
 @router.get(
     "/history",
     response_model=HistoryListResponse,
-    summary="Lista ejecuciones recientes",
-    description="Historial local SQLite con filtros. Sin lenguaje de consulta.",
+    summary="List recent execution runs",
+    description="Local SQLite execution history with filters. No raw query language.",
 )
 def list_history(
     provider: Optional[str] = Query(
-        default=None, description="Filtra por provider solicitado"
+        default=None, description="Filter by requested provider"
     ),
     operation: Optional[str] = Query(
         default=None,
-        description="process, analyze, qa, benchmark, transcription o pipeline",
+        description="process, analyze, qa, benchmark, transcription, or pipeline",
     ),
-    limit: int = Query(default=20, ge=1, le=1000, description="Máximo de filas"),
-    errors_only: bool = Query(default=False, description="Solo ejecuciones fallidas"),
+    limit: int = Query(default=20, ge=1, le=1000, description="Maximum rows to return"),
+    errors_only: bool = Query(default=False, description="Only failed runs"),
     fallback_only: bool = Query(
-        default=False, description="Solo ejecuciones con fallback"
+        default=False, description="Only runs that used fallback"
     ),
 ) -> HistoryListResponse:
     if operation is not None and operation not in {
@@ -39,7 +39,7 @@ def list_history(
         "transcription",
         "pipeline",
     }:
-        raise HTTPException(status_code=422, detail="operation no válida")
+        raise HTTPException(status_code=422, detail="invalid operation")
     try:
         with open_history() as store:
             rows = store.recent_runs(
@@ -50,7 +50,7 @@ def list_history(
                 only_fallbacks=fallback_only,
             )
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="historial no disponible") from exc
+        raise HTTPException(status_code=500, detail="history store unavailable") from exc
     items: List[HistoryItemModel] = []
     for row in rows:
         providers_used = row.get("providers_used")
@@ -70,18 +70,18 @@ def list_history(
 @router.get(
     "/history/{run_id}",
     response_model=HistoryItemModel,
-    summary="Detalle de una ejecución",
-    description="Una fila del historial por id.",
-    responses={404: {"description": "Ejecución inexistente"}},
+    summary="Execution run details",
+    description="A single history record by ID.",
+    responses={404: {"description": "Run not found"}},
 )
 def get_history(run_id: int) -> HistoryItemModel:
     try:
         with open_history() as store:
             row = store.get_run(run_id)
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="historial no disponible") from exc
+        raise HTTPException(status_code=500, detail="history store unavailable") from exc
     if row is None:
-        raise HTTPException(status_code=404, detail="ejecución no encontrada")
+        raise HTTPException(status_code=404, detail="run not found")
     providers_used = row.get("providers_used")
     return HistoryItemModel(
         **{

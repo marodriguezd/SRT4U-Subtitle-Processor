@@ -1,5 +1,5 @@
 """
-Estilos Glassmorphism con transparencias RGBA, iluminación ambiental y alto contraste.
+Glassmorphism styles with RGBA transparencies, ambient lighting, and high contrast.
 """
 
 import sys
@@ -12,10 +12,9 @@ from PyQt6.QtWidgets import QDialog
 
 def sync_minimum_size(dialog: QDialog, floor: QSize) -> None:
     """
-    Fija el tamaño mínimo real de un diálogo según su contenido ya construido,
-    con un suelo de diseño como cota inferior. Evita que el mínimo declarado
-    se quede corto respecto al `minimumSizeHint` real (recortes) si el
-    contenido crece en futuras iteraciones.
+    Sets the actual minimum size of a dialog based on its constructed content,
+    using a design floor as a lower bound. Prevents clipping if content expands
+    beyond the declared minimumSizeHint.
     """
     dialog.ensurePolished()
     dialog.layout().activate()
@@ -41,7 +40,7 @@ class Styles:
     DANGER = "#EF4444"
     INFO = "#38BDF8"
 
-    # Superficies y bordes compartidos por los diálogos y paneles oscuros
+    # Surfaces and borders shared across dialogs and dark panels
     SURFACE = "#0F172A"
     SURFACE_DEEP = "#0B0F19"
     SURFACE_ALT = "#111827"
@@ -49,13 +48,13 @@ class Styles:
     BORDER = "#334155"
     BORDER_SUBTLE = "#1F2937"
 
-    # Texto
+    # Text
     TEXT = "#F8FAFC"
     TEXT_SUBTLE = "#CBD5E1"
     TEXT_MUTED = "#94A3B8"
     TEXT_FAINT = "#64748B"
 
-    # Paleta Light Glass
+    # Light Glass palette
     BG_LIGHT_GRADIENT = "qradialgradient(cx:0.5, cy:0.2, radius:0.9, fx:0.5, fy:0.2, stop:0 #EEF2FF, stop:0.5 #F8FAFC, stop:1 #F1F5F9)"
     SIDEBAR_LIGHT = "rgba(255, 255, 255, 0.85)"
     CARD_LIGHT = "rgba(255, 255, 255, 0.88)"
@@ -64,7 +63,7 @@ class Styles:
     TEXT_SUBTLE_LIGHT = "#334155"
     TEXT_MUTED_LIGHT = "#64748B"
 
-    # Colores de texto que usan los estilos inline de las vistas (tema oscuro)
+    # Text colors used by inline view styles (dark theme)
     INLINE_TEXT_DARK = "#F8FAFC"
     INLINE_MUTED_DARK = "#94A3B8"
     INLINE_SUBTLE_DARK = "#CBD5E1"
@@ -73,34 +72,27 @@ class Styles:
     INLINE_SUCCESS_DARK = "#10B981"
     INLINE_SUCCESS_LIGHT = "#047857"
 
-    # Texto de la pestaña activa del menú lateral. El fondo activo es un tinte
-    # translúcido de PRIMARY sobre la barra lateral, así que el color del texto
-    # depende del tema: un lavanda claro sobre el lavanda del tema claro quedaba
-    # ilegible (contraste ~1.1).
+    # Active sidebar tab text color. Tinted against sidebar background
     NAV_ACTIVE_TEXT_DARK = "#C7D2FE"
     NAV_ACTIVE_TEXT_LIGHT = "#4338CA"
 
-    # Iconos de la barra lateral. `Icons.DEFAULT_ACTIVE`/`DEFAULT_MUTED` están
-    # calibrados para el tema oscuro; en el claro quedaban por debajo de 3:1.
+    # Sidebar icons calibrated for WCAG contrast in both themes
     NAV_ACTIVE_ICON_DARK = "#818CF8"
     NAV_ACTIVE_ICON_LIGHT = "#4F46E5"
     NAV_IDLE_ICON_DARK = "#94A3B8"
     NAV_IDLE_ICON_LIGHT = "#64748B"
 
-    # Superficies de widgets deliberadamente oscuros (reproductor, tarjetas de vídeo)
+    # Surfaces of permanently dark widgets (media player, video cards)
     PERMANENT_DARK_SURFACES = ("#070B14", "#0B0F19")
 
-    # Tema activo de la aplicación. Lo mantiene `MainWindow._apply_theme()` para
-    # que los diálogos del sistema (archivos, mensajes) se pinten en el tema correcto.
+    # Application active theme; tracked for dialog theme matching
     _CURRENT_DARK = True
 
     @staticmethod
     def ui_font(size: int, weight: "QFont.Weight" = QFont.Weight.Normal) -> QFont:
-        """Fuente de la aplicación sin asumir nada instalado.
+        """Application font without external installation dependencies.
 
-        Windows conserva "Segoe UI" (aspecto verificado); en Linux/macOS se
-        usa la fuente general del sistema Qt, que siempre existe. No se
-        empaqueta ni se descarga ninguna fuente.
+        Windows uses 'Segoe UI'; Linux/macOS resolve Qt's GeneralFont system family.
         """
         if sys.platform == "win32":
             family = "Segoe UI"
@@ -114,20 +106,17 @@ class Styles:
 
     @classmethod
     def set_dark(cls, dark: bool) -> None:
-        """Registra el tema activo de la aplicación."""
+        """Record the active application theme."""
         cls._CURRENT_DARK = bool(dark)
 
     @classmethod
     def is_dark(cls) -> bool:
-        """Devuelve True si el tema activo de la aplicación es el oscuro."""
+        """Return True if active application theme is dark."""
         return cls._CURRENT_DARK
 
     @classmethod
     def dialog_colors(cls, dark: Optional[bool] = None) -> Dict[str, str]:
-        """
-        Colores de superficie/texto/acento para los diálogos del sistema, en el
-        tema indicado (por defecto, el tema activo de la aplicación).
-        """
+        """Surface, text, and accent colors for system dialogs."""
         if dark is None:
             dark = cls.is_dark()
         if dark:
@@ -173,12 +162,11 @@ class Styles:
     @classmethod
     def dialog_palette(cls, dark: Optional[bool] = None) -> QPalette:
         """
-        Paleta explícita para diálogos top-level (QFileDialog/QMessageBox).
+        Explicit palette for top-level dialogs (QFileDialog/QMessageBox).
 
-        Aunque el QSS cubre la mayoría de widgets, hay elementos que se pintan
-        con la paleta (delegados de listas, iconos estándar del estilo, color de
-        selección); sin fijarla, esos elementos usan el azul por defecto de Qt
-        (`#308cc6`) y los colores del tema del escritorio.
+        While QSS covers most widgets, some elements are rendered via the
+        palette (list delegates, standard style icons, selection color). Without
+        an explicit palette, those elements fall back to Qt defaults or system themes.
         """
         c = cls.dialog_colors(dark)
         palette = QPalette()
@@ -202,7 +190,7 @@ class Styles:
         for group in groups:
             for role, color in roles.items():
                 palette.setColor(group, role, QColor(color))
-        # Estado deshabilitado: texto atenuado pero legible sobre la superficie
+        # Disabled state: muted text with sufficient contrast against surface
         for role in (
             QPalette.ColorRole.Text,
             QPalette.ColorRole.ButtonText,
@@ -213,7 +201,7 @@ class Styles:
 
     @classmethod
     def message_box_style(cls, dark: Optional[bool] = None) -> str:
-        """QSS para los QMessageBox no nativos, coherente con la paleta glass."""
+        """Stylesheet for non-native QMessageBox matching the design palette."""
         c = cls.dialog_colors(dark)
         return f"""
             QMessageBox {{
@@ -259,7 +247,7 @@ class Styles:
 
     @classmethod
     def tooltip_qss(cls, dark: Optional[bool] = None) -> str:
-        """QSS de nivel de aplicación para tooltips (no heredan estilos de widgets)."""
+        """Application-level tooltip stylesheet."""
         c = cls.dialog_colors(dark)
         return f"""
             QToolTip {{
@@ -275,11 +263,10 @@ class Styles:
     @classmethod
     def file_dialog_style(cls, dark: Optional[bool] = None) -> str:
         """
-        QSS para los QFileDialog no nativos, coherente con el tema glass activo.
+        QSS stylesheet for non-native QFileDialogs, consistent with the active glass theme.
 
-        Las reglas se limitan al propio diálogo (`QFileDialog` y sus descendientes)
-        para no pintar indiscriminadamente widgets internos de Qt que gestionan su
-        fondo por sí mismos (viewports, splitters, grip).
+        Rules are scoped to QFileDialog and its descendants to avoid unintentionally
+        re-styling internal Qt widgets that manage their own backgrounds.
         """
         c = cls.dialog_colors(dark)
         return f"""
@@ -414,9 +401,9 @@ class Styles:
     @classmethod
     def retint_inline_text(cls, root, dark: bool) -> None:
         """
-        Adapta los colores de texto definidos inline en las vistas al tema activo.
-        Solo afecta a etiquetas/botones que heredan el fondo del tema (no a widgets
-        sobre superficies permanentemente oscuras como el reproductor de vídeo).
+        Adapts inline text colors in views to the active theme.
+        Only affects labels and buttons inheriting the theme background,
+        not widgets on permanently dark surfaces like the video player.
         """
         from PyQt6.QtWidgets import QLabel, QAbstractButton
 
@@ -434,7 +421,7 @@ class Styles:
             sheet = widget.styleSheet()
             if not sheet:
                 continue
-            # Los widgets con fondo propio o sobre superficies oscuras fijas no se retocan
+            # Preserve widgets with explicit background or inside permanent dark surfaces
             if "background" in sheet and "transparent" not in sheet:
                 continue
             if cls._has_permanent_dark_ancestor(widget):

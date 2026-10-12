@@ -17,9 +17,9 @@ router = APIRouter(tags=["transcribe"])
 TRANSCRIBE_MAX_BYTES = 500 * 1024 * 1024
 
 _transcribe_note = (
-    "La transcripción con Whisper local puede tardar: se encola un job local "
-    "y el resultado se consulta en /jobs/{id}. Requiere el extra "
-    "'transcription'. Nunca se envía contenido a servicios externos."
+    "Local Whisper transcription can take time: queues a local job "
+    "polled at /jobs/{id}. Requires the 'transcription' optional extra. "
+    "User media is never sent to external services."
 )
 
 
@@ -34,7 +34,7 @@ def _validate_media_extension(filename: Optional[str]) -> str:
     if suffix not in MEDIA_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"formato multimedia no soportado: {suffix or '(sin extensión)'}",
+            detail=f"unsupported media format: {suffix or '(no extension)'}",
         )
     return suffix
 
@@ -43,31 +43,31 @@ def _validate_media_extension(filename: Optional[str]) -> str:
     "/transcribe",
     response_model=JobCreatedResponse,
     status_code=202,
-    summary="Transcribe audio/vídeo (job)",
+    summary="Transcribe audio/video (job)",
     description=_transcribe_note,
 )
 async def transcribe(
     request: Request,
     file: UploadFile = File(  # noqa: B008
-        description="Archivo de audio/vídeo (mp4, mkv, mp3, wav, ...)"
+        description="Audio or video file (mp4, mkv, mp3, wav, ...)"
     ),
     model: Annotated[
         str, Form(description="tiny, base, small, medium, large-v3, turbo")
     ] = "small",  # noqa: B008
-    language: Annotated[str, Form(description="Código de idioma o auto")] = "auto",  # noqa: B008
-    output_format: Annotated[str, Form(description="srt o vtt")] = "srt",  # noqa: B008
-    device: Annotated[str, Form(description="auto, cpu o cuda")] = "auto",  # noqa: B008
+    language: Annotated[str, Form(description="Language code or auto")] = "auto",  # noqa: B008
+    output_format: Annotated[str, Form(description="srt or vtt")] = "srt",  # noqa: B008
+    device: Annotated[str, Form(description="auto, cpu, or cuda")] = "auto",  # noqa: B008
 ) -> JobCreatedResponse:
     suffix = _validate_media_extension(file.filename)
     if model not in WHISPER_MODELS:
         raise HTTPException(
             status_code=422,
-            detail=f"modelo no soportado: {model} (soportados: {', '.join(WHISPER_MODELS)})",
+            detail=f"unsupported model: {model} (supported: {', '.join(WHISPER_MODELS)})",
         )
     if output_format not in {"srt", "vtt"}:
-        raise HTTPException(status_code=422, detail="output_format debe ser srt o vtt")
+        raise HTTPException(status_code=422, detail="output_format must be srt or vtt")
     if device not in {"auto", "cpu", "cuda"}:
-        raise HTTPException(status_code=422, detail="device debe ser auto, cpu o cuda")
+        raise HTTPException(status_code=422, detail="device must be auto, cpu, or cuda")
     tmp_path = await save_upload(file, suffix, max_bytes=TRANSCRIBE_MAX_BYTES)
     filename = file.filename or f"input{suffix}"
 

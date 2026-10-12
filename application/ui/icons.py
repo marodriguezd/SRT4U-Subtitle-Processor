@@ -124,7 +124,7 @@ _SVG_ICONS = {
         <line x1="22" y1="9" x2="16" y2="15"/>
         <line x1="16" y1="9" x2="22" y2="15"/>
     </svg>""",
-    # Navegación y vistas (usados por los diálogos de archivo del sistema)
+    # Navigation and views (used by system file dialogs)
     "arrow_left": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="m15 18-6-6 6-6"/>
     </svg>""",
