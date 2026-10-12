@@ -475,7 +475,7 @@ class BurnInWorker(QThread):
                         if val != "N/A":
                             current_speed_str = val
 
-                    # Emitir progreso periódico al recibir progress=continue
+                    # Emit periodic progress on progress=continue
                     if (
                         line.startswith("progress=")
                         and duration_sec
@@ -485,7 +485,7 @@ class BurnInWorker(QThread):
                             100.0, max(0.0, (current_time_sec / duration_sec) * 100.0)
                         )
 
-                        # Calcular ETA
+                        # Compute ETA
                         speed_float = 1.0
                         try:
                             speed_float = float(current_speed_str.rstrip("x"))

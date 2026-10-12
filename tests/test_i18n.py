@@ -4,7 +4,7 @@ from application.ui.main_window import MainWindow
 
 
 def test_default_language_is_auto_following_the_system(qapp, tmp_path):
-    """Sin configuración guardada, la app sigue el idioma del sistema."""
+    """Without saved settings, the app follows the system language."""
     config = ConfigService()
     config.config_file = str(tmp_path / "settings.json")
     assert config.get("ui_language", "auto") == "auto"
@@ -15,7 +15,7 @@ def test_default_language_is_auto_following_the_system(qapp, tmp_path):
 
 
 def test_saved_language_overrides_the_system_one(qapp, tmp_path):
-    """Un idioma elegido antes se respeta aunque el sistema diga otra cosa."""
+    """A previously chosen language wins even when the system reports another."""
     config = ConfigService()
     config.config_file = str(tmp_path / "settings.json")
     config.set("ui_language", "it")
@@ -24,14 +24,14 @@ def test_saved_language_overrides_the_system_one(qapp, tmp_path):
     assert service.get_configured_language() == "it"
     assert service.current_language == "it"
 
-    # Volver a "auto" recupera el idioma del sistema y lo guarda
+    # Back to "auto" restores the system language and persists it
     service.set_language("auto")
     assert service.get_configured_language() == "auto"
     assert service.current_language == service.detect_system_language()
 
 
 def test_effective_language_label_explains_auto(qapp):
-    """La etiqueta aclara si se sigue el sistema o un idioma guardado."""
+    """The label clarifies whether the system or a saved language is used."""
     win = MainWindow()
     detected_code = win.i18n.detect_system_language()
     detected = win.i18n.SUPPORTED_LANGUAGES[detected_code]["native"]
@@ -47,7 +47,7 @@ def test_effective_language_label_explains_auto(qapp):
     win._refresh_effective_language()
     assert other in win.lbl_lang_effective.text()
     assert detected not in win.lbl_lang_effective.text()
-    # Fuera del modo automático el tooltip vuelve al texto genérico
+    # Outside automatic mode the tooltip returns to the generic text
     assert win.cb_top_lang.toolTip() == win.i18n.t("topbar.lang_tooltip")
 
 

@@ -22,7 +22,7 @@ def sync_minimum_size(dialog: QDialog, floor: QSize) -> None:
 
 
 class Styles:
-    # Paleta Dark Glass
+    # Dark Glass palette
     BG_DARK_GRADIENT = "qradialgradient(cx:0.5, cy:0.2, radius:0.85, fx:0.5, fy:0.2, stop:0 #1E1B4B, stop:0.45 #0F1426, stop:1 #080B12)"
     SIDEBAR_DARK = "rgba(13, 19, 36, 0.75)"
     CARD_DARK = "rgba(20, 27, 48, 0.68)"

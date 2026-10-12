@@ -458,7 +458,7 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(
         pytest.skip(f"hard links are unavailable: {exc}")
     with pytest.raises(PipelineConfigError, match="sobrescribir"):
         PipelineConfig(input_media=media_file, output_subtitle=str(hardlink)).validate()
-    # output_video sin burn-in se rechaza antes, con su propio mensaje.
+    # output_video without burn-in is rejected early, with its own message.
     with pytest.raises(PipelineConfigError, match="requiere activar el burn-in"):
         PipelineConfig(input_media=media_file, output_video=media_file).validate()
     with pytest.raises(PipelineConfigError, match="distintas"):
@@ -480,8 +480,8 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(
     with pytest.raises(PipelineConfigError, match="sobrescribir"):
         PipelineConfig(input_media=srt_file, output_subtitle=str(symlink)).validate()
 
-    # La salida por defecto (`in_pipeline.srt`) no colisiona con la entrada:
-    # la ejecución correcta deja el SRT de origen intacto.
+    # The default output (`in_pipeline.srt`) does not collide with the input:
+    # a successful run leaves the source SRT intact.
     config = PipelineConfig(input_media=srt_file)
     default_result = MediaPipeline().run(config)
     assert default_result.success

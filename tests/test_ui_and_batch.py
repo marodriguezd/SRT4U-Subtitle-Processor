@@ -35,7 +35,7 @@ def test_player_icon_only_controls_are_named(qapp):
 
 
 def test_player_controls_are_named_before_any_language_change(qapp):
-    """Los controles se nombran al construirse, no solo tras `retranslate()`."""
+    """Controls are named at construction, not only after `retranslate()`."""
     from application.services.i18n_service import t
     from application.ui.widgets import VideoPreviewPlayer
 
@@ -65,28 +65,28 @@ def test_main_window_flow(qapp, tmp_path):
     win = MainWindow()
     assert win.stack.count() == 11
 
-    # Prueba de cambio de páginas
+    # Page switching check
     win._switch_page(0)
     assert win.stack.currentIndex() == 0
-    win._switch_page(3)  # Convertir
+    win._switch_page(3)  # Convert
     assert win.stack.currentIndex() == 3
-    win._switch_page(7)  # Acerca de
+    win._switch_page(7)  # About
     assert win.stack.currentIndex() == 7
-    win._switch_page(8)  # Historial
+    win._switch_page(8)  # History
     assert win.stack.currentIndex() == 8
-    win._switch_page(9)  # Transcribir
+    win._switch_page(9)  # Transcribe
     assert win.stack.currentIndex() == 9
     win._switch_page(10)  # Pipeline
     assert win.stack.currentIndex() == 10
 
-    # La conversión escribe junto al archivo de origen: se trabaja sobre una copia
-    # temporal para no ensuciar tests/fixtures.
+    # Conversion writes next to the source file: work on a temp copy
+    # to keep tests/fixtures clean.
     sample_srt = str(tmp_path / "sample.srt")
     shutil.copyfile(os.path.join(FIXTURES_DIR, "sample.srt"), sample_srt)
     win._on_file_selected(sample_srt, "")
     assert win.current_subtitle_path == sample_srt
 
-    # Prueba de conversión directa en la vista
+    # Direct in-view conversion check
     win.cb_convert_format.setCurrentText("VTT (.vtt)")
     win._run_format_conversion()
 
@@ -170,7 +170,7 @@ def test_preview_page_studio_integration(qapp):
     win.diff_viewer.load_subtitles(items, copy.deepcopy(items))
     assert len(win.diff_viewer.cards) > 0
 
-    # Test search input (se fija el idioma para validar el texto traducido)
+    # Test search input (pin the language to validate the translated text)
     win.i18n.set_language("es", save_to_config=False)
     win.preview_search_input.setText("xyz_not_found_token_999")
     assert win.lbl_preview_sub_counter.text().startswith("Mostrando 0")

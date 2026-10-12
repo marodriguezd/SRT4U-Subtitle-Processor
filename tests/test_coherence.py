@@ -1,4 +1,4 @@
-"""Coherence invariants (Fase 12): i18n parity, single version, geo, terminology.
+"""Coherence invariants (Phase 12): i18n parity, single version, geo, terminology.
 
 Small regression guards for inconsistencies that functional tests do not catch:
 a translated UI must never fall back to another language, the product version
@@ -227,21 +227,21 @@ def test_install_contract_base_has_desktop_stack():
 
 
 def test_ci_pins_static_ffmpeg_version():
-    """El FFmpeg de los builds va fijado por versión, nunca en `latest`."""
+    """Build FFmpeg is pinned by version, never `latest`."""
     workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
-    # La etiqueta móvil rompe la reproducibilidad y además se purga.
+    # A moving tag breaks reproducibility and is also purged.
     assert "/releases/download/latest/" not in workflow, (
         "FFmpeg debe descargarse de un tag versionado, no de `latest`"
     )
-    # Ninguna descarga puede venir de un publisher sin tag estable.
+    # No download may come from a publisher without a stable tag.
     assert "github.com/yt-dlp/FFmpeg-Builds/releases/download" not in workflow
 
     version = re.search(r'FFMPEG_VERSION:\s*"([^"]+)"', workflow)
     assert version, "declare FFMPEG_VERSION en el workflow"
     assert re.fullmatch(r"b\d+\.\d+\.\d+", version.group(1)), version.group(1)
 
-    # Los tres builds consumen la variable, no una URL literal repetida.
+    # All three builds consume the variable, not a repeated literal URL.
     assert "releases/download/${FFMPEG_VERSION}/" in workflow
     assert "releases/download/${{ env.FFMPEG_VERSION }}/" in workflow
     for asset in (
@@ -252,8 +252,8 @@ def test_ci_pins_static_ffmpeg_version():
     ):
         assert asset in workflow, asset
 
-    # appimagetool forma parte del AppImage publicado: también debe ir fijado,
-    # o el binario seguiría variando entre builds aunque el FFmpeg no lo hiciera.
+    # appimagetool ships inside the published AppImage: it must also be pinned,
+    # otherwise the binary would keep varying between builds even with FFmpeg fixed.
     appimage = re.search(r'APPIMAGETOOL_VERSION:\s*"([^"]+)"', workflow)
     assert appimage, "declare APPIMAGETOOL_VERSION en el workflow"
     assert re.fullmatch(r"\d+\.\d+\.\d+", appimage.group(1)), appimage.group(1)
@@ -262,12 +262,12 @@ def test_ci_pins_static_ffmpeg_version():
 
 
 def test_ci_installs_the_api_extra_for_the_test_suite():
-    """La suite importa fastapi a nivel de módulo: CI debe instalar `[api]`.
+    """The suite imports fastapi at module level: CI must install `[api]`.
 
-    Sin el extra, `pytest` aborta en la colección con
-    `ModuleNotFoundError: No module named 'fastapi'` en test_api.py,
-    test_pipeline.py y test_transcription.py, y el fallo tumba `test` y
-    `compat-min-pyqt6`, lo que a su vez salta los tres builds y la release.
+    Without the extra, `pytest` aborts during collection with
+    `ModuleNotFoundError: No module named 'fastapi'` in test_api.py,
+    test_pipeline.py and test_transcription.py, and the failure takes down `test`
+    and `compat-min-pyqt6`, which in turn skips the three builds and the release.
     """
     workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
@@ -278,7 +278,7 @@ def test_ci_installs_the_api_extra_for_the_test_suite():
     ):
         assert "fastapi" in (ROOT / module).read_text(encoding="utf-8"), module
 
-    # Los dos jobs que ejecutan la suite tienen que instalar el extra.
+    # Both jobs running the suite must install the extra.
     test_job = workflow.split("\n  test:", 1)[1].split("\n  compat-min-pyqt6:", 1)[0]
     compat_job = workflow.split("\n  compat-min-pyqt6:", 1)[1].split(
         "\n  build-windows:", 1
@@ -287,18 +287,18 @@ def test_ci_installs_the_api_extra_for_the_test_suite():
         assert '".[api]"' in block, f"el job {name} debe instalar el extra [api]"
         assert "python -m pytest" in block, name
 
-    # El extra sale de pyproject: el workflow no debe re-declarar sus pines.
+    # The extra comes from pyproject: the workflow must not re-declare its pins.
     extras = _pyproject()["project"]["optional-dependencies"]["api"]
     for dep in extras:
         assert dep not in workflow, f"{dep} no debe duplicarse en el workflow"
 
 
 def test_ci_release_is_the_only_job_with_write_permission():
-    """`contents: write` sólo en `release`; el resto debe poder leer."""
+    """`contents: write` only in `release`; the rest must stay read-only."""
     workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
     assert re.search(r"^permissions:\n  contents: read$", workflow, re.M)
     assert workflow.count("contents: write") == 1
-    # Y debe ser el job que publica la release, no otro.
+    # And it must be the job publishing the release, no other.
     release_block = workflow.split("\n  release:", 1)[1]
     assert "contents: write" in release_block
 
@@ -325,13 +325,13 @@ def test_release_workflow_gates_publication_on_tag_validation():
         "el job release debe ejecutar la puerta de tag antes de publicar"
     )
     assert "github.ref_name" in release_block
-    # Procedencia: el tag debe apuntar al commit que se publica (sin API).
+    # Provenance: the tag must point at the published commit (no API).
     assert "git rev-parse" in release_block and "refs/tags/" in release_block
     assert "github.sha" in release_block
-    # Procedencia de artefactos: cada build escribe un sello de versión en
-    # texto plano (RELEASE_VERSION) y el job release lo compara con el tag.
-    # Los binarios PyInstaller comprimen el código Python, así que el grep
-    # del literal dentro del ejecutable nunca puede pasar.
+    # Artifact provenance: each build writes a plain-text version stamp
+    # (RELEASE_VERSION) and the release job compares it against the tag.
+    # PyInstaller binaries compress the Python code, so grepping
+    # for the literal inside the executable can never pass.
     _JOB_ORDER = [
         "test",
         "compat-min-pyqt6",
@@ -352,7 +352,7 @@ def test_release_workflow_gates_publication_on_tag_validation():
         assert "RELEASE_VERSION" in job_block, job
     assert "RELEASE_VERSION" in release_block
     assert "no contiene la versión" in release_block
-    # Sigue publicando desde el cuerpo versionado y como estable.
+    # It keeps publishing from the versioned body and as stable.
     assert "body_path: RELEASE_NOTES.md" in release_block
     assert "prerelease: false" in release_block
 
@@ -372,8 +372,8 @@ def test_release_gate_rejects_wrong_version_and_prerelease_tags():
         f"v{EXPECTED_VERSION}-rc1",
         f"v{EXPECTED_VERSION}-beta1",
         f"v{EXPECTED_VERSION}+build.7",
-        f"{EXPECTED_VERSION}",  # sin la 'v'
-        f"v{EXPECTED_VERSION}.1",  # cuatro componentes
+        f"{EXPECTED_VERSION}",  # without the 'v'
+        f"v{EXPECTED_VERSION}.1",  # four components
     ):
         reason = tool.check_tag(bad_tag, pyproject)
         assert reason is not None, f"{bad_tag} debe rechazarse"
@@ -413,7 +413,7 @@ def test_release_notes_are_release_facing_not_preparation():
     # published/stable release that does not exist, and it must not claim a
     # *latest published release* version that differs from GitHub.
     assert f"SRT4U {EXPECTED_VERSION}" in notes
-    # macOS sigue documentado como arm64-only, nunca universal.
+    # macOS stays documented as arm64-only, never universal.
     assert "Apple Silicon (arm64)" in notes
     assert "x86_64 build is produced" not in notes
     assert "x86_64 build is NOT produced" in notes or "no x86_64 build" in notes.lower()

@@ -15,15 +15,15 @@ def sub_service(trans_service):
 
 @pytest.mark.network
 def test_free_google_translation(trans_service):
-    # Prueba la traducción usando la capa gratuita (GoogleTranslate)
+    # Exercise translation through the free tier (GoogleTranslate)
     translated = trans_service.translate_text(
         text="Hello world", target_language="es", engine="google"
     )
     if translated is None or translated.strip() == "Hello world":
-        # El motor devuelve el texto base cuando no hay red o el servicio no responde
+        # The engine returns the source text when offline or the service is down
         pytest.skip("Sin acceso a Internet (el motor devolvió el texto original)")
     assert len(translated) > 0
-    # "Hola Mundo" o similar en español
+    # "Hola Mundo" or similar in Spanish
     assert "hola" in translated.lower() or "mundo" in translated.lower()
 
 
@@ -34,20 +34,20 @@ def test_parallel_vs_sequential_subtitles_translation(sub_service):
         SubtitleItem(index=2, start_ms=4000, end_ms=6000, text="Thank you very much."),
     ]
 
-    # Ejecución paralela
+    # Parallel run
     res_parallel = sub_service.translate_subtitles(
         items=items, target_language="es", engine="google", parallel=True
     )
     assert len(res_parallel) == 2
     if res_parallel[0].text.strip() == "Good morning.":
-        # El motor devuelve el texto base cuando no hay red o el servicio no responde
+        # The engine returns the source text when offline or the service is down
         pytest.skip("Sin acceso a Internet (el motor devolvió el texto original)")
     assert res_parallel[0].text != "Good morning."
     assert (
         "buen" in res_parallel[0].text.lower() or "día" in res_parallel[0].text.lower()
     )
 
-    # Ejecución secuencial
+    # Sequential run
     res_seq = sub_service.translate_subtitles(
         items=items, target_language="es", engine="google", parallel=False
     )
@@ -56,7 +56,7 @@ def test_parallel_vs_sequential_subtitles_translation(sub_service):
 
 
 def test_translation_fallback_offline_resilience(trans_service, monkeypatch):
-    # Un error de red no debe romper la ejecución: el servicio devuelve el texto base.
+    # A network error must not break the run: the service returns the source text.
     from application.services.translation_providers import (
         ProviderNetworkError,
         ProviderRegistry,

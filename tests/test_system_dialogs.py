@@ -1,11 +1,11 @@
 """
-Regresión de tema para los diálogos del sistema (QFileDialog / QMessageBox).
+Theme regression for system dialogs (QFileDialog / QMessageBox).
 
-Estos diálogos son top-level y no heredan el QSS del `central_widget`, así que
-dependen de `Styles.dialog_palette()` + QSS propio. Los tests verifican que la
-paleta sigue el tema activo (y no el azul por defecto de Qt), que los iconos de
-la barra de herramientas se sustituyen por SVG tematizados y que esos iconos son
-realmente visibles sobre la superficie del diálogo.
+These dialogs are top-level and do not inherit the `central_widget` QSS, so
+they rely on `Styles.dialog_palette()` + their own QSS. The tests verify the
+palette follows the active theme (not the Qt default blue), that toolbar
+icons are replaced with themed SVGs and that those icons are
+actually visible on the dialog surface.
 """
 
 import pytest
@@ -52,7 +52,7 @@ def _contrast(a: QColor, b: QColor) -> float:
 
 
 def _icon_contrast(icon, background: QColor, size: int = 16) -> float:
-    """Contraste entre el píxel más extremo del icono y el fondo del diálogo."""
+    """Contrast between the icon's most extreme pixel and the dialog background."""
     image = icon.pixmap(size, size).toImage()
     background_lum = _relative_luminance(background)
     best_pixel = None
@@ -92,9 +92,9 @@ def test_file_dialog_palette_follows_theme(qapp, lang):
                 f"{lang} (dark={dark}): fondo del diálogo {palette.window().color().name()} "
                 f"!= {expected_window.name()}"
             )
-            # Con un QSS de aplicación activo (tooltips), Qt resuelve la paleta vía
-            # QStyleSheetStyle, así que el color de selección debe declararse en QSS;
-            # el azul por defecto de Qt (#308cc6) no debe usarse en ninguna ruta.
+            # With an active application QSS (tooltips), Qt resolves the palette via
+            # QStyleSheetStyle, so the selection color must be declared in QSS;
+            # the Qt default blue (#308cc6) must not be used on any path.
             sheet = dialog.styleSheet()
             assert sheet, "El diálogo no tiene QSS aplicado"
             assert expected_highlight.name().lower() in sheet.lower(), (
@@ -149,7 +149,7 @@ def test_file_dialog_uses_themed_icon_provider_and_hides_grip(qapp, lang):
 
 
 def test_prepare_dialog_is_idempotent_and_public(qapp):
-    """`prepare_dialog` es la API pública de tematización y puede reaplicarse."""
+    """`prepare_dialog` is the public theming API and can be reapplied."""
     from PyQt6.QtWidgets import QFileDialog
 
     dialog = QFileDialog(None, "Open", "", "All (*)")

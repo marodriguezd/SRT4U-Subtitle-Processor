@@ -1,19 +1,19 @@
 """
-Prueba de extremo a extremo con material real: un vídeo de 1 minuto (1920x1080,
-60 fps, con audio) y su fichero de subtítulos SRT (25 bloques con solapamientos
-y un hueco de 1 s).
+End-to-end test with real media: a 1-minute video (1920x1080,
+60 fps, with audio) and its SRT subtitle file (25 cues with overlaps
+and a 1 s gap).
 
-El resto de la suite trabaja con fixtures diminutas y no toca FFmpeg de verdad
-con un vídeo completo; aquí se recorre **cada apartado** de la aplicación con
-los ficheros reales: lectura, limpieza, traducción con el motor gratuito,
-conversión entre los 4 formatos, metadatos del vídeo, generación de ASS, burn-in
-(hardsub) del minuto completo con validación del resultado, reproductor de la
-vista previa y los flujos de la interfaz (procesar, convertir, por lotes,
-ajustes).
+The rest of the suite works with tiny fixtures and never touches real FFmpeg
+on a full video; here **every section** of the application is exercised with
+the real files: reading, cleaning, free-engine translation,
+conversion across the 4 formats, video metadata, ASS generation, burn-in
+(hardsub) of the full minute with result validation, the preview
+player and the UI flows (process, convert, batch,
+settings).
 
-Los ficheros se localizan por `SRT4U_E2E_MEDIA` (por defecto el directorio de
-material del usuario) y todo el módulo se omite si no están, de modo que la
-suite sigue siendo ejecutable en CI sin ese material.
+Files are located via `SRT4U_E2E_MEDIA` (defaulting to the user's media
+directory) and the whole module is skipped when they are missing, so the
+suite stays runnable in CI without that media.
 """
 
 import os
@@ -48,7 +48,7 @@ SRT_NAME = "S1pK5hmTzkE_1min.srt"
 VIDEO_PATH = os.path.join(MEDIA_DIR, VIDEO_NAME)
 SRT_PATH = os.path.join(MEDIA_DIR, SRT_NAME)
 
-# Datos esperados del material real (verificados con ffprobe / inspección)
+# Expected values for the real media (verified with ffprobe / inspection)
 EXPECTED_CUES = 25
 EXPECTED_DURATION_MS = 60000
 EXPECTED_SIZE = (1920, 1080)
@@ -61,10 +61,10 @@ pytestmark = pytest.mark.skipif(
 
 
 # --------------------------------------------------------------------------- #
-# Utilidades
+# Utilities
 # --------------------------------------------------------------------------- #
 def _ffprobe(path: str) -> dict:
-    """Metadatos del fichero con ffprobe ( streams + formato)."""
+    """File metadata via ffprobe (streams + format)."""
     out = subprocess.run(
         [
             "ffprobe",
@@ -92,7 +92,7 @@ def _streams(path: str, codec_type: str) -> list:
 
 
 def _wait_for_worker(worker, timeout_ms: int = 600_000) -> dict:
-    """Ejecuta un QThread de la app hasta que emita finished/failed/cancelled."""
+    """Run an app QThread until it emits finished/failed/cancelled."""
     result: dict = {}
     loop = QEventLoop()
 
@@ -140,7 +140,7 @@ def _frame(video: str, second: float, dest: str) -> QImage:
 
 
 # --------------------------------------------------------------------------- #
-# 1. Lectura del SRT real
+# 1. Reading the real SRT
 # --------------------------------------------------------------------------- #
 def test_01_reads_every_cue_of_the_real_srt():
     service = SubtitleService()
@@ -155,13 +155,13 @@ def test_01_reads_every_cue_of_the_real_srt():
     assert items[0].start_ms == 0 and items[0].end_ms == 5000
     assert items[-1].start_ms == 59000 and items[-1].end_ms == 60000
     assert [it.index for it in items] == list(range(1, EXPECTED_CUES + 1))
-    # El SRT real viene solapado: hay que conservarlo, no "arreglarlo" al leer
+    # The real SRT comes overlapped: preserve it, do not "fix" it on read
     assert any(b.start_ms < a.end_ms for a, b in zip(items, items[1:], strict=False))
 
 
 @pytest.mark.parametrize("fmt", ["srt", "vtt", "ass", "txt"])
 def test_02_every_output_format_round_trips(fmt):
-    """SRT -> formato -> SRT: mismos bloques y mismos textos, sin pérdidas."""
+    """SRT -> format -> SRT: same cues and same texts, no losses."""
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
         items = service.parse_subtitles(handle.read(), "srt")
@@ -173,14 +173,14 @@ def test_02_every_output_format_round_trips(fmt):
     assert len(reparsed) == EXPECTED_CUES
     assert [it.text.strip() for it in reparsed] == [it.text.strip() for it in items]
     if fmt != "txt":
-        # TXT es texto plano: al no llevar marcas de tiempo sólo se conserva
-        # el contenido, pero los otros tres formatos son reversibles al 100%.
+        # TXT is plain text: without timestamps only the content survives,
+        # while the other three formats round-trip at 100%.
         assert [it.start_ms for it in reparsed] == [it.start_ms for it in items]
         assert [it.end_ms for it in reparsed] == [it.end_ms for it in items]
 
 
 # --------------------------------------------------------------------------- #
-# 2. Limpieza
+# 2. Cleaning
 # --------------------------------------------------------------------------- #
 def test_03_cleaning_keeps_the_real_content_intact():
     service = SubtitleService()
@@ -191,22 +191,22 @@ def test_03_cleaning_keeps_the_real_content_intact():
 
     assert total_lines > 0
     assert len(cleaned) > 0
-    # Este subtítulo no tiene ruido que limpiar: no debe perder bloques
+    # This subtitle has no noise to clean: it must not lose any cues
     assert len(cleaned) == EXPECTED_CUES
     assert all(it.text.strip() for it in cleaned)
-    # Los tiempos no se tocan al limpiar
+    # Timings are untouched by cleaning
     assert [it.start_ms for it in cleaned] == [it.start_ms for it in items]
 
 
 # --------------------------------------------------------------------------- #
-# 3. Traducción con el motor gratuito
+# 3. Translation with the free engine
 # --------------------------------------------------------------------------- #
 def test_04_free_translation_engine_on_real_subtitles():
     """
-    El motor gratuito debe traducir; si no hay red, debe decirlo sin romper nada.
+    The free engine must translate; without network it must report it cleanly.
 
-    Es el único punto del E2E que depende de Internet, y aun así comprueba las
-    dos ramas: con red, textos traducidos; sin red, el texto original intacto y
+    This is the only E2E point depending on the Internet, and it still covers
+    both branches: with network, translated texts; without network, the original text intact and
     el recuento de fallos avisando al usuario.
     """
     service = SubtitleService()
@@ -219,7 +219,7 @@ def test_04_free_translation_engine_on_real_subtitles():
     )
 
     if service.last_translation_failures:
-        # Sin red: se conserva el original y queda contabilizado el fallo
+        # Offline: the original is kept and the failure is counted
         assert service.last_translation_failures == len(subset)
         assert [it.text for it in translated] == [it.text for it in subset]
     else:
@@ -229,7 +229,7 @@ def test_04_free_translation_engine_on_real_subtitles():
             it.text.strip() != src.text.strip()
             for it, src in zip(translated, subset, strict=True)
         )
-        # Ningún bloque puede quedarse vacío
+        # No cue may end up empty
         assert all(it.text.strip() for it in translated)
 
 
@@ -267,23 +267,23 @@ def test_05_processing_pipeline_end_to_end(tmp_path, caplog):
     items = service.parse_subtitles(written, "srt")
     assert len(items) == EXPECTED_CUES
     assert items[0].start_ms == 0 and items[-1].end_ms == 60000
-    # Si hubo traducción, el resultado debe estar en español o ser el original
+    # When translated, the result must be in Spanish or the original
     if result.stats.translation_failures == 0:
         assert items[0].text != "Okay guys, Hightail Chapter 1"
 
-    # El fichero se puede volver a procesar sin errores (idempotencia)
+    # The file can be reprocessed without errors (idempotency)
     again = service.process_subtitles(
         file_path=source, do_clean=False, do_translate=False
     )
     assert len(service.parse_subtitles(again.output_content, "srt")) == EXPECTED_CUES
 
-    # Ningún ERROR en el log durante el camino feliz
+    # No ERROR in the log on the happy path
     errors = [r for r in caplog.records if r.levelname in ("ERROR", "CRITICAL")]
     assert not errors, [r.getMessage() for r in errors]
 
 
 # --------------------------------------------------------------------------- #
-# 5. Metadatos del vídeo real
+# 5. Real video metadata
 # --------------------------------------------------------------------------- #
 def test_06_ffmpeg_detects_real_video_metadata():
     ffmpeg = VideoBurnerService.get_ffmpeg_path()
@@ -301,7 +301,7 @@ def test_06_ffmpeg_detects_real_video_metadata():
 
 
 # --------------------------------------------------------------------------- #
-# 6. Generación del ASS para hardsub
+# 6. ASS generation for hardsub
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "options",
@@ -324,7 +324,7 @@ def test_07_ass_script_matches_the_real_video(options):
     assert ass.count("Dialogue:") == EXPECTED_CUES
     assert "Okay guys" in ass
 
-    # Los tiempos de inicio del ASS salen del SRT real, incluido su hueco
+    # ASS start times come from the real SRT, including its gap
     starts = [
         line.split(",")[1].strip()
         for line in ass.splitlines()
@@ -332,7 +332,7 @@ def test_07_ass_script_matches_the_real_video(options):
     ]
     assert len(starts) == EXPECTED_CUES
     assert starts[0] == "0:00:00.00"
-    # Ningún subtítulo empieza durante el hueco real de 30 a 31 s
+    # No subtitle starts during the real 30-31 s gap
     assert not any("0:00:30." in start for start in starts), starts
 
 
@@ -341,7 +341,7 @@ def test_07_ass_script_matches_the_real_video(options):
 # --------------------------------------------------------------------------- #
 @pytest.fixture(scope="module")
 def burned_video(tmp_path_factory, qapp):
-    """Graba los subtítulos sobre el vídeo real completo y devuelve la ruta."""
+    """Burn the subtitles onto the full real video and return the path."""
     out_dir = tmp_path_factory.mktemp("burn")
     out_path = str(out_dir / "S1pK5hmTzkE_1min_burned.mp4")
 
@@ -374,12 +374,12 @@ def test_08_burn_in_output_is_a_valid_playable_video(burned_video):
         "h264",
         *EXPECTED_SIZE,
     )
-    # El audio se copia tal cual, no se recodifica ni se pierde
+    # Audio is copied as-is, never re-encoded nor lost
     assert _streams(burned_video, "audio")[0]["codec_name"] == "aac"
 
 
 def test_09_subtitles_are_actually_rendered_in_the_pixels(burned_video, tmp_path):
-    """La prueba clave: el subtítulo tiene que estar grabado, no sólo ahí en el ASS."""
+    """The key check: the subtitle must be burned in, not just present in the ASS."""
     for second in (1, 3, 8):
         original = _frame(VIDEO_PATH, second, str(tmp_path / f"orig_{second}.png"))
         burned = _frame(burned_video, second, str(tmp_path / f"burn_{second}.png"))
@@ -402,14 +402,14 @@ def test_09_subtitles_are_actually_rendered_in_the_pixels(burned_video, tmp_path
                 if delta > 30:
                     differences[key] += 1
 
-        # La parte alta del fotograma sólo cambia por la recodificación (ruido
-        # de compresión): muy por debajo del cambio que provoca el subtítulo.
+        # The top of the frame only changes through re-encoding (compression
+        # noise): far below the change introduced by the subtitle.
         ratio_top = differences["arriba"] / max(1, sampled["arriba"])
         assert ratio_top < 0.01, f"el reencode alteró demasiado arriba: {ratio_top:.2%}"
-        # La banda del subtítulo sí cambia de verdad, y mucho más
+        # The subtitle band changes for real, and much more
         assert differences["subtitulo"] > differences["arriba"] * 5
 
-        # Y hay texto legible (píxeles claros) en esa banda
+        # And there is legible text (bright pixels) in that band
         bright = sum(
             1
             for y in range(int(height * 0.8), height, 4)
@@ -420,7 +420,7 @@ def test_09_subtitles_are_actually_rendered_in_the_pixels(burned_video, tmp_path
 
 
 def test_10_burn_in_respects_the_gap_of_the_source(burned_video, tmp_path):
-    """El SRT real tiene un hueco de 30 a 31 s: ahí no debe aparecer nada."""
+    """The real SRT has a 30-31 s gap: nothing may appear there."""
     during = _frame(burned_video, 29, str(tmp_path / "during.png"))
     gap = _frame(burned_video, 30.5, str(tmp_path / "gap.png"))
     after = _frame(burned_video, 32, str(tmp_path / "after.png"))
@@ -440,7 +440,7 @@ def test_10_burn_in_respects_the_gap_of_the_source(burned_video, tmp_path):
 
 
 def test_11_burn_in_fails_cleanly_on_a_broken_video(tmp_path, caplog, qapp):
-    """Un vídeo corrupto debe avisar, no reventar ni dejar un archivo a medias."""
+    """A corrupt video must warn, not crash nor leave a partial file."""
     broken = str(tmp_path / "roto.mp4")
     with open(broken, "wb") as handle:
         handle.write(b"esto no es un mp4" * 500)
@@ -458,7 +458,7 @@ def test_11_burn_in_fails_cleanly_on_a_broken_video(tmp_path, caplog, qapp):
 
 
 # --------------------------------------------------------------------------- #
-# 8. Reproductor de la vista previa
+# 8. Preview player
 # --------------------------------------------------------------------------- #
 def test_12_preview_player_opens_the_real_video(qapp):
     player = VideoPreviewPlayer()
@@ -488,7 +488,7 @@ def test_12_preview_player_opens_the_real_video(qapp):
     assert not errors
     assert player.player.duration() == EXPECTED_DURATION_MS
 
-    # Buscar a mitad del vídeo y sincronizar el subtítulo
+    # Seek to mid-video and sync the subtitle
     player.seek_to_ms(30_000)
     qapp.processEvents()
     assert player.player.position() == 30_000
@@ -525,21 +525,21 @@ def test_13_preview_player_shows_the_real_subtitles(qapp):
     qapp.processEvents()
 
     assert "Okay guys" in player.sub_overlay.text()
-    player.seek_to_ms(52_000)  # dentro del bloque 21
+    player.seek_to_ms(52_000)  # inside cue 21
     qapp.processEvents()
     assert "upgrade" in player.sub_overlay.text()
 
-    # Fuera del hueco 30-31 s no hay subtítulo que mostrar
+    # Outside the 30-31 s gap there is no subtitle to show
     player.seek_to_ms(30_500)
     qapp.processEvents()
     assert "upgrade" not in player.sub_overlay.text()
 
 
 # --------------------------------------------------------------------------- #
-# 9. Flujos completos de la interfaz
+# 9. Full UI flows
 # --------------------------------------------------------------------------- #
 def test_14_main_window_processes_the_real_file(qapp, tmp_path):
-    """Inicio -> procesar con traducción -> vista previa -> página de resultado."""
+    """Home -> process with translation -> preview -> result page."""
     win = MainWindow()
     win.i18n.set_language("es", save_to_config=False)
 
@@ -550,7 +550,7 @@ def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     win._on_file_selected(source, VIDEO_PATH)
     assert win.current_subtitle_path == source
 
-    # El vídeo real se carga en el reproductor de la vista previa
+    # The real video loads in the preview player
     loop = QEventLoop()
     win.video_player.player.mediaStatusChanged.connect(
         lambda status: (
@@ -568,12 +568,12 @@ def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     qapp.processEvents()
     assert win.video_player.player.duration() == EXPECTED_DURATION_MS
 
-    # Opciones del formulario
+    # Form options
     win.cb_source_lang.setCurrentIndex(win.cb_source_lang.findData("en"))
     win.cb_target_lang.setCurrentIndex(win.cb_target_lang.findData("es"))
     win.cb_engine.setCurrentIndex(win.cb_engine.findData("google"))
 
-    # Mismo worker que lanza `_start_processing`, pero sin el modal de progreso
+    # Same worker launched by `_start_processing`, but without the progress modal
     worker = ProcessWorker(
         service=win.subtitle_service,
         file_path=source,
@@ -595,15 +595,15 @@ def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     win._on_processing_completed(result)
     qapp.processEvents()
 
-    # Guarda el resultado junto al origen y salta a la página de resumen
+    # Save the result next to the source and jump to the summary page
     assert win.saved_output_path == str(tmp_path / "S1pK5hmTzkE_1min_processed.srt")
     assert os.path.getsize(win.saved_output_path) > 0
     assert win.stack.currentIndex() == 6
 
-    # El visor de diferencias se ha llenado con los 25 bloques reales
+    # The diff viewer has loaded the 25 real cues
     assert len(win.diff_viewer.cards) == EXPECTED_CUES
 
-    # Página de vista previa: el buscador filtra sobre los subtítulos reales
+    # Preview page: search filters over the real subtitles
     win._switch_page(1)
     total_text = win.lbl_preview_sub_counter.text()
     assert total_text
@@ -615,14 +615,14 @@ def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     qapp.processEvents()
     assert win.lbl_preview_sub_counter.text() == total_text
 
-    # El reproductor tiene los subtítulos procesados cargados
+    # The player has the processed subtitles loaded
     win.video_player.seek_to_ms(1_000)
     qapp.processEvents()
     assert win.video_player.sub_overlay.text().strip()
 
 
 def test_15_main_window_converts_the_real_file(qapp, tmp_path):
-    """Página de conversión: los 4 formatos de salida sobre el SRT real."""
+    """Convert page: all 4 output formats over the real SRT."""
     win = MainWindow()
     source = str(tmp_path / SRT_NAME)
     shutil.copyfile(SRT_PATH, source)
@@ -649,7 +649,7 @@ def test_15_main_window_converts_the_real_file(qapp, tmp_path):
 
 
 def test_16_main_window_clean_page_on_the_real_file(qapp, tmp_path):
-    """Página de limpieza: genera el fichero limpio con los 25 bloques intactos."""
+    """Clean page: generates the clean file with the 25 cues intact."""
     win = MainWindow()
     source = str(tmp_path / SRT_NAME)
     shutil.copyfile(SRT_PATH, source)
@@ -667,7 +667,7 @@ def test_16_main_window_clean_page_on_the_real_file(qapp, tmp_path):
     )
     assert len(items) == EXPECTED_CUES
     assert items[0].text.startswith("Okay guys")
-    # El original no se toca: la app nunca sobrescribe el fichero del usuario
+    # The original is untouched: the app never overwrites the user file
     assert (
         SubtitleService()
         .parse_subtitles(open(source, encoding="utf-8").read(), "srt")[0]
@@ -676,15 +676,15 @@ def test_16_main_window_clean_page_on_the_real_file(qapp, tmp_path):
 
 
 def test_17_batch_processing_with_real_files(qapp, tmp_path):
-    """Procesamiento por lotes con varias copias del SRT real."""
+    """Batch processing with several copies of the real SRT."""
     win = MainWindow()
     win._switch_page(4)
 
     for index in range(3):
         copy_path = str(tmp_path / f"parte_{index}{os.path.splitext(SRT_NAME)[1]}")
         shutil.copyfile(SRT_PATH, copy_path)
-        # `_add_batch_files()` abre el diálogo del sistema: aquí se inserta la
-        # fila exactamente igual que lo hace ese método (columnas 0-3).
+        # `_add_batch_files()` opens the system dialog: here the row is inserted
+        # exactly as that method does (columns 0-3).
         row = win.batch_table.rowCount()
         win.batch_table.insertRow(row)
         win.batch_table.setItem(row, 0, QTableWidgetItem(copy_path))
@@ -710,7 +710,7 @@ def test_17_batch_processing_with_real_files(qapp, tmp_path):
         )
         assert len(items) == EXPECTED_CUES
 
-    # La columna 3 es el estado: las tres filas deben acabar completadas
+    # Column 3 is the status: all three rows must end completed
     statuses = [
         win.batch_table.item(row, 3).text() for row in range(win.batch_table.rowCount())
     ]
@@ -718,19 +718,19 @@ def test_17_batch_processing_with_real_files(qapp, tmp_path):
 
 
 def test_18_burn_in_dialog_with_real_subtitles(qapp, tmp_path):
-    """Diálogo de hardsub: genera el ASS con los 25 bloques del vídeo real."""
+    """Hardsub dialog: generates the ASS with the 25 cues of the real video."""
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
         items = service.parse_subtitles(handle.read(), "srt")
 
     dialog = BurnInDialog(video_path=VIDEO_PATH, subtitle_items=items, parent=None)
     try:
-        # El diálogo es utilizable: cabe su contenido y precarga el vídeo real
+        # The dialog is usable: its content fits and it preloads the real video
         assert dialog.width() >= dialog.minimumSizeHint().width()
         assert dialog.txt_video.text() == VIDEO_PATH
         assert dialog.subtitle_items == items
 
-        # Cada opción que ofrece produce un ASS válido con los 25 bloques
+        # Every offered option produces a valid ASS with the 25 cues
         seen = set()
         for box_data in ("semi", "none", "solid"):
             dialog.cb_box.setCurrentIndex(dialog.cb_box.findData(box_data))
@@ -756,7 +756,7 @@ def test_18_burn_in_dialog_with_real_subtitles(qapp, tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# 10. Ajustes, idiomas y estado
+# 10. Settings, languages and state
 # --------------------------------------------------------------------------- #
 def test_19_home_options_are_persisted(qapp, tmp_path):
     win = MainWindow()
@@ -773,13 +773,13 @@ def test_19_home_options_are_persisted(qapp, tmp_path):
     assert config.get("target_lang") == "de"
     assert config.get("preferred_engine") == "google"
 
-    # Una ventana nueva recupera lo guardado
+    # A fresh window restores the saved settings
     win2 = MainWindow()
     assert win2.cb_target_lang.currentData() == "de"
 
 
 def test_20_every_ui_language_processes_the_real_file(qapp, tmp_path):
-    """Los 6 idiomas de la interfaz con el contenido real, sin recortes ni errores."""
+    """All 6 UI languages with the real content, no clipping or errors."""
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
         original = handle.read()
@@ -806,7 +806,7 @@ def test_20_every_ui_language_processes_the_real_file(qapp, tmp_path):
 
 
 def test_21_translation_service_reports_status_for_the_real_file():
-    """El servicio de traducción no revienta con el contenido real."""
+    """The translation service stays stable with the real content."""
     service = TranslationService()
     result = service.translate_text(
         "Okay guys, Hightail Chapter 1", "es", "auto", "google"

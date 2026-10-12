@@ -1,6 +1,6 @@
 """
-Test de humo para `tools/regenerate_screenshots.py`: ejecuta la utilidad real
-en un subproceso (plataforma offscreen) para evitar que se degrade con el tiempo.
+Smoke test for `tools/regenerate_screenshots.py`: runs the real utility in a
+subprocess (offscreen platform) so it cannot silently rot over time.
 """
 
 import os
@@ -10,7 +10,7 @@ from pathlib import Path
 
 TOOL = Path(__file__).resolve().parent.parent / "tools" / "regenerate_screenshots.py"
 
-# 3 lenguas de ventana × 2 temas × 3 páginas (18) + burn_en + progress_en +
+# 3 window languages x 2 themes x 3 pages (18) + burn_en + progress_en +
 # burnprogress_en + filedialog_en (dark/light) + messagebox_en
 MIN_EXPECTED_SHOTS = 24
 EXPECTED_SHOTS = [

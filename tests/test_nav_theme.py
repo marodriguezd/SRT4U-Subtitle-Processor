@@ -1,13 +1,13 @@
 """
-Contraste de la barra lateral en ambos temas.
+Sidebar contrast in both themes.
 
-La pestaña activa se pintaba con `color: #C7D2FE` fijo (un lavanda claro pensado
-para el fondo oscuro) sobre un tinte translúcido de PRIMARY. En el tema claro el
-texto quedaba en ~1.1:1, ilegible, y los iconos del menú (calibrados para el
-fondo oscuro) se quedaban por debajo de 3:1.
+The active tab used a fixed `color: #C7D2FE` (a light lavender designed
+for the dark background) over a translucent PRIMARY tint. In the light theme
+the text dropped to ~1.1:1, unreadable, and the menu icons (calibrated for
+the dark background) fell below 3:1.
 
-Los tests compositional el fondo real — la barra lateral es translúcida y la
-pestaña activa encima — y exigen WCAG AA en los dos temas.
+The tests compose the real background — the sidebar is translucent with the
+active tab on top — and require WCAG AA in both themes.
 """
 
 import re
@@ -19,7 +19,7 @@ from application.ui.icons import Icons
 from application.ui.main_window import MainWindow
 from application.ui.styles import Styles
 
-# Colores de fondo bajo la barra lateral en cada tema (de `BG_*_GRADIENT`).
+# Background colors under the sidebar in each theme (from `BG_*_GRADIENT`).
 UNDER_LIGHT = QColor("#F8FAFC")
 UNDER_DARK = QColor("#0F1426")
 MIN_TEXT_CONTRAST = 4.5
@@ -54,7 +54,7 @@ def _blend(top: QColor, alpha: float, bottom: QColor) -> QColor:
 
 
 def _parse_css_color(spec: str) -> tuple[QColor, float]:
-    """Devuelve (color, alfa) para `#RRGGBB` o `rgba(r, g, b, a)` de Qt."""
+    """Return (color, alpha) for Qt `#RRGGBB` or `rgba(r, g, b, a)`."""
     spec = spec.strip()
     if spec.startswith("#"):
         return QColor(spec), 1.0
@@ -63,7 +63,7 @@ def _parse_css_color(spec: str) -> tuple[QColor, float]:
 
 
 def _sidebar_background(dark: bool) -> QColor:
-    """Compone la barra lateral translúcida sobre el fondo de la ventana."""
+    """Compose the translucent sidebar over the window background."""
     sidebar, alpha = _parse_css_color(
         Styles.SIDEBAR_DARK if dark else Styles.SIDEBAR_LIGHT
     )
@@ -86,7 +86,7 @@ def _active_tab_text(dark: bool) -> QColor:
     block = re.search(
         r'QPushButton\.nav-btn\[active="true"\]\s*\{(.*?)\}', qss, re.S
     ).group(1)
-    # `background-color:` también contiene "color:", así que se excluye
+    # `background-color:` also contains "color:", so it is excluded
     spec = re.search(r"(?<!background-)\bcolor:\s*([^;]+);", block).group(1)
     return _parse_css_color(spec)[0]
 
@@ -127,7 +127,7 @@ def test_idle_nav_items_are_readable(dark):
 
 @pytest.mark.parametrize("dark", [True, False])
 def test_nav_buttons_use_theme_aware_icons(qapp, dark):
-    """El icono real del botón cambia con el tema, no con el color por defecto."""
+    """The button's real icon follows the theme, not the default color."""
     window = MainWindow()
     window.dark_mode = dark
     window._apply_theme()
@@ -157,7 +157,7 @@ def test_nav_buttons_use_theme_aware_icons(qapp, dark):
 
 
 def test_nav_icons_are_not_hardcoded_to_the_dark_defaults():
-    """Guarda contra volver a `Icons.DEFAULT_*`, calibrados sólo para el tema oscuro."""
+    """Guard against falling back to `Icons.DEFAULT_*`, calibrated for dark theme only."""
     window = MainWindow()
     window.dark_mode = False
     window._apply_theme()
@@ -176,7 +176,7 @@ def test_nav_icons_are_not_hardcoded_to_the_dark_defaults():
 
 @pytest.mark.parametrize("dark", [True, False])
 def test_nav_labels_have_no_layout_whitespace(qapp, dark):
-    """El gap icono/texto lo da el QSS `nav-btn`, nunca espacios literales."""
+    """The icon/text gap comes from the `nav-btn` QSS, never literal spaces."""
     from application.services.i18n_service import get_i18n
 
     window = MainWindow()

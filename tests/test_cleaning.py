@@ -18,17 +18,17 @@ def test_clean_srt_spam_removal(service):
     items = service.parse_subtitles(content, "srt")
     cleaned, total_lines, deleted_lines = service.clean_subtitles(items)
 
-    # El bloque 1 era completamente spam (Subtitled by AnimeFansubPro + t.me link) -> eliminado
+    # Cue 1 was pure spam (Subtitled by AnimeFansubPro + t.me link) -> removed
     assert not any("AnimeFansubPro" in it.text for it in cleaned)
     assert not any("t.me" in it.text for it in cleaned)
-    # Bloque 3 era solo música ♪ -> eliminado
+    # Cue 3 was music-only ♪ -> removed
     assert not any("♪" in it.text for it in cleaned)
-    # Bloque 4 tenía spam de www.subtitlesfree.org pero diálogo válido
+    # Cue 4 carried www.subtitlesfree.org spam alongside valid dialogue
     item_scene = [it for it in cleaned if "fingerprints on the window" in it.text]
     assert len(item_scene) == 1
     assert "subtitlesfree.org" not in item_scene[0].text
 
-    # Verifica que se conservan las etiquetas de estilo
+    # Style tags are preserved
     assert any("<i>Good morning" in it.text for it in cleaned)
     assert any("<b>We need to hurry</b>" in it.text for it in cleaned)
 
@@ -46,7 +46,7 @@ def test_clean_vtt_spam_removal(service):
 
     assert not any("YTS.MX" in it.text for it in cleaned)
     assert not any("t.me/tech_news" in it.text for it in cleaned)
-    # Mantiene diálogo real
+    # Real dialogue is kept
     assert any("Welcome to the conference" in it.text for it in cleaned)
     assert any("machine learning is here" in it.text for it in cleaned)
     assert deleted_lines >= 2
@@ -60,7 +60,7 @@ def test_clean_ass_spam_removal(service):
     items = service.parse_subtitles(content, "ass")
     cleaned, total_lines, deleted_lines = service.clean_subtitles(items)
 
-    # Bloque 1 era spam de FansubZone
+    # Cue 1 was FansubZone spam
     assert not any("FansubZone" in it.text for it in cleaned)
     assert any("mountains in the distance" in it.text for it in cleaned)
     assert any(r"{\an8}" in it.text for it in cleaned)

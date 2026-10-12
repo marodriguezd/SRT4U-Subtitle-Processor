@@ -1,6 +1,6 @@
 """
-Cubre los fallos que antes se silenciaban: registro en el archivo de log,
-detección de configuración ilegible/ no escribible y aviso al usuario en la UI.
+Covers previously silenced failures: file logging, unreadable/unwritable
+config detection and user-facing UI notices.
 """
 
 import json
@@ -31,7 +31,7 @@ from application.ui.message_boxes import ThemedMessageBox
 
 @pytest.fixture(autouse=True)
 def _clean_logging():
-    """Deja el logger de la app sin handlers al terminar cada test de este módulo."""
+    """Leave the app logger without handlers after each test in this module."""
     yield
     uninstall_qt_message_handler()
     logger = logging.getLogger("srt4u")
@@ -53,7 +53,7 @@ def test_setup_logging_writes_to_file(tmp_path):
 
 
 def test_setup_logging_survives_unwritable_directory(tmp_path):
-    """No poder crear el log no debe impedir que la app arranque."""
+    """Failing to create the log must not prevent the app from starting."""
     missing = tmp_path / "no" / "existe"
     log_path = setup_logging(config_dir=str(missing), console=False, force=True)
 
@@ -64,7 +64,7 @@ def test_setup_logging_survives_unwritable_directory(tmp_path):
 
 def test_config_service_reports_save_failure(tmp_path, caplog):
     service = ConfigService()
-    service.config_file = str(tmp_path)  # un directorio no se puede abrir como archivo
+    service.config_file = str(tmp_path)  # a directory cannot be opened as a file
 
     caplog.set_level(logging.WARNING, logger="srt4u")
     assert service.set("target_lang", "de") is False
@@ -102,7 +102,7 @@ def _read_log(tmp_path) -> str:
 
 
 def test_qt_warnings_are_routed_to_the_log(tmp_path):
-    """Los avisos de Qt (multimedia, plugins…) deben acabar en el mismo log que la app."""
+    """Qt warnings (multimedia, plugins...) must land in the same log as the app."""
     setup_logging(config_dir=str(tmp_path), console=False, force=True)
     install_qt_message_handler()
 
@@ -112,7 +112,7 @@ def test_qt_warnings_are_routed_to_the_log(tmp_path):
     content = _read_log(tmp_path)
     assert "QMediaPlayer: codec unavailable" in content
     assert "QLibraryPrivate: symbol missing" in content
-    # El nivel se conserva: warning no debe rebajarse a debug ni a error
+    # Severity is preserved: warnings must not be demoted to debug nor raised to error
     warning_line = next(line for line in content.splitlines() if "QMediaPlayer" in line)
     critical_line = next(
         line for line in content.splitlines() if "QLibraryPrivate" in line
@@ -124,20 +124,20 @@ def test_qt_warnings_are_routed_to_the_log(tmp_path):
 def test_qt_message_handler_is_idempotent_and_removable(tmp_path):
     setup_logging(config_dir=str(tmp_path), console=False, force=True)
     install_qt_message_handler()
-    install_qt_message_handler()  # segunda llamada: no debe duplicar el registro
+    install_qt_message_handler()  # second call: must not duplicate the handler
 
     qWarning("un solo registro")
 
     assert _read_log(tmp_path).count("un solo registro") == 1
 
     uninstall_qt_message_handler()
-    uninstall_qt_message_handler()  # no debe fallar si ya se restauró el manejador
+    uninstall_qt_message_handler()  # must not fail when the handler was already restored
     qWarning("mensaje con el manejador por defecto")
     assert "mensaje con el manejador por defecto" not in _read_log(tmp_path)
 
 
 def test_qt_handler_without_logging_configured_does_not_raise():
-    """Sin log configurado, el manejador sigue siendo seguro (no lanza)."""
+    """Without a configured log, the handler stays safe (never raises)."""
     logging.getLogger("srt4u").handlers.clear()
     install_qt_message_handler()
     qWarning("aviso sin destino")
@@ -171,7 +171,7 @@ def test_translation_failures_are_counted_and_logged(tmp_path, monkeypatch, capl
     assert service.last_translation_failures == 2
     assert "no pudo traducir el cue" in caplog.text
 
-    # El contador también llega a las estadísticas del procesamiento completo
+    # The counter also reaches the full-processing statistics
     srt_path = _write_sample_srt(tmp_path / "sample.srt")
     result = service.process_subtitles(
         file_path=srt_path,
@@ -239,7 +239,7 @@ def test_settings_save_failure_warns_user(qapp, tmp_path, monkeypatch):
         staticmethod(lambda *args, **kwargs: recorded.append(args)),
     )
     window = MainWindow()
-    window.config_service.config_file = str(tmp_path)  # escritura imposible
+    window.config_service.config_file = str(tmp_path)  # unwritable location
 
     window._save_settings()
 
@@ -248,7 +248,7 @@ def test_settings_save_failure_warns_user(qapp, tmp_path, monkeypatch):
 
 
 def test_message_box_standard_buttons_are_available(qapp):
-    """Comprobación de humo del envoltorio tematizado tras añadir el aviso de errores."""
+    """Smoke test of the themed wrapper after adding the error notice."""
     box = ThemedMessageBox.build(
         QMessageBox.Icon.Critical,
         None,

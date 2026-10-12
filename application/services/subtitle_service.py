@@ -1072,7 +1072,7 @@ class SubtitleService:
     ) -> ProcessingResult:
         start_time = time.time()
 
-        # Paso 1: Lectura
+        # Step 1: Reading
         if progress_callback:
             progress_callback("step_reading", True)
 
@@ -1082,7 +1082,7 @@ class SubtitleService:
         source_format = self.detect_format(content, file_path)
         out_format = target_format or source_format
 
-        # Paso 2: Análisis
+        # Step 2: Analysis
         if progress_callback:
             progress_callback("step_analyzing", True)
 
@@ -1098,7 +1098,7 @@ class SubtitleService:
         total_original_lines = sum(len(it.text.split("\n")) for it in original_items)
         deleted_lines_count = 0
 
-        # Paso 3: Limpieza
+        # Step 3: Cleaning
         if do_clean:
             if progress_callback:
                 progress_callback("step_cleaning", True)
@@ -1106,7 +1106,7 @@ class SubtitleService:
                 self.clean_subtitles(current_items)
             )
 
-        # Paso 4: Traducción
+        # Step 4: Translation
         translation_failures = 0
         if do_translate and target_language:
             if progress_callback:
@@ -1122,13 +1122,13 @@ class SubtitleService:
             )
             translation_failures = self.last_translation_failures
 
-        # Paso 5: Aplicar formato original
+        # Step 5: Apply original formatting
         if progress_callback:
             progress_callback("step_formatting", True)
 
         output_content = self.format_output(current_items, out_format)
 
-        # Paso 6: Guardado
+        # Step 6: Saving
         if progress_callback:
             progress_callback("step_saving", True)
 

@@ -20,14 +20,14 @@ ABOUT_PAGE = 7
 
 
 def _clipped_texts(root):
-    """Devuelve los textos visibles que no caben en el ancho de su widget."""
+    """Return the visible texts that overflow their widget width."""
     clipped = []
     widgets = list(root.findChildren(QLabel)) + list(root.findChildren(QAbstractButton))
     for widget in widgets:
         text = widget.text()
         if not text or not widget.isVisible():
             continue
-        # Las etiquetas con ajuste de línea nunca se consideran recortadas
+        # Word-wrapped labels are never treated as clipped
         if isinstance(widget, QLabel) and widget.wordWrap():
             continue
         if widget.fontMetrics().horizontalAdvance(text) > widget.width() + TOLERANCE_PX:
@@ -45,7 +45,7 @@ def main_window(qapp):
 
 @pytest.fixture
 def scaled_app_font(qapp):
-    """Aplica una fuente de aplicación ×1.5 y la restaura al terminar."""
+    """Apply a x1.5 application font and restore it afterwards."""
     base = qapp.font()
     scaled = QFont(base)
     if base.pointSizeF() > 0:
@@ -71,7 +71,7 @@ def test_main_window_has_no_clipped_text(main_window, lang, dark):
     for page in range(main_window.stack.count()):
         main_window._switch_page(page)
         main_window.resize(main_window.minimumSizeHint())
-        main_window.grab()  # fuerza el cálculo final del layout
+        main_window.grab()  # force the final layout pass
         clipped = _clipped_texts(main_window)
         assert not clipped, (
             f"Texto recortado en {lang} (dark={dark}), página {page}: {clipped[:5]}"
@@ -83,9 +83,9 @@ def test_main_window_has_no_clipped_text(main_window, lang, dark):
 def test_settings_and_about_no_clipped_text_at_scaled_font(
     qapp, scaled_app_font, lang, dark
 ):
-    """Ajustes y Acerca de no recortan texto con la fuente de sistema ampliada."""
+    """Settings and About never clip text with the enlarged system font."""
     get_i18n().set_language(lang, save_to_config=False)
-    window = MainWindow()  # se crea tras aplicar la fuente para heredarla
+    window = MainWindow()  # created after applying the font so it inherits it
     window.show()
     qapp.processEvents()
     try:
@@ -96,7 +96,7 @@ def test_settings_and_about_no_clipped_text_at_scaled_font(
         for page in (SETTINGS_PAGE, ABOUT_PAGE):
             window._switch_page(page)
             window.resize(window.minimumSizeHint())
-            window.grab()  # fuerza el cálculo final del layout
+            window.grab()  # force the final layout pass
             clipped = _clipped_texts(window)
             assert not clipped, (
                 f"Texto recortado con fuente ×{FONT_SCALE} en {lang} (dark={dark}), "
@@ -125,7 +125,7 @@ def test_burn_in_dialog_fits_its_content(qapp, lang):
 
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_burn_in_dialog_fits_its_content_at_scaled_font(qapp, scaled_app_font, lang):
-    """El diálogo de burn-in crece con la fuente ampliada y no recorta texto."""
+    """The burn-in dialog grows with the enlarged font without clipping text."""
     get_i18n().set_language(lang, save_to_config=False)
     items = [SubtitleItem(index=1, start_ms=0, end_ms=1000, text="Hello world")]
 
@@ -150,7 +150,7 @@ def test_burn_in_dialog_fits_its_content_at_scaled_font(qapp, scaled_app_font, l
 
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_progress_modal_fits_its_content_at_scaled_font(qapp, scaled_app_font, lang):
-    """El modal de progreso no recorta texto con la fuente ampliada."""
+    """The progress modal never clips text with the enlarged font."""
     get_i18n().set_language(lang, save_to_config=False)
 
     modal = ProgressModal()
@@ -170,9 +170,9 @@ def test_progress_modal_fits_its_content_at_scaled_font(qapp, scaled_app_font, l
 def test_burn_in_progress_modal_fits_its_content_at_scaled_font(
     qapp, scaled_app_font, monkeypatch, lang
 ):
-    """El modal de progreso de burn-in crece con la fuente ampliada sin recortes."""
+    """The burn-in progress modal grows with the enlarged font without clipping."""
     get_i18n().set_language(lang, save_to_config=False)
-    # No arrancar FFmpeg: solo interesa la geometría del diálogo.
+    # Do not start FFmpeg: only the dialog geometry matters.
     monkeypatch.setattr(
         BurnInProgressModal, "_start_worker", lambda self, *a, **k: None
     )
@@ -206,7 +206,7 @@ def test_burn_in_progress_modal_fits_its_content_at_scaled_font(
 
 
 def _assert_minimum_covers_hint(dialog, name: str, lang: str) -> None:
-    """Comprueba que el mínimo declarado de un diálogo cubre su contenido."""
+    """Check that a dialog's declared minimum covers its content."""
     hint = dialog.minimumSizeHint()
     assert dialog.minimumWidth() >= hint.width(), (
         f"{name}: ancho mínimo declarado {dialog.minimumWidth()} < "
@@ -221,13 +221,13 @@ def _assert_minimum_covers_hint(dialog, name: str, lang: str) -> None:
 @pytest.mark.parametrize("lang", LANGUAGES)
 def test_all_dialogs_minimum_size_covers_content(qapp, monkeypatch, lang):
     """
-    Invariante de geometría: el tamaño mínimo declarado de cada diálogo de la
-    app nunca queda por debajo de su `minimumSizeHint` (contenido mínimo real).
-    Se comprueba tras construir y también tras mostrar (el layout puede
-    recalcularse con las métricas reales de la ventana).
+    Geometry invariant: every app dialog's declared minimum size never falls
+    below its `minimumSizeHint` (real minimum content).
+    Checked after construction and after showing (the layout may
+    recompute with the window's real metrics).
     """
     get_i18n().set_language(lang, save_to_config=False)
-    # No arrancar FFmpeg: solo interesa la geometría del diálogo.
+    # Do not start FFmpeg: only the dialog geometry matters.
     monkeypatch.setattr(
         BurnInProgressModal, "_start_worker", lambda self, *a, **k: None
     )
