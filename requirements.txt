@@ -1,8 +1,8 @@
-# PyQt6: 6.6.1 es la mínima verificada (la suite completa pasa en CI con ella y con
-# el runtime PyQt6-Qt6 del mismo minor) y <6.12 evita saltos de minor no verificados.
-# requirements.txt es un mirror exacto de [project].dependencies en pyproject.toml;
-# tests/test_coherence.py falla si el stack base difiere. El job CI compat-min-pyqt6
-# lee de aquí la cota mínima y la verifica con el stack completo.
-# Si se cambia la cota inferior, el job `compat-min-pyqt6` de CI la revalida solo.
+# PyQt6: 6.6.1 is the verified minimum (the full suite passes in CI with it and
+# with the same-minor PyQt6-Qt6 runtime) and <6.12 avoids unverified minor jumps.
+# requirements.txt is an exact mirror of [project].dependencies in pyproject.toml;
+# tests/test_coherence.py fails when the base stack drifts. The CI compat-min-pyqt6
+# job reads the minimum bound from here and verifies it against the full stack.
+# When the lower bound changes, the CI `compat-min-pyqt6` job revalidates it alone.
 PyQt6>=6.6.1,<6.12
 deep-translator>=1.11.4

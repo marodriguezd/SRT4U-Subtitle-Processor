@@ -1,9 +1,9 @@
-# Configuración de lint compartida entre local y CI (job "test" de build.yml).
-# Selectores alineados con el alcance acordado en la auditoría:
-#   F  = pyflakes (imports/variables sin usar, nombres no definidos, ...)
-#   E7 = pycodestyle: sentencias (E701, E711, E712, E721, E722, E731, E741, ...)
-#   E9 = pycodestyle: errores de ejecución/parseo (E902, E999, ...)
-#   B  = flake8-bugbear (errores probables y antipatrones)
+# Lint configuration shared between local runs and CI (build.yml "test" job).
+# Selectors aligned with the audit-agreed scope:
+#   F  = pyflakes (unused imports/variables, undefined names, ...)
+#   E7 = pycodestyle: statements (E701, E711, E712, E721, E722, E731, E741, ...)
+#   E9 = pycodestyle: runtime/parse errors (E902, E999, ...)
+#   B  = flake8-bugbear (likely bugs and antipatterns)
 target-version = "py311"
 
 [lint]
