@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/icon.png" alt="logotipo de SRT4U" height="96" />
+</div>
+
 # SRT4U - Subtitle Processor
 
 [![Licencia: GPL-3.0-only](https://img.shields.io/badge/Licencia-GPL--3.0--only-blue.svg)](LICENSE)
@@ -5,7 +9,7 @@
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Plataformas](https://img.shields.io/badge/Plataformas-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
-[**English**](README.md) | [**Español**](README_es.md)
+[**English**](README.md) | **Español** | [**Deutsch**](README_de.md) | [**Français**](README_fr.md) | [**Italiano**](README_it.md) | [**中文**](README_zh.md)
 
 Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de subtítulos (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) con reproductor de vídeo sincronizado en tiempo real e incrustación directa en vídeo (Burn-In / Hardsub).
 
@@ -86,15 +90,16 @@ pip install ".[transcription]"  # Whisper local: srt4u transcribe / pipeline
 pip install ".[dev]"            # pytest + ruff para contribuir
 ```
 
-La instalación base (`pip install .`) incluye la GUI y la CLI (PyQt6 +
-`deep-translator`), además de analytics, QA, traducción, historial y pipeline
-para archivos de subtítulos. `requirements.txt` refleja esas dependencias base
-para los checkouts y CI. Los extras `[api]`, `[transcription]` y `[dev]`
-añaden FastAPI, `faster-whisper` y herramientas de desarrollo. Los modelos
-Whisper no se empaquetan: se descargan al primer uso con aviso previo
-(`SRT4U_WHISPER_MODEL_DIR` permite reubicar la caché). Burn-in necesita FFmpeg;
-las compilaciones de CI incluyen un ejecutable, mientras que una instalación
-desde código fuente requiere FFmpeg disponible en `PATH` o en el paquete.
+> [!NOTE]
+> La instalación base (`pip install .`) incluye la GUI y la CLI (PyQt6 +
+> `deep-translator`), además de analytics, QA, traducción, historial y pipeline
+> para archivos de subtítulos. `requirements.txt` refleja esas dependencias base
+> para los checkouts y CI. Los extras `[api]`, `[transcription]` y `[dev]`
+> añaden FastAPI, `faster-whisper` y herramientas de desarrollo. Los modelos
+> Whisper no se empaquetan: se descargan al primer uso con aviso previo
+> (`SRT4U_WHISPER_MODEL_DIR` permite reubicar la caché). Burn-in necesita FFmpeg;
+> las compilaciones de CI incluyen un ejecutable, mientras que una instalación
+> desde código fuente requiere FFmpeg disponible en `PATH` o en el paquete.
 
 ### Quickstart en 60 segundos
 
@@ -197,11 +202,3 @@ Los mensajes propios de Qt también se enrutan ahí (`qWarning`/`qCritical`/`qFa
 | Web Video Text Tracks | `.vtt` | Sí | Sí | Sí (parámetros de cue y tags) |
 | Advanced SubStation Alpha | `.ass` / `.ssa` | Sí | Sí | Sí (estilos y posiciones) |
 | Texto plano (diálogo) | `.txt` | Sí | Sí | Solo líneas |
-
----
-
-## Licencia
- 
-License: GNU General Public License v3.0 only (GPL-3.0-only)
- 
-Consulta el archivo [LICENSE](LICENSE) para ver el texto completo de la licencia.

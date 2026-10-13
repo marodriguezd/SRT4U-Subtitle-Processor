@@ -60,7 +60,7 @@ def test_changing_the_combo_refreshes_the_effective_language(qapp):
 
 def test_i18n_service_translations():
     service = I18nService()
-    languages = ["en", "es", "pt", "de", "it", "zh-CN"]
+    languages = ["en", "es", "pt", "de", "it", "fr", "zh-CN"]
     for lang in languages:
         assert lang in service.supported_languages
 
@@ -84,6 +84,10 @@ def test_i18n_service_translations():
     service.set_language("it")
     assert service.t("nav.home") == "Home"
     assert service.t("nav.about") == "Informazioni"
+
+    service.set_language("fr")
+    assert service.t("nav.home") == "Accueil"
+    assert service.t("nav.about") == "À propos"
 
     service.set_language("zh-CN")
     assert service.t("nav.home") == "首页"
@@ -142,3 +146,36 @@ def test_main_window_i18n_switching(qapp):
     assert not win.nav_buttons[0].icon().isNull()
     assert win.btn_fast_clean.text().strip() == "立即清理文件"
     assert not win.btn_fast_clean.icon().isNull()
+
+
+def test_i18n_full_key_parity_no_blanks():
+    """Iron gate: every language exposes exactly the English key set, no blanks."""
+    import re
+    service = I18nService()
+    base_keys = set(service.TRANSLATIONS["en"].keys())
+    assert len(base_keys) > 300, "base inventory must stay complete"
+    for lang, table in service.TRANSLATIONS.items():
+        cur = set(table.keys())
+        assert cur == base_keys, f"{lang}: missing={sorted(base_keys - cur)[:5]} extra={sorted(cur - base_keys)[:5]}"
+        for key, value in table.items():
+            assert str(value).strip(), f"{lang}:{key} is blank"
+            assert str(value) != key, f"{lang}:{key} echoes the key"
+
+
+def test_i18n_placeholder_sets_match_across_locales():
+    """Placeholders like {name}/{total}/{size:.1f} must survive in every locale."""
+    import re
+    service = I18nService()
+    pat = re.compile(r"\{[^}]+\}")
+    base = service.TRANSLATIONS["en"]
+    for key, en_value in base.items():
+        base_ph = set(pat.findall(str(en_value)))
+        if not base_ph:
+            continue
+        for lang, table in service.TRANSLATIONS.items():
+            if lang == "en":
+                continue
+            cur_ph = set(pat.findall(str(table[key])))
+            # Names may be localized but the placeholder *count* must match;
+            # strict name equality catches dropped {total}/{visible} pairs.
+            assert cur_ph == base_ph, f"{lang}:{key} placeholders {sorted(cur_ph)} != {sorted(base_ph)}"

@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/icon.png" alt="SRT4U logo" height="96" />
+</div>
+
 # SRT4U - Subtitle Processor
 
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPL--3.0--only-blue.svg)](LICENSE)
@@ -5,7 +9,7 @@
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52.svg?logo=qt&logoColor=white)](https://pypi.org/project/PyQt6/)
 [![Platforms](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
-[**English**](README.md) | [**Español**](README_es.md)
+**English** | [**Español**](README_es.md) | [**Deutsch**](README_de.md) | [**Français**](README_fr.md) | [**Italiano**](README_it.md) | [**中文**](README_zh.md)
 
 Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) with a real-time synchronized video player and direct video burn-in export.
 
@@ -90,11 +94,13 @@ The base install (`pip install .`) includes the GUI and CLI stack (PyQt6 +
 `deep-translator`) as well as analytics, QA, translation, history, and the
 pipeline for subtitle inputs. `requirements.txt` mirrors these base
 requirements for source checkouts and CI. The `[api]`, `[transcription]`, and
-`[dev]` extras add FastAPI, `faster-whisper`, and development tools. Whisper
-models are not bundled; they download on first use with prior notice
-(`SRT4U_WHISPER_MODEL_DIR` relocates the cache). Burn-in requires FFmpeg; CI
-builds bundle an FFmpeg executable, while source installs need a usable FFmpeg
-on `PATH` or in the application bundle.
+`[dev]` extras add FastAPI, `faster-whisper`, and development tools.
+
+> [!NOTE]
+> Whisper models are not bundled; they download on first use with prior notice
+> (`SRT4U_WHISPER_MODEL_DIR` relocates the cache). Burn-in requires FFmpeg; CI
+> builds bundle an FFmpeg executable, while source installs need a usable FFmpeg
+> on `PATH` or in the application bundle.
 
 ### 60-second quickstart
 
@@ -196,11 +202,3 @@ It records configuration read/write failures, per-block translation engine error
 | Web Video Text Tracks | `.vtt` | Yes | Yes | Yes (cue settings & tags) |
 | Advanced SubStation Alpha | `.ass` / `.ssa` | Yes | Yes | Yes (styles & positions) |
 | Plain Text Dialogue | `.txt` | Yes | Yes | Lines only |
-
----
-
-## License
-
-License: GNU General Public License v3.0 only (GPL-3.0-only)
-
-See [LICENSE](LICENSE) for the full license text.
