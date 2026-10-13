@@ -54,7 +54,9 @@ def list_benchmarks() -> BenchmarkListResponse:
     try:
         return BenchmarkListResponse(items=_summaries())
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="history store unavailable") from exc
+        raise HTTPException(
+            status_code=500, detail="history store unavailable"
+        ) from exc
 
 
 @router.get(
@@ -73,7 +75,9 @@ def get_benchmark(benchmark_id: str) -> BenchmarkDetailResponse:
                 if (row.get("benchmark_id") or "unknown") == benchmark_id
             ]
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="history store unavailable") from exc
+        raise HTTPException(
+            status_code=500, detail="history store unavailable"
+        ) from exc
     if not rows:
         raise HTTPException(status_code=404, detail="benchmark not found")
     return BenchmarkDetailResponse(

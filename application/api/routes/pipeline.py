@@ -59,9 +59,7 @@ async def pipeline(
     file: UploadFile = File(  # noqa: B008
         description="Input audio, video, or subtitle file"
     ),
-    transcribe: Annotated[
-        bool, Form(description="Transcribe media input")
-    ] = True,  # noqa: B008
+    transcribe: Annotated[bool, Form(description="Transcribe media input")] = True,  # noqa: B008
     model: Annotated[str, Form(description="Whisper model")] = "small",  # noqa: B008
     language: Annotated[str, Form(description="Language code or auto")] = "auto",  # noqa: B008
     device: Annotated[str, Form(description="auto, cpu, or cuda")] = "auto",  # noqa: B008

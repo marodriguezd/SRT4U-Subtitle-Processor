@@ -74,9 +74,7 @@ def install_qt_message_handler() -> None:
             prefix = f"[{category}] " if category and category != "default" else ""
             logger.log(levels.get(msg_type, logging.INFO), "%s%s", prefix, message)
         except Exception as exc:
-            logger.debug(
-                "Failed to log Qt message (%s)", type(exc).__name__
-            )
+            logger.debug("Failed to log Qt message (%s)", type(exc).__name__)
         finally:
             _qt_handler_state.busy = False
 

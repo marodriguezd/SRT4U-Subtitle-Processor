@@ -33,9 +33,7 @@ async def analyze(
         try:
             analytics, qa_report = service.analyze_file(str(tmp_path))
         except FileNotFoundError as exc:
-            raise HTTPException(
-                status_code=400, detail="file not found"
-            ) from exc
+            raise HTTPException(status_code=400, detail="file not found") from exc
         except (OSError, UnicodeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=safe_detail(exc)) from exc
         return AnalyzeResponse(

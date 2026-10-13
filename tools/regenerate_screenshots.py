@@ -41,9 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Regenerate SRT4U UI verification screenshots."
     )
-    parser.add_argument(
-        "--out", default="/tmp/srt4u-shots", help="Output directory"
-    )
+    parser.add_argument("--out", default="/tmp/srt4u-shots", help="Output directory")
     parser.add_argument(
         "--langs",
         default=",".join(DIALOG_LANGS),

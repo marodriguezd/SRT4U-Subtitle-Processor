@@ -41,17 +41,13 @@ def _build_parser() -> argparse.ArgumentParser:
     process = subparsers.add_parser(
         "process", help="clean, translate, or convert one or more subtitle files"
     )
-    process.add_argument(
-        "input", nargs="+", help="input file(s) or directory"
-    )
+    process.add_argument("input", nargs="+", help="input file(s) or directory")
     process.add_argument(
         "-o",
         "--output",
         help="output file or directory for batch processing",
     )
-    process.add_argument(
-        "--config", help="declarative pipeline preset in JSON format"
-    )
+    process.add_argument("--config", help="declarative pipeline preset in JSON format")
     process.add_argument(
         "--clean",
         action=argparse.BooleanOptionalAction,
@@ -129,9 +125,7 @@ def _build_parser() -> argparse.ArgumentParser:
                 help="exit with code 1 on errors or warnings",
             )
         analysis.add_argument("-o", "--output", help="save report to a file")
-        analysis.add_argument(
-            "--format", choices=("json", "csv"), help="export format"
-        )
+        analysis.add_argument("--format", choices=("json", "csv"), help="export format")
 
     benchmark = subparsers.add_parser(
         "benchmark", help="benchmark providers on a fixed subtitle dataset"
@@ -187,9 +181,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="path to history database (default: user history database)",
     )
 
-    history = subparsers.add_parser(
-        "history", help="inspect local execution history"
-    )
+    history = subparsers.add_parser("history", help="inspect local execution history")
     history.add_argument("--provider", default=None, help="filter by provider")
     history.add_argument(
         "--operation",
@@ -200,9 +192,7 @@ def _build_parser() -> argparse.ArgumentParser:
     history.add_argument(
         "--limit", type=int, default=20, help="maximum number of rows (default: 20)"
     )
-    history.add_argument(
-        "--errors-only", action="store_true", help="only failed runs"
-    )
+    history.add_argument("--errors-only", action="store_true", help="only failed runs")
     history.add_argument(
         "--fallback-only", action="store_true", help="only runs with fallback"
     )
@@ -210,7 +200,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="emit valid JSON to stdout"
     )
     history.add_argument(
-        "--stats", action="store_true", help="show aggregates instead of individual rows"
+        "--stats",
+        action="store_true",
+        help="show aggregates instead of individual rows",
     )
     history.add_argument(
         "--db",
@@ -356,7 +348,9 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="burn final subtitles into video (requires --video-output)",
     )
-    pipeline.add_argument("--video-output", help="output video path with burned-in subtitles")
+    pipeline.add_argument(
+        "--video-output", help="output video path with burned-in subtitles"
+    )
     pipeline.add_argument(
         "--db",
         default=None,
@@ -373,7 +367,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="emit structured result as JSON",
     )
 
-    serve = subparsers.add_parser("serve", help="launch local REST API server (FastAPI)")
+    serve = subparsers.add_parser(
+        "serve", help="launch local REST API server (FastAPI)"
+    )
     serve.add_argument(
         "--host",
         default="127.0.0.1",

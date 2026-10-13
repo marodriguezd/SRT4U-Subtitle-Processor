@@ -150,13 +150,14 @@ def test_main_window_i18n_switching(qapp):
 
 def test_i18n_full_key_parity_no_blanks():
     """Iron gate: every language exposes exactly the English key set, no blanks."""
-    import re
     service = I18nService()
     base_keys = set(service.TRANSLATIONS["en"].keys())
     assert len(base_keys) > 300, "base inventory must stay complete"
     for lang, table in service.TRANSLATIONS.items():
         cur = set(table.keys())
-        assert cur == base_keys, f"{lang}: missing={sorted(base_keys - cur)[:5]} extra={sorted(cur - base_keys)[:5]}"
+        assert cur == base_keys, (
+            f"{lang}: missing={sorted(base_keys - cur)[:5]} extra={sorted(cur - base_keys)[:5]}"
+        )
         for key, value in table.items():
             assert str(value).strip(), f"{lang}:{key} is blank"
             assert str(value) != key, f"{lang}:{key} echoes the key"
@@ -165,6 +166,7 @@ def test_i18n_full_key_parity_no_blanks():
 def test_i18n_placeholder_sets_match_across_locales():
     """Placeholders like {name}/{total}/{size:.1f} must survive in every locale."""
     import re
+
     service = I18nService()
     pat = re.compile(r"\{[^}]+\}")
     base = service.TRANSLATIONS["en"]
@@ -178,4 +180,6 @@ def test_i18n_placeholder_sets_match_across_locales():
             cur_ph = set(pat.findall(str(table[key])))
             # Names may be localized but the placeholder *count* must match;
             # strict name equality catches dropped {total}/{visible} pairs.
-            assert cur_ph == base_ph, f"{lang}:{key} placeholders {sorted(cur_ph)} != {sorted(base_ph)}"
+            assert cur_ph == base_ph, (
+                f"{lang}:{key} placeholders {sorted(cur_ph)} != {sorted(base_ph)}"
+            )

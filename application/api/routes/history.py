@@ -50,7 +50,9 @@ def list_history(
                 only_fallbacks=fallback_only,
             )
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="history store unavailable") from exc
+        raise HTTPException(
+            status_code=500, detail="history store unavailable"
+        ) from exc
     items: List[HistoryItemModel] = []
     for row in rows:
         providers_used = row.get("providers_used")
@@ -79,7 +81,9 @@ def get_history(run_id: int) -> HistoryItemModel:
         with open_history() as store:
             row = store.get_run(run_id)
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="history store unavailable") from exc
+        raise HTTPException(
+            status_code=500, detail="history store unavailable"
+        ) from exc
     if row is None:
         raise HTTPException(status_code=404, detail="run not found")
     providers_used = row.get("providers_used")

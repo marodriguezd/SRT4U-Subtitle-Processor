@@ -69,7 +69,7 @@ def test_config_service_reports_save_failure(tmp_path, caplog):
     caplog.set_level(logging.WARNING, logger="srt4u")
     assert service.set("target_lang", "de") is False
     assert service.save_error
-    assert "No se pudo guardar la configuración" in caplog.text
+    assert "Could not save configuration" in caplog.text
 
 
 def test_config_service_reports_load_error(tmp_path, caplog):
@@ -82,7 +82,7 @@ def test_config_service_reports_load_error(tmp_path, caplog):
 
     assert service.load_error
     assert service.get("target_lang") == ConfigService.DEFAULT_CONFIG["target_lang"]
-    assert "No se pudo leer la configuración" in caplog.text
+    assert "Could not load configuration" in caplog.text
 
 
 def test_config_service_saves_valid_json(tmp_path):

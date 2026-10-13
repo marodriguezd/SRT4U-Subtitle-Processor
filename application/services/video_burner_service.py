@@ -43,9 +43,7 @@ class BurnInOptions:
     font_color: str = "white"  # "white", "yellow", "cyan"
     box_style: str = "semi"  # "none", "semi", "solid"
     quality_preset: str = "high"  # "high", "fast"
-    fix_overlaps: bool = (
-        True  # Automatically adjusts timing to prevent visual overlaps
-    )
+    fix_overlaps: bool = True  # Automatically adjusts timing to prevent visual overlaps
 
 
 class VideoBurnerService:

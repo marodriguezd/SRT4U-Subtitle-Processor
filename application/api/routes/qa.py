@@ -36,9 +36,7 @@ async def qa(
         try:
             qa_report = service.qa_file(str(tmp_path))
         except FileNotFoundError as exc:
-            raise HTTPException(
-                status_code=400, detail="file not found"
-            ) from exc
+            raise HTTPException(status_code=400, detail="file not found") from exc
         except (OSError, UnicodeError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=safe_detail(exc)) from exc
         payload = qa_report.to_dict()

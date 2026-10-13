@@ -55,6 +55,6 @@ def test_screenshot_tool_runs_and_produces_shots(tmp_path):
     empty = [name for name in shots if (tmp_path / name).stat().st_size == 0]
     assert not empty, f"Capturas vacías: {empty}"
 
-    assert "Capturas guardadas" in result.stdout, (
+    assert "Screenshots saved to" in result.stdout, (
         f"La utilidad no reportó el resumen final.\nstdout:\n{result.stdout}"
     )

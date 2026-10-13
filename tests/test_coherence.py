@@ -24,7 +24,7 @@ def _i18n_catalogs():
 
 def test_i18n_key_parity_and_no_empty_values():
     catalogs = _i18n_catalogs()
-    assert set(catalogs) == {"en", "es", "pt", "de", "it", "zh-CN"}
+    assert set(catalogs) == {"en", "es", "pt", "de", "it", "fr", "zh-CN"}
     reference = set(catalogs["en"])
     assert len(reference) > 200
     for lang, catalog in catalogs.items():
@@ -119,6 +119,7 @@ def test_author_location_is_sevilla_everywhere():
             "Sevilla" in location
             or "Sevilha" in location
             or "Siviglia" in location
+            or "Séville" in location
             or "塞维利亚" in location
         ), lang
 
