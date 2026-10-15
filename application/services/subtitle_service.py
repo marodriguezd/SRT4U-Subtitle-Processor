@@ -499,7 +499,7 @@ class SubtitleService:
                 if not text.strip():
                     self._add_issue(
                         "empty_cue",
-                        "la cue no contiene texto",
+                        "cue has no text",
                         timing_line + 1,
                         time_line_full,
                     )
