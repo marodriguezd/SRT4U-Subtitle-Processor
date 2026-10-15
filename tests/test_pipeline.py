@@ -447,7 +447,7 @@ def test_burn_in_uses_runner(fakes, media_file, tmp_path):
 def test_pipeline_rejects_output_paths_that_overwrite_inputs(
     tmp_path, media_file, srt_file
 ):
-    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+    with pytest.raises(PipelineConfigError, match="overwrite"):
         PipelineConfig(
             input_media=media_file, burn_in_enabled=True, output_video=media_file
         ).validate()
@@ -456,19 +456,19 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(
         os.link(media_file, hardlink)
     except OSError as exc:
         pytest.skip(f"hard links are unavailable: {exc}")
-    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+    with pytest.raises(PipelineConfigError, match="overwrite"):
         PipelineConfig(input_media=media_file, output_subtitle=str(hardlink)).validate()
     # output_video without burn-in is rejected early, with its own message.
-    with pytest.raises(PipelineConfigError, match="requiere activar el burn-in"):
+    with pytest.raises(PipelineConfigError, match="requires burn-in to be enabled"):
         PipelineConfig(input_media=media_file, output_video=media_file).validate()
-    with pytest.raises(PipelineConfigError, match="distintas"):
+    with pytest.raises(PipelineConfigError, match="must be different"):
         PipelineConfig(
             input_media=media_file,
             output_subtitle=str(tmp_path / "same.mp4"),
             output_video=str(tmp_path / "same.mp4"),
             burn_in_enabled=True,
         ).validate()
-    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+    with pytest.raises(PipelineConfigError, match="overwrite"):
         PipelineConfig(input_media=srt_file, output_subtitle=srt_file).validate()
 
     symlink = tmp_path / "alias.srt"
@@ -477,7 +477,7 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(
     except OSError as exc:
         pytest.skip(f"symlinks are unavailable: {exc}")
 
-    with pytest.raises(PipelineConfigError, match="sobrescribir"):
+    with pytest.raises(PipelineConfigError, match="overwrite"):
         PipelineConfig(input_media=srt_file, output_subtitle=str(symlink)).validate()
 
     # The default output (`in_pipeline.srt`) does not collide with the input:

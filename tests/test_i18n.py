@@ -64,7 +64,6 @@ def test_i18n_service_translations():
     for lang in languages:
         assert lang in service.supported_languages
 
-    # Check key translations across languages
     service.set_language("en")
     assert service.t("nav.home") == "Home"
     assert service.t("nav.about") == "About"

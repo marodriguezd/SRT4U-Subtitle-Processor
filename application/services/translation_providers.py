@@ -56,7 +56,7 @@ class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
             raise urllib.error.HTTPError(
                 req.full_url,
                 code,
-                "redirección entre orígenes rechazada",
+                "cross-origin redirect rejected",
                 headers,
                 fp,
             )
@@ -204,15 +204,13 @@ class ProviderRegistry:
     @classmethod
     def register(cls, name: str, factory, *, aliases=(), replace: bool = False) -> None:
         if not callable(factory):
-            raise TypeError("la factory de provider debe ser invocable")
+            raise TypeError("provider factory must be callable")
         names = (name, *aliases)
         normalized = tuple(cls._normalize(value) for value in names)
         if any(not value for value in normalized):
-            raise ProviderConfigurationError(
-                "los nombres y alias no pueden estar vacíos"
-            )
+            raise ProviderConfigurationError("names and aliases cannot be empty")
         if any(value in cls._factories for value in normalized) and not replace:
-            raise ValueError(f"provider ya registrado: {name}")
+            raise ValueError(f"provider already registered: {name}")
         for value in normalized:
             cls._factories[value] = factory
 
@@ -222,11 +220,11 @@ class ProviderRegistry:
         try:
             factory = cls._factories[normalized]
         except KeyError as exc:
-            raise ProviderConfigurationError(f"provider no soportado: {name}") from exc
+            raise ProviderConfigurationError(f"unsupported provider: {name}") from exc
         provider = factory(config_service=config_service)
         if not isinstance(provider, TranslationProvider):
             raise ProviderConfigurationError(
-                f"la factory '{name}' no devolvió un TranslationProvider válido"
+                f"factory '{name}' did not return a valid TranslationProvider"
             )
         return provider
 
@@ -245,7 +243,7 @@ class ProviderRegistry:
     @staticmethod
     def _normalize(name: str) -> str:
         if not isinstance(name, str) or not name.strip():
-            raise ProviderConfigurationError("el nombre del provider es obligatorio")
+            raise ProviderConfigurationError("the provider name is required")
         return name.strip().casefold()
 
 
@@ -267,13 +265,13 @@ class GoogleProvider(TranslationProvider):
                     source=src, target=target_language
                 ).translate(text)
                 if not isinstance(translated, str) or not translated.strip():
-                    raise ProviderResponseError("Google devolvió una traducción vacía")
+                    raise ProviderResponseError("Google returned an empty translation")
                 return translated
             except ProviderResponseError:
                 raise
             except Exception as exc:
                 logger.debug(
-                    "deep-translator falló (se intenta el fallback con urllib): %s",
+                    "deep-translator failed (retrying with the urllib fallback): %s",
                     type(exc).__name__,
                 )
 
@@ -288,12 +286,12 @@ class GoogleProvider(TranslationProvider):
             with _open(request, 10) as response:
                 data = json.loads(response.read().decode("utf-8"))
             if not data or not isinstance(data[0], list):
-                raise ProviderResponseError("Google devolvió una respuesta inesperada")
+                raise ProviderResponseError("Google returned an unexpected response")
             translated = "".join(
                 segment[0] for segment in data[0] if segment and segment[0]
             )
             if not translated:
-                raise ProviderResponseError("Google devolvió una traducción vacía")
+                raise ProviderResponseError("Google returned an empty translation")
             return translated
         except TranslationProviderError:
             raise
@@ -326,7 +324,7 @@ class DeepLProvider(TranslationProvider):
     ):
         api_key = str(self.config_service.get("deepl_api_key", "")).strip()
         if not api_key:
-            raise ProviderConfigurationError("DeepL API key no configurada")
+            raise ProviderConfigurationError("DeepL API key is not configured")
         is_pro = self.config_service.get("deepl_type", "free") == "pro"
         url = (
             "https://api.deepl.com/v2/translate"
@@ -357,7 +355,7 @@ class DeepLProvider(TranslationProvider):
             translated = translations[0].get("text") if translations else None
             if not isinstance(translated, str) or not translated:
                 raise ProviderResponseError(
-                    "DeepL devolvió una respuesta sin traducciones"
+                    "DeepL returned a response without translations"
                 )
             return ProviderResponse(translated, model=self.model)
         except TranslationProviderError:
@@ -377,21 +375,23 @@ class OpenAICompatibleProvider(TranslationProvider):
         self.model = str(self.config_service.get("openai_model", "gpt-4o-mini"))
         parsed_url = urllib.parse.urlparse(self.base_url)
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-            raise ProviderConfigurationError("la URL base del endpoint no es válida")
+            raise ProviderConfigurationError("the endpoint base URL is not valid")
         self._local_endpoint = is_loopback_host(parsed_url.hostname)
         # Deep-audit M5: cleartext HTTP is only acceptable when the request can
         # never leave the machine. For anything else the API key would travel
         # unencrypted, so the configuration is rejected instead of warned about.
         if parsed_url.scheme == "http" and not self._local_endpoint:
             raise ProviderConfigurationError(
-                "los endpoints remotos requieren HTTPS; sólo se permite HTTP "
-                "para localhost, 127.0.0.0/8 o ::1"
+                "remote endpoints require HTTPS; plain HTTP is only allowed "
+                "for localhost, 127.0.0.0/8 or ::1"
             )
 
     def _credentials(self):
         api_key = str(self.config_service.get("openai_api_key", "")).strip()
         if not api_key and not self._local_endpoint:
-            raise ProviderConfigurationError("API key para el endpoint no configurada")
+            raise ProviderConfigurationError(
+                "API key for the endpoint is not configured"
+            )
         return api_key
 
     def _payload(self, text, target_language):
@@ -435,12 +435,12 @@ class OpenAICompatibleProvider(TranslationProvider):
             choices = data.get("choices", [])
             if not choices:
                 raise ProviderResponseError(
-                    "endpoint compatible devolvió choices vacío"
+                    "compatible endpoint returned empty choices"
                 )
             translated = choices[0].get("message", {}).get("content")
             if not isinstance(translated, str) or not translated.strip():
                 raise ProviderResponseError(
-                    "endpoint compatible devolvió contenido inválido"
+                    "compatible endpoint returned invalid content"
                 )
             usage = data.get("usage") or {}
             return ProviderResponse(
@@ -476,16 +476,14 @@ def _normalize_error(exc: Exception, provider: str) -> TranslationProviderError:
             # A cross-origin redirect is refused on purpose; say so instead of
             # reporting a meaningless status code.
             return ProviderResponseError(
-                f"{provider}: redirección rechazada ({exc.reason or exc.code})"
+                f"{provider}: redirect rejected ({exc.reason or exc.code})"
             )
         if exc.code in (401, 403):
             return ProviderAuthenticationError(
-                f"{provider}: autenticación rechazada (HTTP {exc.code})"
+                f"{provider}: authentication rejected (HTTP {exc.code})"
             )
         if exc.code == 429:
-            return ProviderRateLimitError(
-                f"{provider}: límite de solicitudes (HTTP 429)"
-            )
+            return ProviderRateLimitError(f"{provider}: rate limit exceeded (HTTP 429)")
         if exc.code >= 500:
             return ProviderNetworkError(
                 f"{provider}: error transitorio HTTP {exc.code}"
@@ -497,7 +495,7 @@ def _normalize_error(exc: Exception, provider: str) -> TranslationProviderError:
         return ProviderNetworkError(f"{provider}: error de red ({type(exc).__name__})")
     if isinstance(exc, (json.JSONDecodeError, KeyError, IndexError, TypeError)):
         return ProviderResponseError(
-            f"{provider}: respuesta no válida ({type(exc).__name__})"
+            f"{provider}: invalid response ({type(exc).__name__})"
         )
     return ProviderUnknownError(f"{provider}: error inesperado ({type(exc).__name__})")
 

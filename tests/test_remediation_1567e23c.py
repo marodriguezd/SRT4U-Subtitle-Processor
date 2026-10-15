@@ -137,7 +137,7 @@ def real_video():
     """
     ffmpeg = _ffmpeg()
     if not ffmpeg:
-        pytest.skip("FFmpeg no está disponible en este entorno")
+        pytest.skip("FFmpeg is not available in this environment")
     tmpdir = tempfile.mkdtemp(prefix="srt4u_d1_")
     path = os.path.join(tmpdir, "input_long.mp4")
     _make_video(ffmpeg, path, 600)

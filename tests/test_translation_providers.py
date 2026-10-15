@@ -70,12 +70,12 @@ def test_registry_registers_aliases_and_creates_valid_provider():
 
     ProviderRegistry.register("test-custom-provider", FakeProvider)
     assert isinstance(ProviderRegistry.get("TEST-CUSTOM-PROVIDER"), FakeProvider)
-    with pytest.raises(ValueError, match="ya registrado"):
+    with pytest.raises(ValueError, match="already registered"):
         ProviderRegistry.register("test-custom-provider", FakeProvider)
 
 
 def test_registry_rejects_unknown_provider():
-    with pytest.raises(ProviderConfigurationError, match="no soportado"):
+    with pytest.raises(ProviderConfigurationError, match="unsupported provider"):
         ProviderRegistry.get("missing-provider")
 
 
@@ -421,9 +421,9 @@ def test_translation_logs_never_contain_api_keys_or_input_text(monkeypatch, capl
 
 def test_invalid_registry_factory_and_endpoint_configuration_are_reported():
     ProviderRegistry.register("wrong-factory", lambda **kwargs: object())
-    with pytest.raises(ProviderConfigurationError, match="no devolvió"):
+    with pytest.raises(ProviderConfigurationError, match="did not return"):
         ProviderRegistry.get("wrong-factory")
-    with pytest.raises(ProviderConfigurationError, match="URL base"):
+    with pytest.raises(ProviderConfigurationError, match="base URL"):
         OpenAICompatibleProvider(MemoryConfig(openai_base_url="javascript:alert(1)"))
 
 
@@ -460,11 +460,11 @@ def test_translation_metrics_aggregate_unknown_tokens_as_null():
 
 
 def test_translation_service_rejects_invalid_max_retries():
-    with pytest.raises(ValueError, match="no negativo"):
+    with pytest.raises(ValueError, match="non-negative"):
         TranslationService(config_service=MemoryConfig(), max_retries=-1)
-    with pytest.raises(ValueError, match="no negativo"):
+    with pytest.raises(ValueError, match="non-negative"):
         TranslationService(config_service=MemoryConfig(), max_retries=True)
-    with pytest.raises(ValueError, match="no negativo"):
+    with pytest.raises(ValueError, match="non-negative"):
         TranslationService(config_service=MemoryConfig(), max_retries="2")
 
 

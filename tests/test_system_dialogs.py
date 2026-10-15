@@ -96,7 +96,7 @@ def test_file_dialog_palette_follows_theme(qapp, lang):
             # QStyleSheetStyle, so the selection color must be declared in QSS;
             # the Qt default blue (#308cc6) must not be used on any path.
             sheet = dialog.styleSheet()
-            assert sheet, "El diálogo no tiene QSS aplicado"
+            assert sheet, "The dialog has no QSS applied"
             assert expected_highlight.name().lower() in sheet.lower(), (
                 f"{lang} (dark={dark}): el QSS no declara el color de selección "
                 f"{expected_highlight.name()}"
@@ -177,7 +177,7 @@ def test_message_box_is_themed(qapp):
             QMessageBox.StandardButton.Ok,
         )
         try:
-            assert box.styleSheet(), "El QMessageBox no tiene QSS aplicado"
+            assert box.styleSheet(), "The QMessageBox has no QSS applied"
             assert (
                 box.palette().window().color().name()
                 == QColor(Styles.dialog_colors(dark)["bg"]).name()

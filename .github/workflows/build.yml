@@ -447,7 +447,7 @@ jobs:
             release-artifacts/SRT4U-Linux-x86_64/RELEASE_VERSION \
             release-artifacts/SRT4U-macOS/RELEASE_VERSION; do
             if ! grep -aqxF "$VERSION" "$artifact"; then
-              echo "release cancelled: ${artifact} no contiene la versión ${VERSION} (artifact from another ref?)" >&2
+              echo "release cancelled: ${artifact} does not contain version ${VERSION} (artifact from another ref?)" >&2
               exit 1
             fi
           done

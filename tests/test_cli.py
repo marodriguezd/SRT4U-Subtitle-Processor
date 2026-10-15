@@ -82,7 +82,7 @@ def test_cli_processes_batch_and_preserves_relative_paths(tmp_path):
     assert result.returncode == 0, result.stderr
     assert (output_dir / "one.srt").exists()
     assert (output_dir / "nested" / "two.vtt").exists()
-    assert "2/2 archivos procesados" in result.stdout
+    assert "2/2 files processed" in result.stdout
 
 
 def test_cli_uses_json_pipeline_and_cli_overrides_preset(tmp_path):
@@ -127,7 +127,7 @@ def test_cli_rejects_invalid_presets(tmp_path):
     )
 
     assert result.returncode == 2
-    assert "opciones desconocidas" in result.stderr
+    assert "unknown options" in result.stderr
 
 
 def test_cli_requires_target_when_translation_enabled(tmp_path):
@@ -138,7 +138,7 @@ def test_cli_requires_target_when_translation_enabled(tmp_path):
     )
 
     assert result.returncode == 2
-    assert "--target es obligatorio" in result.stderr
+    assert "--target is required" in result.stderr
 
 
 def test_cli_stats_is_opt_in_and_preserves_default_output(
@@ -310,5 +310,5 @@ def test_cli_does_not_overwrite_input_file(tmp_path):
     )
 
     assert result.returncode == 2
-    assert "no puede sobrescribir" in result.stderr
+    assert "cannot overwrite" in result.stderr
     assert "Keep me" in source.read_text(encoding="utf-8")

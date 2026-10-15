@@ -239,7 +239,7 @@ def test_ci_pins_static_ffmpeg_version():
     assert "github.com/yt-dlp/FFmpeg-Builds/releases/download" not in workflow
 
     version = re.search(r'FFMPEG_VERSION:\s*"([^"]+)"', workflow)
-    assert version, "declare FFMPEG_VERSION en el workflow"
+    assert version, "declare FFMPEG_VERSION in the workflow"
     assert re.fullmatch(r"b\d+\.\d+\.\d+", version.group(1)), version.group(1)
 
     # All three builds consume the variable, not a repeated literal URL.
@@ -256,7 +256,7 @@ def test_ci_pins_static_ffmpeg_version():
     # appimagetool ships inside the published AppImage: it must also be pinned,
     # otherwise the binary would keep varying between builds even with FFmpeg fixed.
     appimage = re.search(r'APPIMAGETOOL_VERSION:\s*"([^"]+)"', workflow)
-    assert appimage, "declare APPIMAGETOOL_VERSION en el workflow"
+    assert appimage, "declare APPIMAGETOOL_VERSION in the workflow"
     assert re.fullmatch(r"\d+\.\d+\.\d+", appimage.group(1)), appimage.group(1)
     assert "appimagetool/releases/download/${APPIMAGETOOL_VERSION}/" in workflow
     assert "appimagetool/releases/download/continuous/" not in workflow
@@ -285,7 +285,7 @@ def test_ci_installs_the_api_extra_for_the_test_suite():
         "\n  build-windows:", 1
     )[0]
     for name, block in (("test", test_job), ("compat-min-pyqt6", compat_job)):
-        assert '".[api]"' in block, f"el job {name} debe instalar el extra [api]"
+        assert '".[api]"' in block, f"job {name} must install the [api] extra"
         assert "python -m pytest" in block, name
 
     # The extra comes from pyproject: the workflow must not re-declare its pins.
@@ -352,7 +352,7 @@ def test_release_workflow_gates_publication_on_tag_validation():
         assert "Stamp release version" in job_block, job
         assert "RELEASE_VERSION" in job_block, job
     assert "RELEASE_VERSION" in release_block
-    assert "no contiene la versión" in release_block
+    assert "does not contain version" in release_block
     # It keeps publishing from the versioned body and as stable.
     assert "body_path: RELEASE_NOTES.md" in release_block
     assert "prerelease: false" in release_block

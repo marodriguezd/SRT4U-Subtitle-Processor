@@ -389,18 +389,16 @@ def _load_pipeline(config_path: Optional[str]) -> Dict[str, Any]:
             document = json.load(config_file)
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(
-            f"no se pudo leer el preset JSON ({type(exc).__name__})"
+            f"could not read the JSON preset ({type(exc).__name__})"
         ) from exc
     if not isinstance(document, dict):
-        raise ValueError("el preset debe ser un objeto JSON")
+        raise ValueError("the preset must be a JSON object")
     pipeline = document.get("pipeline", document)
     if not isinstance(pipeline, dict):
-        raise ValueError("la propiedad 'pipeline' debe ser un objeto JSON")
+        raise ValueError("the 'pipeline' property must be a JSON object")
     unknown = set(pipeline) - PIPELINE_OPTIONS
     if unknown:
-        raise ValueError(
-            f"opciones desconocidas en el preset: {', '.join(sorted(unknown))}"
-        )
+        raise ValueError(f"unknown options in the preset: {', '.join(sorted(unknown))}")
     normalized = dict(pipeline)
     if "convert_to" in normalized:
         if "target_format" in normalized:
@@ -408,7 +406,7 @@ def _load_pipeline(config_path: Optional[str]) -> Dict[str, Any]:
         normalized["target_format"] = normalized.pop("convert_to")
     for key in ("clean", "translate", "parallel"):
         if key in normalized and not isinstance(normalized[key], bool):
-            raise ValueError(f"'{key}' debe ser true o false")
+            raise ValueError(f"'{key}' must be true or false")
     return normalized
 
 
@@ -438,9 +436,9 @@ def _resolve_options(
     options.setdefault("engine", "google")
     options.setdefault("parallel", True)
     if options.get("translate") and not options.get("target_language"):
-        parser.error("--target es obligatorio cuando se activa --translate")
+        parser.error("--target is required when --translate is enabled")
     if options.get("target_format") not in (None, "srt", "vtt", "ass", "ssa", "txt"):
-        parser.error("el preset contiene un formato de salida no soportado")
+        parser.error("the preset contains an unsupported output format")
     if not isinstance(options["engine"], str) or options["engine"] not in {
         "google",
         "deepl",
@@ -448,15 +446,15 @@ def _resolve_options(
         "ollama",
         "llm",
     }:
-        parser.error("el preset contiene un motor de traducción no soportado")
+        parser.error("the preset contains an unsupported translation engine")
     if not isinstance(options["parallel"], bool):
-        parser.error("'parallel' debe ser true o false")
+        parser.error("'parallel' must be true or false")
     if not isinstance(options["source_language"], str):
-        parser.error("'source_language' debe ser un código de idioma")
+        parser.error("'source_language' must be a language code")
     if options.get("target_language") is not None and not isinstance(
         options["target_language"], str
     ):
-        parser.error("'target_language' debe ser un código de idioma")
+        parser.error("'target_language' must be a language code")
     return options
 
 
@@ -494,18 +492,18 @@ def _collect_inputs(
                 ):
                     candidates.append((resolved, candidate.relative_to(path)))
         else:
-            raise ValueError(f"no existe la entrada: {path}")
+            raise ValueError(f"input does not exist: {path}")
         for source, relative in candidates:
             if source.suffix.lower() not in SUPPORTED_EXTENSIONS:
-                raise ValueError(f"formato de entrada no soportado: {source}")
+                raise ValueError(f"unsupported input format: {source}")
             if source not in relative_paths:
                 sources.append(source)
                 relative_paths[source] = relative
     if not sources:
-        raise ValueError("no se encontraron archivos de subtítulos compatibles")
+        raise ValueError("no compatible subtitle files were found")
     destinations = list(relative_paths.values())
     if len(destinations) != len(set(destinations)):
-        raise ValueError("hay archivos de entrada con la misma ruta relativa de salida")
+        raise ValueError("input files share the same relative output path")
     return sources, relative_paths
 
 
@@ -550,10 +548,10 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if output_file and any(
         _paths_refer_to_same_file(output_file, source) for source in sources
     ):
-        parser.error("el archivo de salida no puede sobrescribir el archivo de entrada")
+        parser.error("the output file cannot overwrite the input file")
     if batch_mode:
         if output_directory.exists() and not output_directory.is_dir():
-            parser.error("la salida de un lote debe ser un directorio")
+            parser.error("the output of a batch must be a directory")
         batch_destinations = []
         for source in sources:
             selected_format = _format_for(source, options, None)
@@ -564,14 +562,14 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
                 _paths_refer_to_same_file(destination, source_file)
                 for source_file in sources
             ):
-                parser.error("la salida no puede sobrescribir un archivo de entrada")
+                parser.error("the output cannot overwrite an input file")
             batch_destinations.append(destination.resolve())
         if len(batch_destinations) != len(set(batch_destinations)) or any(
             _paths_refer_to_same_file(first, second)
             for index, first in enumerate(batch_destinations)
             for second in batch_destinations[index + 1 :]
         ):
-            parser.error("varios archivos producirían la misma ruta de salida")
+            parser.error("several files would produce the same output path")
 
     service = SubtitleService()
     failed = 0
@@ -628,14 +626,14 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
                 )
             if result.stats.translation_failures:
                 print(
-                    f"AVISO: {result.stats.translation_failures} cues no se tradujeron",
+                    f"WARNING: {result.stats.translation_failures} cues were not translated",
                     file=sys.stderr,
                 )
             if result.parse_issues:
                 kinds = ", ".join(sorted({issue.kind for issue in result.parse_issues}))
                 print(
-                    f"AVISO: {len(result.parse_issues)} bloque(s) del archivo no se "
-                    f"pudieron procesar ({kinds}); revisa el archivo de entrada",
+                    f"WARNING: {len(result.parse_issues)} block(s) of the file could not "
+                    f"be processed ({kinds}); check the input file",
                     file=sys.stderr,
                 )
             if not args.no_history:
@@ -652,7 +650,7 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         except Exception as exc:
             failed += 1
             print(
-                f"ERROR: no se pudo procesar el archivo ({type(exc).__name__})",
+                f"ERROR: could not process the file ({type(exc).__name__})",
                 file=sys.stderr,
             )
             if not args.no_history:
@@ -668,8 +666,8 @@ def _process(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
                     error_type="processing",
                 )
     print(
-        f"Resumen: {len(sources) - failed}/{len(sources)} archivos procesados; "
-        f"{translation_failures} fallos de traducción."
+        f"Summary: {len(sources) - failed}/{len(sources)} files processed; "
+        f"{translation_failures} translation failures."
     )
     return 1 if failed or translation_failures else 0
 
@@ -731,15 +729,15 @@ def _human_report(command: str, payload: Dict[str, Any], strict: bool = False) -
     quality = metrics["quality"]
     processing = metrics["processing"]
     return (
-        f"Subtítulos: {content['subtitle_count']} | duración: "
+        f"Subtitles: {content['subtitle_count']} | duration: "
         f"{timing['total_duration_ms'] / 1000:.3f}s\n"
         f"Palabras: {content['total_words']} | caracteres: "
-        f"{content['total_characters']} | líneas: {content['line_count']}\n"
-        f"CPS medio/máx/mín: {timing['average_cps']:.3f}/"
+        f"{content['total_characters']} | lines: {content['line_count']}\n"
+        f"CPS avg/max/min: {timing['average_cps']:.3f}/"
         f"{timing['max_cps']:.3f}/{timing['min_cps']:.3f} | solapamientos: "
         f"{timing['overlapping_subtitles']}\n"
         f"QA: {quality['errors']} errores, {quality['warnings']} avisos | "
-        f"limpieza: {processing['lines_removed']} líneas eliminadas | "
+        f"cleaning: {processing['lines_removed']} lines removed | "
         f"tiempo: {processing['processing_time_seconds']:.3f}s\n"
     )
 
@@ -756,17 +754,17 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         else:
             analytics, qa_report = service.analyze_file(str(source))
     except FileNotFoundError:
-        print("ERROR: archivo de subtítulos no encontrado", file=sys.stderr)
+        print("ERROR: subtitle file not found", file=sys.stderr)
         return 2
     except (OSError, UnicodeError, ValueError) as exc:
         print(
-            f"ERROR: no se pudo analizar el archivo ({type(exc).__name__})",
+            f"ERROR: could not parse the file ({type(exc).__name__})",
             file=sys.stderr,
         )
         return 2
     except Exception as exc:
         print(
-            f"ERROR: no se pudo analizar el archivo ({type(exc).__name__})",
+            f"ERROR: could not parse the file ({type(exc).__name__})",
             file=sys.stderr,
         )
         return 2
@@ -786,9 +784,9 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
     if export_format is None and output_format:
         export_format = output_format
     if export_format not in (None, "json", "csv"):
-        parser.error("el formato de exportación debe ser json o csv")
+        parser.error("the export format must be json or csv")
     if output_format in {"json", "csv"} and export_format not in (None, output_format):
-        parser.error("la extensión de --output no coincide con el formato solicitado")
+        parser.error("the --output extension does not match the requested format")
     if args.json and export_format == "csv":
         parser.error("--json y --format csv son incompatibles")
     if export_format == "csv":
@@ -809,7 +807,7 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
             atomic_write_text(str(output_path), rendered, encoding="utf-8")
         except OSError as exc:
             print(
-                f"ERROR: no se pudo guardar el informe ({type(exc).__name__})",
+                f"ERROR: could not save the report ({type(exc).__name__})",
                 file=sys.stderr,
             )
             return 2
@@ -843,11 +841,11 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
     providers = [name.strip() for name in (args.providers or "").split(",")]
     providers = [name for name in providers if name]
     if not providers:
-        parser.error("--providers requiere al menos un provider")
+        parser.error("--providers requires at least one provider")
     if args.runs is None or args.runs < 1:
-        parser.error("--runs debe ser un entero positivo")
+        parser.error("--runs must be a positive integer")
     if args.max_retries is None or args.max_retries < 0:
-        parser.error("--max-retries debe ser un entero no negativo")
+        parser.error("--max-retries must be a non-negative integer")
     try:
         dataset = load_benchmark_dataset(args.dataset)
     except ValueError as exc:
@@ -880,7 +878,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             atomic_write_text(str(output_path), rendered, encoding="utf-8")
         except OSError as exc:
             print(
-                f"ERROR: no se pudo guardar el informe ({type(exc).__name__})",
+                f"ERROR: could not save the report ({type(exc).__name__})",
                 file=sys.stderr,
             )
             return 2
@@ -894,7 +892,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             atomic_write_text(str(csv_path), report.to_csv(), encoding="utf-8")
         except OSError as exc:
             print(
-                f"ERROR: no se pudo guardar el CSV ({type(exc).__name__})",
+                f"ERROR: could not save the CSV ({type(exc).__name__})",
                 file=sys.stderr,
             )
             return 2
@@ -918,7 +916,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             )
         except HistoryError as exc:
             print(
-                f"AVISO: no se pudo guardar el benchmark ({type(exc).__name__})",
+                f"WARNING: could not save the benchmark ({type(exc).__name__})",
                 file=sys.stderr,
             )
     return 0
@@ -928,7 +926,7 @@ def _run_history(args: argparse.Namespace, parser: argparse.ArgumentParser) -> i
     from .services.history_store import HistoryError, HistoryStore
 
     if args.limit is None or args.limit < 1:
-        parser.error("--limit debe ser un entero positivo")
+        parser.error("--limit must be a positive integer")
     try:
         with HistoryStore(args.db) as store:
             if args.stats:
@@ -942,12 +940,12 @@ def _run_history(args: argparse.Namespace, parser: argparse.ArgumentParser) -> i
                     print(
                         f"Ejecuciones: {stats['total']} "
                         f"({stats['successful']} ok, {stats['failed']} fallidas, "
-                        f"{stats['fallbacks']} con fallback)"
+                        f"{stats['fallbacks']} with fallback)"
                     )
                     avg = stats["avg_duration_ms"]
                     print(
-                        "Duración media: "
-                        + (f"{avg:.1f}ms" if avg is not None else "desconocida")
+                        "Average duration: "
+                        + (f"{avg:.1f}ms" if avg is not None else "unknown")
                     )
                 return 0
             rows = store.recent_runs(
@@ -959,7 +957,7 @@ def _run_history(args: argparse.Namespace, parser: argparse.ArgumentParser) -> i
             )
     except HistoryError as exc:
         print(
-            f"ERROR: no se pudo leer el historial ({type(exc).__name__})",
+            f"ERROR: could not read the history ({type(exc).__name__})",
             file=sys.stderr,
         )
         return 2
@@ -969,10 +967,10 @@ def _run_history(args: argparse.Namespace, parser: argparse.ArgumentParser) -> i
         )
         return 0
     if not rows:
-        print("Sin ejecuciones registradas.")
+        print("No runs recorded.")
         return 0
     for row in rows:
-        status = "ok" if row.get("success") else (row.get("error_type") or "fallo")
+        status = "ok" if row.get("success") else (row.get("error_type") or "failed")
         fallback = " +fallback" if row.get("fallback_used") else ""
         print(
             f"#{row['id']} {row.get('timestamp', '')[:19]} "
@@ -998,14 +996,14 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         message = (
             INSTALL_HINT
             if INSTALL_HINT in str(exc)
-            else f"provider de transcripción no disponible ({exc.error_type})"
+            else f"transcription provider unavailable ({exc.error_type})"
         )
         print(f"ERROR: {message}", file=sys.stderr)
         return 2
     size, description = WHISPER_MODELS.get(args.model, ("?", ""))
     print(
-        f"Modelo whisper/{args.model} ({size}, {description}): "
-        "se descarga una vez si no está en caché.",
+        f"Model whisper/{args.model} ({size}, {description}): "
+        "downloaded once if not cached.",
         file=sys.stderr,
     )
 
@@ -1025,7 +1023,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
             progress_callback=_progress,
         )
     except TranscriptionError as exc:
-        print(f"ERROR: no se pudo transcribir ({exc.error_type})", file=sys.stderr)
+        print(f"ERROR: could not transcribe ({exc.error_type})", file=sys.stderr)
         if not args.no_history:
             record_safely(
                 "transcription",
@@ -1044,7 +1042,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         content = service.render(result, args.target_format)
     except TranscriptionError as exc:
         print(
-            f"ERROR: no se pudieron generar los subtítulos ({exc.error_type})",
+            f"ERROR: could not generate the subtitles ({exc.error_type})",
             file=sys.stderr,
         )
         return 2
@@ -1059,7 +1057,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         atomic_write_text(str(destination), content, encoding="utf-8")
     except OSError as exc:
         print(
-            f"ERROR: no se pudo guardar la transcripción ({type(exc).__name__})",
+            f"ERROR: could not save the transcription ({type(exc).__name__})",
             file=sys.stderr,
         )
         return 2
@@ -1084,7 +1082,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
                 )
         except Exception as exc:
             print(
-                f"AVISO: no se pudo registrar el historial ({type(exc).__name__})",
+                f"WARNING: could not record the history ({type(exc).__name__})",
                 file=sys.stderr,
             )
     return 0
@@ -1137,13 +1135,13 @@ def _run_pipeline(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         elif stage == "transcription" and isinstance(payload, dict):
             count = payload.get("segments")
             if count:
-                print(f"... transcripción: {count} segmentos", file=sys.stderr)
+                print(f"... transcription: {count} segments", file=sys.stderr)
 
     try:
         result = MediaPipeline().run(config, progress_callback=_progress)
     except Exception as exc:
         print(
-            f"ERROR: no se pudo completar la pipeline ({type(exc).__name__})",
+            f"ERROR: could not complete the pipeline ({type(exc).__name__})",
             file=sys.stderr,
         )
         return 1
@@ -1157,7 +1155,7 @@ def _run_pipeline(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         if result.success:
             print(f"OK {source} -> {result.output_subtitle}")
             if result.output_video:
-                print(f"Vídeo: {result.output_video}")
+                print(f"Video: {result.output_video}")
         elif result.cancelled:
             print("Cancelada.", file=sys.stderr)
         else:
@@ -1175,12 +1173,12 @@ def _run_serve(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int
         import uvicorn  # type: ignore[import-not-found]
     except ImportError:
         print(
-            "ERROR: la API requiere el extra 'api' (python -m pip install '.[api]')",
+            "ERROR: the API requires the 'api' extra (python -m pip install '.[api]')",
             file=sys.stderr,
         )
         return 2
     if not 1 <= args.port <= 65535:
-        parser.error("--port debe estar entre 1 y 65535")
+        parser.error("--port must be between 1 and 65535")
     from .api.app import app as api_app
 
     print(

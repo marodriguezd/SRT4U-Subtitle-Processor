@@ -28,8 +28,8 @@ def test_cli_analyze_prints_human_readable_metrics():
     result = run_cli("analyze", "tests/fixtures/sample.srt")
 
     assert result.returncode == 0
-    assert "Subtítulos: 5" in result.stdout
-    assert "CPS medio/máx/mín:" in result.stdout
+    assert "Subtitles: 5" in result.stdout
+    assert "CPS avg/max/min:" in result.stdout
     assert result.stderr == ""
 
 
@@ -93,7 +93,7 @@ def test_cli_qa_reports_missing_file_with_exit_code_two(tmp_path):
     result = run_cli("qa", tmp_path / "no-such-file.srt", "--json")
     assert result.returncode == 2
     assert result.stdout == ""
-    assert "archivo de subtítulos no encontrado" in result.stderr
+    assert "subtitle file not found" in result.stderr
 
 
 def test_cli_qa_strict_passes_without_warnings_or_errors(tmp_path):
@@ -140,7 +140,7 @@ def test_cli_rejects_output_extension_that_conflicts_with_requested_format(tmp_p
         tmp_path / "report.csv",
     )
     assert result.returncode == 2
-    assert "extensión de --output" in result.stderr
+    assert "--output extension" in result.stderr
 
 
 def test_cli_rejects_strict_for_analyze():
@@ -183,7 +183,7 @@ def test_cli_reports_missing_file_cleanly():
 
     assert result.returncode == 2
     assert result.stdout == ""
-    assert "archivo de subtítulos no encontrado" in result.stderr
+    assert "subtitle file not found" in result.stderr
 
 
 def test_cli_rejects_invalid_export_format():

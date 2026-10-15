@@ -65,12 +65,12 @@ class TranscriptionService:
         """Return the lowercase extension or raise a normalized error."""
         if not media_path or not os.path.isfile(media_path):
             raise TranscriptionInvalidFileError(
-                f"archivo multimedia no encontrado: {media_path or '(vacío)'}"
+                f"media file not found: {media_path or '(empty)'}"
             )
         suffix = os.path.splitext(media_path)[1].lower()
         if suffix not in MEDIA_EXTENSIONS:
             raise TranscriptionFormatError(
-                f"formato multimedia no soportado: {suffix or '(sin extensión)'} "
+                f"unsupported media format: {suffix or '(no extension)'} "
                 f"(soportados: {', '.join(sorted(MEDIA_EXTENSIONS))})"
             )
         return suffix
@@ -86,9 +86,9 @@ class TranscriptionService:
             from .transcription_whisper import INSTALL_HINT
 
             raise TranscriptionError(
-                f"provider '{name}' no disponible: {INSTALL_HINT}"
+                f"provider '{name}' unavailable: {INSTALL_HINT}"
                 if name == "whisper"
-                else f"provider '{name}' no disponible en este equipo"
+                else f"provider '{name}' is not available on this machine"
             )
         return name
 
@@ -132,7 +132,7 @@ class TranscriptionService:
         fmt = (output_format or "srt").lower().lstrip(".")
         if fmt not in {"srt", "vtt"}:
             raise TranscriptionError(
-                f"formato de salida no soportado: {output_format} (usa srt o vtt)"
+                f"unsupported output format: {output_format} (use srt or vtt)"
             )
         return self.subtitle_service.format_output(self.to_subtitle_items(result), fmt)
 

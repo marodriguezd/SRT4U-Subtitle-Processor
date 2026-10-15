@@ -118,13 +118,13 @@ class TranscriptionRegistry:
     @classmethod
     def register(cls, name: str, factory, *, aliases=(), replace: bool = False) -> None:
         if not callable(factory):
-            raise TypeError("la factory de transcripción debe ser invocable")
+            raise TypeError("transcription factory must be callable")
         names = (name, *aliases)
         normalized = tuple(cls._normalize(value) for value in names)
         if any(not value for value in normalized):
-            raise TranscriptionError("los nombres y alias no pueden estar vacíos")
+            raise TranscriptionError("names and aliases cannot be empty")
         if any(value in cls._factories for value in normalized) and not replace:
-            raise ValueError(f"provider de transcripción ya registrado: {name}")
+            raise ValueError(f"transcription provider already registered: {name}")
         for value in normalized:
             cls._factories[value] = factory
 
@@ -135,12 +135,12 @@ class TranscriptionRegistry:
             factory = cls._factories[normalized]
         except KeyError as exc:
             raise TranscriptionError(
-                f"provider de transcripción no soportado: {name}"
+                f"unsupported transcription provider: {name}"
             ) from exc
         provider = factory(config_service=config_service)
         if not isinstance(provider, TranscriptionProvider):
             raise TranscriptionError(
-                f"la factory '{name}' no devolvió un TranscriptionProvider válido"
+                f"factory '{name}' did not return a valid TranscriptionProvider"
             )
         return provider
 
@@ -151,7 +151,5 @@ class TranscriptionRegistry:
     @staticmethod
     def _normalize(name: str) -> str:
         if not isinstance(name, str) or not name.strip():
-            raise TranscriptionError(
-                "el nombre del provider de transcripción es obligatorio"
-            )
+            raise TranscriptionError("transcription provider name is required")
         return name.strip().casefold()

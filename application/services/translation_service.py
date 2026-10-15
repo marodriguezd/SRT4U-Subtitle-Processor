@@ -56,7 +56,7 @@ class TranslationService:
             or not isinstance(max_retries, int)
             or max_retries < 0
         ):
-            raise ValueError("max_retries debe ser un entero no negativo")
+            raise ValueError("max_retries must be a non-negative integer")
         self.max_retries = max_retries
         configured_fallbacks = (
             self.DEFAULT_FALLBACKS if fallbacks is None else fallbacks
@@ -129,7 +129,7 @@ class TranslationService:
         started = time.perf_counter()
         requested = provider.casefold() if isinstance(provider, str) else str(provider)
         if not isinstance(text, str):
-            error = ProviderConfigurationError("el texto debe ser una cadena")
+            error = ProviderConfigurationError("text must be a string")
             result = self._failure_result(
                 text=str(text),
                 provider=requested,
@@ -210,7 +210,7 @@ class TranslationService:
                             or not candidate_response.text.strip()
                         ):
                             raise ProviderResponseError(
-                                "provider devolvió una respuesta de traducción inválida"
+                                "provider returned an invalid translation response"
                             )
                         response = candidate_response
                         translated = candidate_response.text
@@ -271,7 +271,7 @@ class TranslationService:
         error_message = None
         if not success:
             error = last_error or ProviderConfigurationError(
-                f"no se pudo resolver el provider: {requested}"
+                f"could not resolve provider: {requested}"
             )
             error_type = error.error_type
             error_message = None
@@ -324,12 +324,12 @@ class TranslationService:
             candidate = pending.pop(0)
             if candidate in chain:
                 raise ProviderConfigurationError(
-                    f"fallback circular o repetido para provider: {candidate}"
+                    f"circular or repeated fallback for provider: {candidate}"
                 )
             chain.append(candidate)
             if len(chain) > 8:
                 raise ProviderConfigurationError(
-                    "la cadena de fallback supera 8 providers"
+                    "the fallback chain exceeds 8 providers"
                 )
             pending.extend(self.fallbacks.get(candidate, ()))
         return tuple(chain)

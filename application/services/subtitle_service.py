@@ -334,7 +334,7 @@ class SubtitleService:
         if end_ms < start_ms:
             self._add_issue(
                 "reversed_timing",
-                f"el final ({end_ms} ms) precede al inicio ({start_ms} ms)",
+                f"the end ({end_ms} ms) precedes the start ({start_ms} ms)",
                 line,
                 f"{start_raw} --> {end_raw}",
             )
@@ -401,7 +401,7 @@ class SubtitleService:
             if not text.strip():
                 self._add_issue(
                     "empty_cue",
-                    "el cue no contiene texto",
+                    "the cue contains no text",
                     start_line + 1,
                     lines[start_line],
                 )
@@ -490,7 +490,7 @@ class SubtitleService:
                 if timings is None:
                     self._add_issue(
                         "cue_dropped",
-                        "la cue tiene un timestamp no utilizable",
+                        "the cue has an unusable timestamp",
                         timing_line + 1,
                         time_line_full,
                     )
@@ -547,7 +547,7 @@ class SubtitleService:
             if not match:
                 self._add_issue(
                     "malformed_dialogue",
-                    "línea Dialogue con número de campos incorrecto",
+                    "Dialogue line with an incorrect number of fields",
                     number,
                     line_str,
                 )
@@ -565,7 +565,7 @@ class SubtitleService:
             if style and not ass_utils.is_safe_style_name(style):
                 self._add_issue(
                     "unsafe_style_name",
-                    f"el nombre de estilo {style!r} no es utilizable",
+                    f"style name {style!r} is not usable",
                     number,
                     line_str,
                 )
@@ -573,7 +573,7 @@ class SubtitleService:
             text = raw_text.replace(r"\N", "\n").replace(r"\n", "\n")
             if not text.strip():
                 self._add_issue(
-                    "empty_cue", "el evento no contiene texto", number, line_str
+                    "empty_cue", "the event contains no text", number, line_str
                 )
                 continue
             items.append(
@@ -702,7 +702,7 @@ class SubtitleService:
                     continue
                 if self.is_spam_line(line):
                     deleted_lines += 1
-                    logger.debug("Línea de spam eliminada: %s", line.strip()[:80])
+                    logger.debug("Spam line removed: %s", line.strip()[:80])
                     continue
                 kept_lines.append(line.strip())
 
@@ -718,7 +718,7 @@ class SubtitleService:
                 cleaned_items.append(item_cleaned)
             elif item.text.strip():
                 logger.debug(
-                    "Cue %s eliminado por completo (todas sus líneas eran spam)",
+                    "Cue %s removed entirely (all its lines were spam)",
                     item.index,
                 )
 
@@ -773,7 +773,7 @@ class SubtitleService:
             return cancel_event is not None and cancel_event.is_set()
 
         if cancelled():
-            raise SubtitleCancelledError("traducción cancelada")
+            raise SubtitleCancelledError("translation cancelled")
 
         def translate_single_item(idx: int, item: SubtitleItem) -> "_CueTranslation":
             original_text = item.text.strip()
@@ -833,7 +833,7 @@ class SubtitleService:
                     if not metric.error_type:
                         metric.error_type = "unknown"
                     logger.warning(
-                        "El provider '%s' no pudo traducir el cue %s: error_type=%s",
+                        "Provider '%s' could not translate cue %s: error_type=%s",
                         engine,
                         item.index,
                         metric.error_type,
@@ -859,7 +859,7 @@ class SubtitleService:
                 raise
             except Exception as exc:
                 logger.error(
-                    "Excepción al traducir el cue %s con el provider '%s' (%s)",
+                    "Exception while translating cue %s with provider '%s' (%s)",
                     item.index,
                     engine,
                     type(exc).__name__,
@@ -925,7 +925,7 @@ class SubtitleService:
             # half-finished translation.
             self.last_translation_failures = 0
             self.last_translation_metrics = None
-            raise SubtitleCancelledError("traducción cancelada")
+            raise SubtitleCancelledError("translation cancelled")
 
         # Deterministic reconstruction: input order, never completion order.
         ordered: List[_CueTranslation] = [r for r in records if r is not None]
@@ -973,7 +973,7 @@ class SubtitleService:
         )
         if failed_records:
             logger.warning(
-                "Traducción incompleta: %s de %s cues mantienen el texto original (error_type=%s)",
+                "Incomplete translation: %s of %s cues keep the original text (error_type=%s)",
                 self.last_translation_failures,
                 total_items,
                 failed_records[0].error_type or "unknown",
@@ -1090,7 +1090,7 @@ class SubtitleService:
         parse_issues = list(self.last_parse_issues)
         if parse_issues:
             logger.warning(
-                "El parser no pudo usar %s bloque(s) del archivo: %s",
+                "The parser could not use %s block(s) of the file: %s",
                 len(parse_issues),
                 ", ".join(sorted({issue.kind for issue in parse_issues})),
             )

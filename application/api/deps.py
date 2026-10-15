@@ -30,7 +30,7 @@ def open_history() -> HistoryStore:
     try:
         return HistoryStore()
     except HistoryError as exc:
-        raise HTTPException(status_code=500, detail="historial no disponible") from exc
+        raise HTTPException(status_code=500, detail="history unavailable") from exc
 
 
 def validate_extension(filename: Optional[str]) -> str:
@@ -38,7 +38,7 @@ def validate_extension(filename: Optional[str]) -> str:
     if suffix not in SUPPORTED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"formato de entrada no soportado: {suffix or '(sin extensión)'}",
+            detail=f"unsupported input format: {suffix or '(no extension)'}",
         )
     return suffix
 
@@ -55,15 +55,15 @@ def validate_provider(provider: str) -> str:
     """
     name = (provider or "").strip()
     if not name:
-        raise HTTPException(status_code=422, detail="provider es obligatorio")
+        raise HTTPException(status_code=422, detail="provider is required")
     try:
         ProviderRegistry.get(name)
     except ProviderConfigurationError as exc:
         raise HTTPException(
             status_code=422,
             detail=(
-                f"provider no soportado: {name} "
-                f"(disponibles: {', '.join(ProviderRegistry.names())})"
+                f"unsupported provider: {name} "
+                f"(available: {', '.join(ProviderRegistry.names())})"
             ),
         ) from exc
     return name
@@ -88,7 +88,7 @@ async def save_upload(
             if received > max_bytes:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"archivo demasiado grande (límite {max_bytes} bytes)",
+                    detail=f"file too large (limit {max_bytes} bytes)",
                 )
             handle.write(chunk)
         handle.close()
@@ -100,9 +100,9 @@ async def save_upload(
     except Exception as exc:
         if tmp is not None and tmp.exists():
             tmp.unlink(missing_ok=True)
-        logger.exception("Fallo al guardar la subida")
+        logger.exception("Failed to save the upload")
         raise HTTPException(
-            status_code=500, detail="no se pudo procesar la subida"
+            status_code=500, detail="could not process the upload"
         ) from exc
 
 
@@ -152,19 +152,19 @@ def safe_detail(exc: Exception, fallback: str = "error interno") -> str:
             "unknown",
         }
         error_type = exc.error_type if exc.error_type in error_types else "unknown"
-        return f"error de transcripción ({error_type})"
+        return f"transcription error ({error_type})"
     if isinstance(exc, TranslationProviderError):
         messages = {
-            ProviderAuthenticationError: "el proveedor rechazó la autenticación",
-            ProviderConfigurationError: "configuración del proveedor no válida",
-            ProviderNetworkError: "no se pudo conectar con el proveedor",
-            ProviderRateLimitError: "el proveedor aplicó un límite de solicitudes",
-            ProviderResponseError: "el proveedor devolvió una respuesta no válida",
-            ProviderTimeoutError: "el proveedor agotó el tiempo de espera",
-            ProviderUnknownError: "falló el proveedor de traducción",
+            ProviderAuthenticationError: "the provider rejected authentication",
+            ProviderConfigurationError: "invalid provider configuration",
+            ProviderNetworkError: "could not connect to the provider",
+            ProviderRateLimitError: "the provider applied a rate limit",
+            ProviderResponseError: "the provider returned an invalid response",
+            ProviderTimeoutError: "the provider timed out",
+            ProviderUnknownError: "the translation provider failed",
         }
         for error_class, message in messages.items():
             if isinstance(exc, error_class):
                 return message
-        return "falló el proveedor de traducción"
+        return "the translation provider failed"
     return fallback

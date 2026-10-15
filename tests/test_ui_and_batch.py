@@ -90,9 +90,9 @@ def test_main_window_flow(qapp, tmp_path):
     win.cb_convert_format.setCurrentText("VTT (.vtt)")
     win._run_format_conversion()
 
-    expected_converted = str(tmp_path / "sample_converted.vtt")
-    assert os.path.exists(expected_converted)
-    assert os.path.getsize(expected_converted) > 0
+    expected_processed = str(tmp_path / "sample_processed.vtt")
+    assert os.path.exists(expected_processed)
+    assert os.path.getsize(expected_processed) > 0
 
 
 def test_batch_processing_logic(tmp_path):

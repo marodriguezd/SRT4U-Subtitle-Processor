@@ -107,7 +107,7 @@ class JobManager:
                 job = self._jobs.get(job_id)
                 if job is not None:
                     job["status"] = "cancelled" if job["cancel_requested"] else "failed"
-                    job["error"] = str(exc) or "error en el job"
+                    job["error"] = str(exc) or "job error"
                     job["finished_at"] = _utc_now_iso()
                     self._prune_locked()
             return

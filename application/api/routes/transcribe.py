@@ -100,7 +100,7 @@ async def transcribe(
                 from ...logging_setup import get_logger
 
                 get_logger("api").warning(
-                    "No se pudo registrar la transcripción (%s)", type(exc).__name__
+                    "Could not record the transcription (%s)", type(exc).__name__
                 )
             payload = TranscriptionResultModel(
                 output_content=content,

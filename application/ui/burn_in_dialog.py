@@ -39,7 +39,7 @@ logger = get_logger("ui")
 
 class BurnInDialog(QDialog):
     """
-    Modal de configuración de opciones de incrustación visual y selección de rutas.
+    Modal dialog for burn-in option configuration and path selection.
     """
 
     burn_requested = pyqtSignal(str, str, list, BurnInOptions)
@@ -693,7 +693,7 @@ class BurnInProgressModal(QDialog):
         self.btn_close.show()
 
     def _on_failed(self, error_msg: str):
-        logger.error("Burn-in fallido; detalle técnico en el log de FFmpeg")
+        logger.error("Burn-in failed; technical details are in the FFmpeg log")
         self.lbl_title.setText(t("burn.err_title"))
         self.lbl_title.setStyleSheet(
             f"font-size: 16px; font-weight: 800; color: {Styles.DANGER};"

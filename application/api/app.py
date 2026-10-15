@@ -35,8 +35,8 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
     app = FastAPI(
         title="SRT4U Subtitle Processor",
         description=(
-            "API REST local sobre el núcleo existente de SRT4U: análisis, QA, "
-            "traducción, procesamiento e historial. Uso local, sin autenticación."
+            "Local REST API over the existing SRT4U core: analysis, QA, "
+            "translation, processing and history. Local use only, no authentication."
         ),
         version=APP_VERSION,
     )

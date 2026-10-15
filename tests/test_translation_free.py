@@ -21,7 +21,7 @@ def test_free_google_translation(trans_service):
     )
     if translated is None or translated.strip() == "Hello world":
         # The engine returns the source text when offline or the service is down
-        pytest.skip("Sin acceso a Internet (el motor devolvió el texto original)")
+        pytest.skip("No Internet access (the engine returned the original text)")
     assert len(translated) > 0
     # "Hola Mundo" or similar in Spanish
     assert "hola" in translated.lower() or "mundo" in translated.lower()
@@ -41,7 +41,7 @@ def test_parallel_vs_sequential_subtitles_translation(sub_service):
     assert len(res_parallel) == 2
     if res_parallel[0].text.strip() == "Good morning.":
         # The engine returns the source text when offline or the service is down
-        pytest.skip("Sin acceso a Internet (el motor devolvió el texto original)")
+        pytest.skip("No Internet access (the engine returned the original text)")
     assert res_parallel[0].text != "Good morning."
     assert (
         "buen" in res_parallel[0].text.lower() or "día" in res_parallel[0].text.lower()

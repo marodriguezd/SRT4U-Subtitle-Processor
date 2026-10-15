@@ -75,7 +75,7 @@ def _clock_to_ms(hours: str, minutes: str, seconds: str) -> int:
 
 def _validate_fraction(raw_fraction: str, original: str) -> int:
     if raw_fraction and not re.fullmatch(_FRACTION, raw_fraction):
-        raise ValueError(f"fracción de segundo inválida: {original!r}")
+        raise ValueError(f"invalid fractional second: {original!r}")
     return int(raw_fraction.ljust(3, "0")) if raw_fraction else 0
 
 
@@ -88,28 +88,28 @@ def parse_timestamp_to_ms(time_str: str) -> int:
     lives here now so parser and QA share it.
     """
     if not isinstance(time_str, str):
-        raise ValueError("el timestamp debe ser una cadena")
+        raise ValueError("timestamp must be a string")
     normalized = time_str.strip().replace(",", ".")
     if not normalized:
-        raise ValueError("timestamp vacío")
+        raise ValueError("empty timestamp")
     parts = normalized.split(":")
     if len(parts) == 3:
         raw_hours, raw_minutes, raw_seconds = parts
     elif len(parts) == 2:
         raw_hours, raw_minutes, raw_seconds = "0", parts[0], parts[1]
     else:
-        raise ValueError(f"formato de timestamp no soportado: {time_str!r}")
+        raise ValueError(f"unsupported timestamp format: {time_str!r}")
 
     if not re.fullmatch(_HOURS, raw_hours):
-        raise ValueError(f"horas inválidas: {raw_hours!r}")
+        raise ValueError(f"invalid hours: {raw_hours!r}")
     if not re.fullmatch(_MINUTES, raw_minutes):
-        raise ValueError(f"minutos inválidos: {raw_minutes!r}")
+        raise ValueError(f"invalid minutes: {raw_minutes!r}")
     if "." in raw_seconds:
         raw_whole, _, raw_fraction = raw_seconds.partition(".")
     else:
         raw_whole, raw_fraction = raw_seconds, ""
     if not re.fullmatch(_SECONDS, raw_whole):
-        raise ValueError(f"segundos inválidos: {raw_whole!r}")
+        raise ValueError(f"invalid seconds: {raw_whole!r}")
 
     milliseconds = _clock_to_ms(raw_hours, raw_minutes, raw_whole)
     return milliseconds + _validate_fraction(raw_fraction, time_str)

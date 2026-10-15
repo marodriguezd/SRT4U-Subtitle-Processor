@@ -16,7 +16,7 @@ def sample_clip(tmp_path_factory):
     """Generate a temporary video clip with FFmpeg to test duration extraction."""
     ffmpeg = VideoBurnerService.get_ffmpeg_path()
     if not ffmpeg:
-        pytest.skip("FFmpeg no está disponible en este entorno")
+        pytest.skip("FFmpeg is not available in this environment")
 
     clip = tmp_path_factory.mktemp("clips") / "clip.mp4"
     cmd = [
@@ -34,7 +34,7 @@ def sample_clip(tmp_path_factory):
         cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False
     )
     if result.returncode != 0 or not clip.exists():
-        pytest.skip("No se pudo generar el clip de prueba con FFmpeg")
+        pytest.skip("Could not generate the test clip with FFmpeg")
     return str(clip)
 
 

@@ -60,9 +60,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# --------------------------------------------------------------------------- #
 # Utilities
-# --------------------------------------------------------------------------- #
 def _ffprobe(path: str) -> dict:
     """File metadata via ffprobe (streams + format)."""
     out = subprocess.run(
@@ -139,9 +137,7 @@ def _frame(video: str, second: float, dest: str) -> QImage:
     return QImage(dest)
 
 
-# --------------------------------------------------------------------------- #
 # 1. Reading the real SRT
-# --------------------------------------------------------------------------- #
 def test_01_reads_every_cue_of_the_real_srt():
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
@@ -179,9 +175,7 @@ def test_02_every_output_format_round_trips(fmt):
         assert [it.end_ms for it in reparsed] == [it.end_ms for it in items]
 
 
-# --------------------------------------------------------------------------- #
 # 2. Cleaning
-# --------------------------------------------------------------------------- #
 def test_03_cleaning_keeps_the_real_content_intact():
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
@@ -198,9 +192,7 @@ def test_03_cleaning_keeps_the_real_content_intact():
     assert [it.start_ms for it in cleaned] == [it.start_ms for it in items]
 
 
-# --------------------------------------------------------------------------- #
 # 3. Translation with the free engine
-# --------------------------------------------------------------------------- #
 def test_04_free_translation_engine_on_real_subtitles():
     """
     The free engine must translate; without network it must report it cleanly.
@@ -233,9 +225,7 @@ def test_04_free_translation_engine_on_real_subtitles():
         assert all(it.text.strip() for it in translated)
 
 
-# --------------------------------------------------------------------------- #
-# 4. Pipeline completo de procesamiento
-# --------------------------------------------------------------------------- #
+# 4. Full processing pipeline
 def test_05_processing_pipeline_end_to_end(tmp_path, caplog):
     service = SubtitleService()
     source = str(tmp_path / SRT_NAME)
@@ -282,12 +272,10 @@ def test_05_processing_pipeline_end_to_end(tmp_path, caplog):
     assert not errors, [r.getMessage() for r in errors]
 
 
-# --------------------------------------------------------------------------- #
 # 5. Real video metadata
-# --------------------------------------------------------------------------- #
 def test_06_ffmpeg_detects_real_video_metadata():
     ffmpeg = VideoBurnerService.get_ffmpeg_path()
-    assert ffmpeg, "no se encontró FFmpeg"
+    assert ffmpeg, "FFmpeg not found"
 
     duration = VideoBurnerService.get_video_duration_ms(VIDEO_PATH)
     assert abs(duration - EXPECTED_DURATION_MS) < 1000
@@ -300,9 +288,7 @@ def test_06_ffmpeg_detects_real_video_metadata():
     assert float(probe["format"]["duration"]) == pytest.approx(60.0, abs=0.5)
 
 
-# --------------------------------------------------------------------------- #
 # 6. ASS generation for hardsub
-# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "options",
     [
@@ -336,9 +322,7 @@ def test_07_ass_script_matches_the_real_video(options):
     assert not any("0:00:30." in start for start in starts), starts
 
 
-# --------------------------------------------------------------------------- #
-# 7. Burn-in (hardsub) del minuto completo  -- se hace una vez y se reutiliza
-# --------------------------------------------------------------------------- #
+# 7. Burn-in (hardsub) of the full minute -- done once and reused
 @pytest.fixture(scope="module")
 def burned_video(tmp_path_factory, qapp):
     """Burn the subtitles onto the full real video and return the path."""
@@ -355,7 +339,7 @@ def burned_video(tmp_path_factory, qapp):
     )
     elapsed = time.time() - started
 
-    assert "error" not in result, f"el burn-in falló: {result.get('error')}"
+    assert "error" not in result, f"burn-in failed: {result.get('error')}"
     assert not result.get("cancelled")
     assert result.get("output") == out_path
     assert os.path.exists(out_path) and os.path.getsize(out_path) > 1_000_000
@@ -387,8 +371,8 @@ def test_09_subtitles_are_actually_rendered_in_the_pixels(burned_video, tmp_path
         assert (burned.width(), burned.height()) == EXPECTED_SIZE
 
         height = original.height()
-        differences = {"arriba": 0, "subtitulo": 0}
-        sampled = {"arriba": 0, "subtitulo": 0}
+        differences = {"top": 0, "subtitle": 0}
+        sampled = {"top": 0, "subtitle": 0}
         for y in range(0, height, 6):
             for x in range(0, original.width(), 12):
                 a, b = original.pixelColor(x, y), burned.pixelColor(x, y)
@@ -397,7 +381,7 @@ def test_09_subtitles_are_actually_rendered_in_the_pixels(burned_video, tmp_path
                     + abs(a.green() - b.green())
                     + abs(a.blue() - b.blue())
                 )
-                key = "arriba" if y < height * 0.6 else "subtitulo"
+                key = "top" if y < height * 0.6 else "subtitle"
                 sampled[key] += 1
                 if delta > 30:
                     differences[key] += 1
@@ -457,9 +441,7 @@ def test_11_burn_in_fails_cleanly_on_a_broken_video(tmp_path, caplog, qapp):
     assert not os.path.exists(out) or os.path.getsize(out) == 0
 
 
-# --------------------------------------------------------------------------- #
 # 8. Preview player
-# --------------------------------------------------------------------------- #
 def test_12_preview_player_opens_the_real_video(qapp):
     player = VideoPreviewPlayer()
     player.show()
@@ -535,9 +517,7 @@ def test_13_preview_player_shows_the_real_subtitles(qapp):
     assert "upgrade" not in player.sub_overlay.text()
 
 
-# --------------------------------------------------------------------------- #
 # 9. Full UI flows
-# --------------------------------------------------------------------------- #
 def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     """Home -> process with translation -> preview -> result page."""
     win = MainWindow()
@@ -610,7 +590,7 @@ def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     win.preview_search_input.setText("goblins")
     qapp.processEvents()
     filtered_text = win.lbl_preview_sub_counter.text()
-    assert filtered_text != total_text, "el buscador no filtró nada"
+    assert filtered_text != total_text, "the search filtered nothing"
     win.preview_search_input.setText("")
     qapp.processEvents()
     assert win.lbl_preview_sub_counter.text() == total_text
@@ -638,8 +618,8 @@ def test_15_main_window_converts_the_real_file(qapp, tmp_path):
     ):
         win.cb_convert_format.setCurrentText(label)
         win._run_format_conversion()
-        produced = str(tmp_path / f"S1pK5hmTzkE_1min_converted.{ext}")
-        assert os.path.exists(produced), f"no se generó {produced}"
+        produced = str(tmp_path / f"S1pK5hmTzkE_1min_processed.{ext}")
+        assert os.path.exists(produced), f"{produced} was not generated"
         assert os.path.getsize(produced) > 0
         if ext != "txt":
             items = service.parse_subtitles(
@@ -755,9 +735,7 @@ def test_18_burn_in_dialog_with_real_subtitles(qapp, tmp_path):
         dialog.close()
 
 
-# --------------------------------------------------------------------------- #
 # 10. Settings, languages and state
-# --------------------------------------------------------------------------- #
 def test_19_home_options_are_persisted(qapp, tmp_path):
     win = MainWindow()
     source = str(tmp_path / SRT_NAME)

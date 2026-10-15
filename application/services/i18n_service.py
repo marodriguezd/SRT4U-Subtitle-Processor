@@ -376,7 +376,7 @@ class I18nService(QObject):
             "alert.unexpected_error_title": "Unexpected error",
             "alert.unexpected_error_desc": "An unexpected error occurred. Details were saved to the log file:\n{path}",
         },
-        # ------------------ ES (ESPAÑOL) ------------------
+        # ------------------ ES (SPANISH) ------------------
         "es": {
             # Navigation
             "nav.home": "Inicio",
@@ -713,7 +713,7 @@ class I18nService(QObject):
             "alert.unexpected_error_title": "Error inesperado",
             "alert.unexpected_error_desc": "Se produjo un error inesperado. Los detalles se guardaron en el archivo de log:\n{path}",
         },
-        # ------------------ PT (PORTUGUÊS) ------------------
+        # ------------------ PT (PORTUGUESE) ------------------
         "pt": {
             # Navigation
             "nav.home": "Início",
@@ -1050,7 +1050,7 @@ class I18nService(QObject):
             "alert.unexpected_error_title": "Erro inesperado",
             "alert.unexpected_error_desc": "Ocorreu um erro inesperado. Os detalhes foram guardados no ficheiro de registo (log):\n{path}",
         },
-        # ------------------ DE (DEUTSCH) ------------------
+        # ------------------ DE (GERMAN) ------------------
         "de": {
             # Navigation
             "nav.home": "Startseite",
@@ -1387,7 +1387,7 @@ class I18nService(QObject):
             "alert.unexpected_error_title": "Unerwarteter Fehler",
             "alert.unexpected_error_desc": "Ein unerwarteter Fehler ist aufgetreten. Die Details wurden ins Protokoll (Log) geschrieben:\n{path}",
         },
-        # ------------------ IT (ITALIANO) ------------------
+        # ------------------ IT (ITALIAN) ------------------
         "it": {
             # Navigation
             "nav.home": "Home",
@@ -1724,7 +1724,7 @@ class I18nService(QObject):
             "alert.unexpected_error_title": "Errore imprevisto",
             "alert.unexpected_error_desc": "Si è verificato un errore imprevisto. I dettagli sono stati salvati nel file di log:\n{path}",
         },
-        # ------------------ FR (FRANÇAIS) ------------------
+        # ------------------ FR (FRENCH) ------------------
         "fr": {
             # Navigation
             "nav.home": "Accueil",
@@ -2061,7 +2061,7 @@ class I18nService(QObject):
             "alert.unexpected_error_title": "Erreur inattendue",
             "alert.unexpected_error_desc": "Une erreur inattendue s'est produite. Les détails ont été enregistrés dans le journal :\n{path}",
         },
-        # ------------------ ZH-CN (简体中文) ------------------
+        # ------------------ ZH-CN (SIMPLIFIED CHINESE) ------------------
         "zh-CN": {
             # Navigation
             "nav.home": "首页",

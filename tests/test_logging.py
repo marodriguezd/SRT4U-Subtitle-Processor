@@ -58,7 +58,9 @@ def test_setup_logging_survives_unwritable_directory(tmp_path):
     log_path = setup_logging(config_dir=str(missing), console=False, force=True)
 
     assert log_path.endswith("srt4u.log")
-    get_logger("test").warning("el log no se pudo abrir, pero no se lanza excepción")
+    get_logger("test").warning(
+        "the log could not be opened, but no exception is raised"
+    )
     assert not (missing / "srt4u.log").exists()
 
 
@@ -180,7 +182,7 @@ def test_translation_failures_are_counted_and_logged(tmp_path, monkeypatch, capl
         target_language="es",
     )
     assert result.stats.translation_failures == 2
-    assert "Traducción incompleta" in caplog.text
+    assert "Incomplete translation" in caplog.text
 
 
 def test_translation_exceptions_are_logged(tmp_path, monkeypatch, caplog):
@@ -196,7 +198,7 @@ def test_translation_exceptions_are_logged(tmp_path, monkeypatch, caplog):
 
     assert translated[0].text == "Hello"
     assert service.last_translation_failures == 1
-    assert "Excepción al traducir el cue 1" in caplog.text
+    assert "Exception while translating cue 1" in caplog.text
 
 
 def test_main_window_warns_when_translation_fails(qapp, tmp_path, monkeypatch):
@@ -218,7 +220,7 @@ def test_main_window_warns_when_translation_fails(qapp, tmp_path, monkeypatch):
     )
     window._on_processing_completed(result)
 
-    assert recorded, "No se avisó al usuario de la traducción incompleta"
+    assert recorded, "The user was not notified of the incomplete translation"
     title, text = recorded[0][1], recorded[0][2]
     assert title == get_i18n().t("alert.translation_failures_title")
     assert "1" in text and "1" in get_i18n().t(
@@ -243,7 +245,7 @@ def test_settings_save_failure_warns_user(qapp, tmp_path, monkeypatch):
 
     window._save_settings()
 
-    assert recorded, "No se avisó al usuario del fallo al guardar los ajustes"
+    assert recorded, "The user was not notified of the failure to save the settings"
     assert recorded[0][1] == get_i18n().t("alert.settings_save_error_title")
 
 

@@ -48,7 +48,7 @@ class QARules:
             or not math.isfinite(self.max_cps)
             or self.max_cps <= 0
         ):
-            raise ValueError("max_cps debe ser un número finito mayor que cero")
+            raise ValueError("max_cps must be a finite number greater than zero")
         integer_limits = (
             self.max_characters_per_line,
             self.max_lines,
@@ -59,19 +59,17 @@ class QARules:
             isinstance(value, bool) or not isinstance(value, int)
             for value in integer_limits
         ):
-            raise ValueError(
-                "los límites de líneas, caracteres y duración deben ser enteros"
-            )
+            raise ValueError("line, character and duration limits must be integers")
         if self.max_characters_per_line <= 0:
-            raise ValueError("max_characters_per_line debe ser mayor que cero")
+            raise ValueError("max_characters_per_line must be greater than zero")
         if self.max_lines <= 0:
-            raise ValueError("max_lines debe ser mayor que cero")
+            raise ValueError("max_lines must be greater than zero")
         if self.min_duration_ms < 0:
-            raise ValueError("min_duration_ms no puede ser negativo")
+            raise ValueError("min_duration_ms cannot be negative")
         if self.max_duration_ms <= 0:
-            raise ValueError("max_duration_ms debe ser mayor que cero")
+            raise ValueError("max_duration_ms must be greater than zero")
         if self.min_duration_ms > self.max_duration_ms:
-            raise ValueError("min_duration_ms no puede superar max_duration_ms")
+            raise ValueError("min_duration_ms cannot exceed max_duration_ms")
 
     @property
     def min_duration(self) -> float:
@@ -94,7 +92,7 @@ class QAFinding:
 
     def __post_init__(self):
         if self.severity not in {"error", "warning", "info"}:
-            raise ValueError("severity debe ser error, warning o info")
+            raise ValueError("severity must be error, warning or info")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -163,7 +161,7 @@ class _CueIndexRule(SubtitleQARule):
                         index
                         if isinstance(index, int) and not isinstance(index, bool)
                         else None,
-                        "El índice del cue debe ser un entero positivo.",
+                        "The cue index must be a positive integer.",
                     )
                 )
             elif index in first_by_index:
@@ -172,7 +170,7 @@ class _CueIndexRule(SubtitleQARule):
                         "error",
                         "duplicate_index",
                         index,
-                        "El índice del cue está repetido.",
+                        "The cue index is duplicated.",
                         {"first_position": first_by_index[index] + 1},
                     )
                 )
@@ -202,7 +200,7 @@ class _TimingRule(SubtitleQARule):
                         "error",
                         "invalid_timecode",
                         item.index,
-                        "El cue tiene un intervalo temporal inválido.",
+                        "The cue has an invalid time interval.",
                         {"start_ms": item.start_ms, "end_ms": item.end_ms},
                     )
                 )
@@ -223,7 +221,7 @@ class _TimingRule(SubtitleQARule):
                     "warning",
                     "overlap",
                     items[position].index,
-                    "El intervalo del cue se solapa con otro subtítulo.",
+                    "The cue interval overlaps another subtitle.",
                     {"overlaps_with": [items[partner_position].index]},
                 )
             )
@@ -241,7 +239,7 @@ class _CueOrderRule(SubtitleQARule):
                         "info",
                         "non_monotonic_order",
                         item.index,
-                        "El cue aparece fuera del orden temporal.",
+                        "The cue is out of temporal order.",
                         {
                             "start_ms": item.start_ms,
                             "previous_start_ms": previous_valid.start_ms,
@@ -266,7 +264,7 @@ class _ContentRule(SubtitleQARule):
                         "warning",
                         "empty_subtitle",
                         item.index,
-                        "El cue no contiene texto visible.",
+                        "The cue contains no visible text.",
                     )
                 )
             elif normalized in first_by_text:
@@ -275,7 +273,7 @@ class _ContentRule(SubtitleQARule):
                         "warning",
                         "duplicate_subtitle",
                         item.index,
-                        "El texto del cue está duplicado.",
+                        "The cue text is duplicated.",
                         {"first_subtitle_index": first_by_text[normalized]},
                     )
                 )
@@ -288,7 +286,7 @@ class _ContentRule(SubtitleQARule):
                         "warning",
                         "too_many_lines",
                         item.index,
-                        "El cue supera el máximo de líneas configurado.",
+                        "The cue exceeds the configured maximum number of lines.",
                         {"line_count": len(lines), "maximum_lines": rules.max_lines},
                     )
                 )
@@ -299,7 +297,7 @@ class _ContentRule(SubtitleQARule):
                             "warning",
                             "empty_line",
                             item.index,
-                            "El cue contiene una línea vacía.",
+                            "The cue contains an empty line.",
                             {"line_number": line_number},
                         )
                     )
@@ -309,7 +307,7 @@ class _ContentRule(SubtitleQARule):
                             "warning",
                             "line_too_long",
                             item.index,
-                            "La línea supera el máximo de caracteres configurado.",
+                            "The line exceeds the configured maximum number of characters.",
                             {
                                 "line_number": line_number,
                                 "characters": len(line),
@@ -327,7 +325,7 @@ class _ContentRule(SubtitleQARule):
                         "warning",
                         "duration_too_short",
                         item.index,
-                        "La duración del cue es inferior al mínimo configurado.",
+                        "The cue duration is below the configured minimum.",
                         {"duration_ms": duration, "minimum_ms": rules.min_duration_ms},
                     )
                 )
@@ -337,7 +335,7 @@ class _ContentRule(SubtitleQARule):
                         "warning",
                         "duration_too_long",
                         item.index,
-                        "La duración del cue supera el máximo configurado.",
+                        "The cue duration exceeds the configured maximum.",
                         {"duration_ms": duration, "maximum_ms": rules.max_duration_ms},
                     )
                 )
@@ -348,7 +346,7 @@ class _ContentRule(SubtitleQARule):
                         "warning",
                         "cps_exceeded",
                         item.index,
-                        "La velocidad de lectura supera el máximo CPS configurado.",
+                        "The reading speed exceeds the configured maximum CPS.",
                         {"cps": round(cps, 3), "maximum_cps": rules.max_cps},
                     )
                 )
@@ -370,7 +368,7 @@ class _FormattingRule(SubtitleQARule):
                                 "warning",
                                 "malformed_formatting_tag",
                                 item.index,
-                                "Las etiquetas HTML del cue no están equilibradas.",
+                                "The cue's HTML tags are not balanced.",
                             )
                         )
                         break
@@ -384,7 +382,7 @@ class _FormattingRule(SubtitleQARule):
                             "warning",
                             "malformed_formatting_tag",
                             item.index,
-                            "El cue contiene etiquetas HTML sin cerrar.",
+                            "The cue contains unclosed HTML tags.",
                         )
                     )
 
@@ -403,7 +401,7 @@ class _FormattingRule(SubtitleQARule):
                         "warning",
                         "malformed_formatting_tag",
                         item.index,
-                        "Las etiquetas de estilo ASS del cue tienen llaves desequilibradas.",
+                        "The ASS style tags of the cue have unbalanced braces.",
                     )
                 )
             if incomplete_html and not item.text.endswith(">"):
@@ -412,7 +410,7 @@ class _FormattingRule(SubtitleQARule):
                         "warning",
                         "malformed_formatting_tag",
                         item.index,
-                        "El cue contiene una etiqueta HTML incompleta.",
+                        "The cue contains an incomplete HTML tag.",
                     )
                 )
 
@@ -474,7 +472,7 @@ class SubtitleQA:
         if source_content is not None and not source_content.strip():
             findings.append(
                 QAFinding(
-                    "warning", "empty_file", None, "El archivo no contiene subtítulos."
+                    "warning", "empty_file", None, "The file contains no subtitles."
                 )
             )
         if source_content is not None and file_format:
@@ -518,7 +516,7 @@ class SubtitleQA:
                         "warning",
                         "formatting_tag_mismatch",
                         original.index,
-                        "Las etiquetas de formato no coinciden con el cue de referencia.",
+                        "Format tags do not match the reference cue.",
                         {"expected_tags": expected, "actual_tags": actual},
                     )
                 )
@@ -540,7 +538,9 @@ class SubtitleQA:
             re.IGNORECASE,
         ):
             findings.append(
-                QAFinding("error", "invalid_format", None, "Falta la cabecera WEBVTT.")
+                QAFinding(
+                    "error", "invalid_format", None, "The WEBVTT header is missing."
+                )
             )
         if not content.strip():
             return
@@ -595,7 +595,7 @@ class SubtitleQA:
                             "error",
                             "invalid_index",
                             cue_number,
-                            "El cue SRT no tiene un índice numérico.",
+                            "The SRT cue has no numeric index.",
                         )
                     )
                 else:
@@ -606,7 +606,7 @@ class SubtitleQA:
                                 "error",
                                 "invalid_index",
                                 cue_number,
-                                "El índice del cue SRT debe ser positivo.",
+                                "The SRT cue index must be positive.",
                                 {"declared_index": declared},
                             )
                         )
@@ -616,7 +616,7 @@ class SubtitleQA:
                                 "error",
                                 "duplicate_index",
                                 cue_number,
-                                "El índice del cue SRT está repetido.",
+                                "The SRT cue index is duplicated.",
                                 {
                                     "declared_index": declared,
                                     "first_position": declared_indices[declared],
@@ -631,7 +631,7 @@ class SubtitleQA:
                                     "warning",
                                     "invalid_format",
                                     cue_number,
-                                    "La numeración SRT no es consecutiva desde uno.",
+                                    "SRT numbering is not consecutive from one.",
                                     {
                                         "declared_index": declared,
                                         "expected_index": cue_number,
@@ -647,7 +647,7 @@ class SubtitleQA:
                         if file_format == "srt"
                         else "invalid_format",
                         cue_number,
-                        "El bloque no contiene una línea de timecode válida.",
+                        "The block does not contain a valid timecode line.",
                     )
                 )
                 continue
@@ -674,7 +674,7 @@ class SubtitleQA:
                             "error",
                             "invalid_timecode",
                             cue_number,
-                            "No se pudo interpretar la línea de timecode del archivo.",
+                            "The file's timecode line could not be parsed.",
                         )
                     )
                 continue
@@ -685,7 +685,7 @@ class SubtitleQA:
                         "warning",
                         "empty_subtitle",
                         cue_number,
-                        "El bloque con timecode no contiene texto.",
+                        "The timecode block contains no text.",
                     )
                 )
 
@@ -741,7 +741,7 @@ class SubtitleQA:
                     "error",
                     "invalid_format",
                     None,
-                    "El archivo ASS/SSA no contiene las secciones básicas requeridas.",
+                    "The ASS/SSA file does not contain the required basic sections.",
                 )
             )
         dialogue_number = 0
@@ -756,7 +756,7 @@ class SubtitleQA:
                         "error",
                         "invalid_format",
                         dialogue_number,
-                        "La línea Dialogue de ASS/SSA no tiene los campos esperados.",
+                        "The ASS/SSA Dialogue line does not have the expected fields.",
                     )
                 )
                 continue
@@ -771,6 +771,6 @@ class SubtitleQA:
                         "error",
                         "invalid_timecode",
                         dialogue_number,
-                        "La línea Dialogue de ASS/SSA contiene timecodes inválidos.",
+                        "The ASS/SSA Dialogue line contains invalid timecodes.",
                     )
                 )

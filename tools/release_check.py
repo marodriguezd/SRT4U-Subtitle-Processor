@@ -43,13 +43,13 @@ def check_tag(tag: str, pyproject_path: Path) -> str | None:
     """Return a refusal reason, or ``None`` when the tag may be published."""
     if not STABLE_TAG_RE.fullmatch(tag):
         return (
-            f"el tag {tag!r} no es una versión estable vMAJOR.MINOR.PATCH; "
-            "las pre-releases (p. ej. v1.4.9-rc1) no se publican como estables"
+            f"the tag {tag!r} is not a stable vMAJOR.MINOR.PATCH version; "
+            "pre-releases (e.g. v1.4.9-rc1) are not published as stable"
         )
     expected = f"v{project_version(pyproject_path)}"
     if tag != expected:
         return (
-            f"el tag {tag!r} no coincide con la versión del proyecto "
+            f"the tag {tag!r} does not match the project version "
             f"({expected} en pyproject.toml)"
         )
     return None

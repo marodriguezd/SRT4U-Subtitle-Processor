@@ -38,17 +38,17 @@ from .transcription_providers import (
 
 logger = get_logger("transcription")
 
-INSTALL_HINT = "transcripción no disponible: instala el extra con python -m pip install '.[transcription]'"
+INSTALL_HINT = "transcription unavailable: install the extra with python -m pip install '.[transcription]'"
 
 #: Model -> (approx. download size, short description). Sizes are indicative
 #: for the default quantized checkpoints and are shown before any download.
 WHISPER_MODELS = {
-    "tiny": ("~75 MB", "mínimo, rápido, calidad baja"),
+    "tiny": ("~75 MB", "minimum, fast, low quality"),
     "base": ("~145 MB", "ligero, calidad aceptable"),
     "small": ("~465 MB", "equilibrio recomendado"),
-    "medium": ("~1.5 GB", "mejor calidad, más lento"),
-    "large-v3": ("~3 GB", "máxima calidad, lento, más RAM"),
-    "turbo": ("~1.6 GB", "rápido con buena calidad"),
+    "medium": ("~1.5 GB", "better quality, slower"),
+    "large-v3": ("~3 GB", "maximum quality, slow, more RAM"),
+    "turbo": ("~1.6 GB", "fast with good quality"),
 }
 
 
@@ -93,21 +93,21 @@ class WhisperProvider(TranscriptionProvider):
             raise TranscriptionNotInstalledError(INSTALL_HINT)
         if not media_path or not os.path.isfile(media_path):
             raise TranscriptionInvalidFileError(
-                f"archivo multimedia no encontrado: {media_path or '(vacío)'}"
+                f"media file not found: {media_path or '(empty)'}"
             )
         if config.model not in WHISPER_MODELS:
             raise TranscriptionModelError(
-                f"modelo no soportado: {config.model} "
+                f"unsupported model: {config.model} "
                 f"(soportados: {', '.join(WHISPER_MODELS)})"
             )
         if cancel_event is not None and cancel_event.is_set():
-            raise TranscriptionCancelledError("transcripción cancelada")
+            raise TranscriptionCancelledError("transcription cancelled")
 
         device = self._resolve_device(config.device)
         size, _ = WHISPER_MODELS[config.model]
         logger.info(
-            "Transcribiendo '%s' con whisper/%s en %s "
-            "(el modelo, %s, se descarga una vez si no está en caché)",
+            "Transcribing '%s' with whisper/%s on %s "
+            "(model %s is downloaded once if not cached)",
             os.path.basename(media_path),
             config.model,
             device,
@@ -141,7 +141,7 @@ class WhisperProvider(TranscriptionProvider):
             segments: List[TranscriptionSegment] = []
             for position, raw in enumerate(raw_segments, 1):
                 if cancel_event is not None and cancel_event.is_set():
-                    raise TranscriptionCancelledError("transcripción cancelada")
+                    raise TranscriptionCancelledError("transcription cancelled")
                 text = (getattr(raw, "text", "") or "").strip()
                 if not text:
                     continue
@@ -196,7 +196,7 @@ class WhisperProvider(TranscriptionProvider):
             return value
         if value != "auto":
             raise TranscriptionError(
-                f"dispositivo no soportado: {device} (usa auto, cpu o cuda)"
+                f"unsupported device: {device} (use auto, cpu or cuda)"
             )
         WhisperModel = _load_faster_whisper()
         if WhisperModel is not None:
@@ -227,8 +227,8 @@ def _normalize_error(exc: Exception, model: str) -> TranscriptionError:
     lowered = message.casefold()
     if "ffmpeg" in lowered or "ffprobe" in lowered:
         return TranscriptionFFmpegError(
-            "FFmpeg no disponible o no pudo leer el archivo "
-            "(instala FFmpeg y reintenta)"
+            "FFmpeg is unavailable or could not read the file "
+            "(install FFmpeg and retry)"
         )
     if (
         "out of memory" in lowered
@@ -236,11 +236,11 @@ def _normalize_error(exc: Exception, model: str) -> TranscriptionError:
         and ("cuda" in lowered or "alloc" in lowered)
     ):
         return TranscriptionMemoryError(
-            f"memoria insuficiente para el modelo '{model}'; "
-            "prueba con un modelo menor (tiny/base/small) o cierra aplicaciones"
+            f"not enough memory for model '{model}'; "
+            "try a smaller model (tiny/base/small) or close other applications"
         )
     if "no such file" in lowered or "not found" in lowered and "model" not in lowered:
-        return TranscriptionInvalidFileError("archivo multimedia inválido o ilegible")
+        return TranscriptionInvalidFileError("invalid or unreadable media file")
     if "model" in lowered and (
         "not found" in lowered
         or "download" in lowered
@@ -248,13 +248,13 @@ def _normalize_error(exc: Exception, model: str) -> TranscriptionError:
         or "403" in lowered
     ):
         return TranscriptionModelError(
-            f"modelo '{model}' no disponible "
+            f"model '{model}' is not available "
             f"(soportados: {', '.join(WHISPER_MODELS)}); "
-            "revisa tu conexión la primera vez, el modelo se descarga una vez"
+            "check your connection the first time; the model is downloaded once"
         )
-    logger.warning("Whisper falló (%s)", type(exc).__name__)
+    logger.warning("Whisper failed (%s)", type(exc).__name__)
     return TranscriptionUnknownError(
-        f"whisper: error inesperado ({type(exc).__name__})"
+        f"whisper: unexpected error ({type(exc).__name__})"
     )
 
 

@@ -142,11 +142,11 @@ class VideoBurnerService:
                 total_ms = int((hours * 3600 + minutes * 60 + seconds) * 1000)
                 return total_ms
             logger.warning(
-                "FFmpeg no informó la duración de %s; el progreso se mostrará sin porcentaje",
+                "FFmpeg did not report the duration of %s; progress will be shown without a percentage",
                 video_path,
             )
         except Exception as exc:
-            logger.warning("No se pudo obtener la duración (%s)", type(exc).__name__)
+            logger.warning("Could not obtain the duration (%s)", type(exc).__name__)
 
         return None
 
@@ -337,31 +337,29 @@ class BurnInWorker(QThread):
                 self._process.wait(timeout=1.5)
             except Exception as exc:
                 logger.warning(
-                    "FFmpeg no respondió a terminate (%s); se fuerza el cierre",
+                    "FFmpeg did not respond to terminate (%s); forcing shutdown",
                     type(exc).__name__,
                 )
                 try:
                     self._process.kill()
                 except Exception as kill_exc:
                     logger.warning(
-                        "No se pudo matar el proceso de FFmpeg (%s)",
+                        "Could not kill the FFmpeg process (%s)",
                         type(kill_exc).__name__,
                     )
 
     def run(self):
         ffmpeg_bin = VideoBurnerService.get_ffmpeg_path()
         if not self.video_path or not os.path.isfile(self.video_path):
-            logger.error("El archivo de vídeo no existe")
+            logger.error("The video file does not exist")
             self.failed.emit(t("burn.error_video_missing"))
             return
         if paths_refer_to_same_file(self.video_path, self.output_path):
-            logger.error("La salida del burn-in coincide con el vídeo de entrada")
+            logger.error("The burn-in output matches the input video")
             self.failed.emit(t("burn.error_same_path"))
             return
         if not ffmpeg_bin:
-            logger.error(
-                "No se encontró un binario de FFmpeg funcional; no se puede incrustar subtítulos"
-            )
+            logger.error("No working FFmpeg binary found; cannot burn in subtitles")
             self.failed.emit(t("burn.error_no_ffmpeg"))
             return
 
@@ -380,7 +378,7 @@ class BurnInWorker(QThread):
             )
             temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
         except Exception as exc:
-            logger.error("No se pudo preparar el burn-in (%s)", type(exc).__name__)
+            logger.error("Could not prepare the burn-in (%s)", type(exc).__name__)
             self.failed.emit(t("burn.error_prepare"))
             return
 
@@ -449,7 +447,7 @@ class BurnInWorker(QThread):
 
                 while True:
                     if self._is_cancelled:
-                        logger.info("Burn-in cancelado por el usuario")
+                        logger.info("Burn-in cancelled by the user")
                         self.cancelled.emit()
                         return
 
@@ -466,7 +464,7 @@ class BurnInWorker(QThread):
                             current_time_sec = us / 1000000.0
                         except ValueError as exc:
                             logger.debug(
-                                "Línea de progreso ilegible (%s)", type(exc).__name__
+                                "Unreadable progress line (%s)", type(exc).__name__
                             )
                     elif line.startswith("speed="):
                         val = line.split("=")[1].strip()
@@ -491,7 +489,7 @@ class BurnInWorker(QThread):
                                 speed_float = 1.0
                         except ValueError:
                             logger.debug(
-                                "Velocidad de codificación ilegible (%s); se asume 1.0x",
+                                "Unreadable encoding speed (%s); assuming 1.0x",
                                 current_speed_str,
                             )
 
@@ -519,7 +517,7 @@ class BurnInWorker(QThread):
                 self.finished_success.emit(self.output_path)
             else:
                 logger.error(
-                    "FFmpeg terminó con error (código %s); detalles técnicos omitidos",
+                    "FFmpeg exited with an error (code %s); technical details omitted",
                     self._process.returncode,
                 )
                 self.failed.emit(
@@ -527,7 +525,7 @@ class BurnInWorker(QThread):
                 )
 
         except Exception as e:
-            logger.error("Excepción al ejecutar FFmpeg (%s)", type(e).__name__)
+            logger.error("Exception while running FFmpeg (%s)", type(e).__name__)
             if not self._is_cancelled:
                 self.failed.emit(t("burn.error_exception"))
         finally:
@@ -539,6 +537,6 @@ class BurnInWorker(QThread):
                     os.remove(temp_output)
             except OSError as exc:
                 logger.warning(
-                    "No se pudo eliminar el vídeo temporal (%s)", type(exc).__name__
+                    "Could not delete the temporary video (%s)", type(exc).__name__
                 )
             shutil.rmtree(temp_dir, ignore_errors=True)

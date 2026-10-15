@@ -26,7 +26,7 @@ def get_resource_path(relative_path):
         base_path = sys._MEIPASS
     except AttributeError as exc:
         logger.debug(
-            "Ejecutando sin PyInstaller (%s); se usa el directorio actual", exc
+            "Running without PyInstaller (%s); using the current directory", exc
         )
         base_path = os.path.abspath(".")
 
@@ -59,9 +59,7 @@ def install_excepthook(log_path: str) -> None:
             sys.__excepthook__(exc_type, exc_value, exc_tb)
             return
 
-        logger.critical(
-            "Excepción no controlada", exc_info=(exc_type, exc_value, exc_tb)
-        )
+        logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_tb))
         # Notification only makes sense if a QApplication instance is active
         if QApplication.instance() is None:
             return
@@ -76,7 +74,7 @@ def install_excepthook(log_path: str) -> None:
             )
         except Exception as exc:
             # Never fail inside the exception hook itself
-            logger.debug("No se pudo mostrar el aviso de error inesperado: %s", exc)
+            logger.debug("Could not show the unexpected error notice: %s", exc)
 
     sys.excepthook = _hook
 
@@ -118,5 +116,5 @@ if __name__ == "__main__":
     processor.setWindowIcon(app_icon)
     processor.show()
     exit_code = app.exec()
-    logger.info("SRT4U finalizado (código %s)", exit_code)
+    logger.info("SRT4U finished (exit code %s)", exit_code)
     sys.exit(exit_code)

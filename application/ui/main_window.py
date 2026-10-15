@@ -171,7 +171,7 @@ class ProcessWorker(QThread):
         except SubtitleCancelledError:
             self.cancelled.emit()
         except Exception:
-            logger.exception("Fallo al procesar el subtítulo")
+            logger.exception("Failed to process the subtitle")
             self.failed.emit(t("worker.error_processing"))
 
 
@@ -222,10 +222,10 @@ class TranscribeWorker(QThread):
         except TranscriptionCancelledError:
             self.failed.emit(t("transcribe.cancelled"))
         except TranscriptionError as e:
-            logger.warning("Fallo de transcripción (%s)", e.error_type)
+            logger.warning("Transcription failed (%s)", e.error_type)
             self.failed.emit(e.error_type)
         except Exception:
-            logger.exception("Fallo inesperado al transcribir el medio")
+            logger.exception("Unexpected failure while transcribing the media")
             self.failed.emit(t("worker.error_transcribe"))
 
 
@@ -259,10 +259,10 @@ class PipelineWorker(QThread):
                 return
             self.completed.emit(result)
         except PipelineConfigError as e:
-            logger.warning("Configuración de pipeline no válida (%s)", type(e).__name__)
+            logger.warning("Invalid pipeline configuration (%s)", type(e).__name__)
             self.failed.emit(t("worker.error_pipeline_config"))
         except Exception:
-            logger.exception("Fallo inesperado en la pipeline")
+            logger.exception("Unexpected failure in the pipeline")
             self.failed.emit(t("worker.error_pipeline_internal"))
 
 
@@ -490,9 +490,7 @@ class MainWindow(QMainWindow):
                 try:
                     cancel()
                 except Exception as exc:  # pragma: no cover - defensive
-                    logger.warning(
-                        "No se pudo cancelar un worker (%s)", type(exc).__name__
-                    )
+                    logger.warning("Could not cancel a worker (%s)", type(exc).__name__)
 
         deadline = time.monotonic() + CLOSE_GRACE_SECONDS
         while time.monotonic() < deadline:
@@ -1072,8 +1070,8 @@ class MainWindow(QMainWindow):
         self.lbl_transcribe_sub = QLabel(
             t(
                 "transcribe.subtitle",
-                "Convierte audio o vídeo en subtítulos con Whisper local. "
-                "El resultado alimenta Analytics, QA, limpieza y traducción.",
+                "Converts audio or video into subtitles with local Whisper. "
+                "The result feeds Analytics, QA, cleaning and translation.",
             )
         )
         self.lbl_transcribe_sub.setStyleSheet(
@@ -1091,16 +1089,12 @@ class MainWindow(QMainWindow):
         file_card.setObjectName("CardContainer")
         f_layout = QHBoxLayout(file_card)
         f_layout.setContentsMargins(18, 14, 18, 14)
-        self.lbl_transcribe_file = QLabel(
-            t("transcribe.no_file", "Ningún archivo seleccionado")
-        )
+        self.lbl_transcribe_file = QLabel(t("transcribe.no_file", "No file selected"))
         self.lbl_transcribe_file.setStyleSheet(
             f"font-size: 13px; color: {Styles.TEXT_MUTED};"
         )
         f_layout.addWidget(self.lbl_transcribe_file, stretch=1)
-        self.btn_choose_media = QPushButton(
-            t("transcribe.btn_choose", "Elegir archivo")
-        )
+        self.btn_choose_media = QPushButton(t("transcribe.btn_choose", "Choose file"))
         self.btn_choose_media.setProperty("class", "secondary-btn")
         self.btn_choose_media.setIcon(
             Icons.get_icon(
@@ -1181,8 +1175,8 @@ class MainWindow(QMainWindow):
             self.lbl_transcribe_avail.setText(
                 t(
                     "transcribe.avail_ok",
-                    "Whisper disponible localmente. Modelos: {models}. "
-                    "El modelo se descarga una vez si no está en caché.",
+                    "Whisper available locally. Models: {models}. "
+                    "The model is downloaded once if it is not cached.",
                     models=models,
                 )
             )
@@ -1192,7 +1186,7 @@ class MainWindow(QMainWindow):
                 t(
                     "transcribe.avail_missing",
                     "Whisper no instalado: python -m pip install '.[transcription]'. "
-                    "La transcripción es 100% local.",
+                    "Transcription is 100% local.",
                 )
             )
             self.btn_start_transcribe.setEnabled(False)
@@ -1204,7 +1198,7 @@ class MainWindow(QMainWindow):
     def _choose_transcribe_file(self):
         chosen = ask_open_file(
             self,
-            t("transcribe.choose_title", "Elegir audio o vídeo"),
+            t("transcribe.choose_title", "Choose audio or video"),
             self._transcribe_media_filter(),
         )
         if chosen:
@@ -1220,10 +1214,10 @@ class MainWindow(QMainWindow):
         if not self.current_media_path or not os.path.exists(self.current_media_path):
             ThemedMessageBox.warning(
                 self,
-                t("transcribe.file_req_title", "Falta el archivo"),
+                t("transcribe.file_req_title", "File missing"),
                 t(
                     "transcribe.file_req_desc",
-                    "Elige un archivo de audio o vídeo para transcribir.",
+                    "Choose an audio or video file to transcribe.",
                 ),
             )
             return
@@ -1233,7 +1227,7 @@ class MainWindow(QMainWindow):
             self._refresh_transcribe_availability()
             ThemedMessageBox.warning(
                 self,
-                t("transcribe.unavailable_title", "Transcripción no disponible"),
+                t("transcribe.unavailable_title", "Transcription unavailable"),
                 str(exc),
             )
             return
@@ -1313,7 +1307,7 @@ class MainWindow(QMainWindow):
             content = self.transcription_service.render(result, output_format)
         except TranscriptionError as exc:
             logger.warning(
-                "No se pudo renderizar la transcripción (%s)", type(exc).__name__
+                "Could not render the transcription (%s)", type(exc).__name__
             )
             ThemedMessageBox.critical(
                 self,
@@ -1327,7 +1321,7 @@ class MainWindow(QMainWindow):
             self.subtitle_service.write_output_file(out_path, content)
             self.saved_output_path = out_path
         except Exception:
-            logger.exception("No se pudo guardar la transcripción")
+            logger.exception("Could not save the transcription")
             ThemedMessageBox.critical(
                 self,
                 t("alert.save_error_title"),
@@ -1355,11 +1349,11 @@ class MainWindow(QMainWindow):
                 )
         except Exception as exc:
             logger.warning(
-                "No se pudo registrar la transcripción (%s)", type(exc).__name__
+                "Could not record the transcription (%s)", type(exc).__name__
             )
 
     def _on_transcribe_failed(self, error_msg: str):
-        logger.error("Transcripción fallida")
+        logger.error("Transcription failed")
         modal = getattr(self, "transcribe_modal", None)
         if modal is not None and modal.isVisible():
             modal.reject()
@@ -1388,8 +1382,8 @@ class MainWindow(QMainWindow):
         self.lbl_pipeline_sub = QLabel(
             t(
                 "pipeline.subtitle",
-                "Transcripción → limpieza → analytics → QA → traducción "
-                "opcional → QA final → exportación → burn-in opcional.",
+                "Transcription → cleaning → analytics → QA → translation "
+                "optional → final QA → export → optional burn-in.",
             )
         )
         self.lbl_pipeline_sub.setStyleSheet(
@@ -1403,16 +1397,12 @@ class MainWindow(QMainWindow):
         file_card.setObjectName("CardContainer")
         f_layout = QHBoxLayout(file_card)
         f_layout.setContentsMargins(18, 14, 18, 14)
-        self.lbl_pipeline_file = QLabel(
-            t("pipeline.no_file", "Ningún archivo seleccionado")
-        )
+        self.lbl_pipeline_file = QLabel(t("pipeline.no_file", "No file selected"))
         self.lbl_pipeline_file.setStyleSheet(
             f"font-size: 13px; color: {Styles.TEXT_MUTED};"
         )
         f_layout.addWidget(self.lbl_pipeline_file, stretch=1)
-        self.btn_choose_pipeline = QPushButton(
-            t("pipeline.btn_choose", "Elegir archivo")
-        )
+        self.btn_choose_pipeline = QPushButton(t("pipeline.btn_choose", "Choose file"))
         self.btn_choose_pipeline.setProperty("class", "secondary-btn")
         self.btn_choose_pipeline.setIcon(
             Icons.get_icon(
@@ -1474,7 +1464,7 @@ class MainWindow(QMainWindow):
         s_layout.setVerticalSpacing(10)
         self.lbl_pipeline_clean = QLabel(t("pipeline.clean", "Limpieza"))
         self.toggle_pipeline_clean = ModernToggle(checked=True)
-        self.lbl_pipeline_translate = QLabel(t("pipeline.translate", "Traducción"))
+        self.lbl_pipeline_translate = QLabel(t("pipeline.translate", "Translation"))
         self.toggle_pipeline_translate = ModernToggle(checked=False)
         self.lbl_pipeline_qa = QLabel(t("pipeline.qa", "QA"))
         self.toggle_pipeline_qa = ModernToggle(checked=True)
@@ -1493,7 +1483,7 @@ class MainWindow(QMainWindow):
         s_layout.addWidget(self.lbl_pipeline_burn, 2, 0)
         s_layout.addWidget(self.toggle_pipeline_burn, 2, 1)
         self.btn_choose_video_out = QPushButton(
-            t("pipeline.btn_video_out", "Vídeo salida…")
+            t("pipeline.btn_video_out", "Output video…")
         )
         self.btn_choose_video_out.setProperty("class", "secondary-btn")
         self.btn_choose_video_out.clicked.connect(self._choose_pipeline_video_out)
@@ -1520,7 +1510,7 @@ class MainWindow(QMainWindow):
     def _choose_pipeline_file(self):
         chosen = ask_open_file(
             self,
-            t("pipeline.choose_title", "Elegir audio, vídeo o subtítulo"),
+            t("pipeline.choose_title", "Choose audio, video or subtitle"),
             self._pipeline_media_filter(),
         )
         if chosen:
@@ -1540,7 +1530,7 @@ class MainWindow(QMainWindow):
     def _choose_pipeline_video_out(self):
         chosen = ask_save_file(
             self,
-            t("pipeline.video_out_title", "Vídeo de salida"),
+            t("pipeline.video_out_title", "Output video"),
             f"{t('pipeline.video_out_filter')};;{t('dialog.all_files')}",
         )
         if chosen:
@@ -1555,10 +1545,10 @@ class MainWindow(QMainWindow):
         if not self.pipeline_input_path or not os.path.exists(self.pipeline_input_path):
             ThemedMessageBox.warning(
                 self,
-                t("pipeline.file_req_title", "Falta el archivo"),
+                t("pipeline.file_req_title", "File missing"),
                 t(
                     "pipeline.file_req_desc",
-                    "Elige un archivo de audio, vídeo o subtítulo.",
+                    "Choose an audio, video or subtitle file.",
                 ),
             )
             return
@@ -1567,10 +1557,10 @@ class MainWindow(QMainWindow):
         if do_translate and not target:
             ThemedMessageBox.warning(
                 self,
-                t("pipeline.target_req_title", "Falta el destino"),
+                t("pipeline.target_req_title", "Target missing"),
                 t(
                     "pipeline.target_req_desc",
-                    "Indica el idioma de destino para traducir.",
+                    "Specify the target language for translation.",
                 ),
             )
             return
@@ -1578,10 +1568,10 @@ class MainWindow(QMainWindow):
         if do_burn and not self.pipeline_video_output:
             ThemedMessageBox.warning(
                 self,
-                t("pipeline.video_req_title", "Falta el vídeo de salida"),
+                t("pipeline.video_req_title", "Output video missing"),
                 t(
                     "pipeline.video_req_desc",
-                    "Elige el archivo de vídeo de salida para el burn-in.",
+                    "Choose the output video file for burn-in.",
                 ),
             )
             return
@@ -1692,7 +1682,7 @@ class MainWindow(QMainWindow):
                 self.pipeline_worker.config,
             )
         except Exception as exc:
-            logger.warning("No se pudo registrar la pipeline (%s)", type(exc).__name__)
+            logger.warning("Could not record the pipeline (%s)", type(exc).__name__)
 
     def _on_pipeline_failed(self, error_msg: str):
         logger.error("Pipeline fallida")
@@ -2149,7 +2139,7 @@ class MainWindow(QMainWindow):
             self.subtitle_service.write_output_file(out_path, result.output_content)
             self.saved_output_path = out_path
         except Exception:
-            logger.exception("No se pudo guardar el resultado procesado")
+            logger.exception("Could not save the processed result")
             ThemedMessageBox.critical(
                 self,
                 t("alert.save_error_title"),
@@ -2185,7 +2175,7 @@ class MainWindow(QMainWindow):
         failures = result.stats.translation_failures
         if failures:
             logger.warning(
-                "Traducción incompleta: %s de %s bloques mantienen el texto original",
+                "Incomplete translation: %s of %s blocks keep the original text",
                 failures,
                 len(result.processed_items),
             )
@@ -2205,7 +2195,7 @@ class MainWindow(QMainWindow):
         if parse_issues:
             kinds = ", ".join(sorted({issue.kind for issue in parse_issues}))
             logger.warning(
-                "El parser no pudo usar %s bloque(s): %s",
+                "The parser could not use %s block(s): %s",
                 len(parse_issues),
                 kinds,
             )
@@ -2231,7 +2221,7 @@ class MainWindow(QMainWindow):
 
     def _on_processing_cancelled(self):
         """The user cancelled: close the modal, publish nothing."""
-        logger.info("Procesamiento cancelado por el usuario")
+        logger.info("Processing cancelled by the user")
         modal = getattr(self, "modal", None)
         if modal is not None and modal.isVisible():
             modal.reject()
@@ -2279,7 +2269,7 @@ class MainWindow(QMainWindow):
         tgt_fmt = fmt_map.get(self.cb_convert_format.currentText(), "srt")
 
         base, _ = os.path.splitext(self.current_subtitle_path)
-        out_path = f"{base}_converted.{tgt_fmt}"
+        out_path = f"{base}_processed.{tgt_fmt}"
 
         try:
             with open(
@@ -2301,11 +2291,11 @@ class MainWindow(QMainWindow):
                 t("alert.conv_success_desc", path=out_path),
             )
         except Exception:
-            logger.exception("Falló la conversión del archivo")
+            logger.exception("File conversion failed")
             ThemedMessageBox.critical(
                 self,
                 t("alert.conv_error_title"),
-                t("alert.conv_error_desc", err="error de conversión"),
+                t("alert.conv_error_desc", err="conversion error"),
             )
 
     def _on_subtitles_edited(self, edited_items):
@@ -2425,11 +2415,11 @@ class MainWindow(QMainWindow):
                 if matching_vid:
                     self.video_player.load_video(matching_vid)
             except Exception:
-                logger.exception("No se pudo cargar el archivo de subtítulos")
+                logger.exception("Could not load the subtitle file")
                 ThemedMessageBox.critical(
                     self,
                     t("alert.load_error_title"),
-                    t("alert.load_error_desc", err="archivo ilegible"),
+                    t("alert.load_error_desc", err="unreadable file"),
                 )
 
     def _open_saved_file(self):
@@ -2505,7 +2495,7 @@ class MainWindow(QMainWindow):
                     engine=engine,
                 )
             except Exception:
-                logger.exception("Fallo al procesar el archivo del lote")
+                logger.exception("Failed to process the batch file")
                 self.batch_table.setItem(
                     row,
                     3,
@@ -2567,7 +2557,7 @@ class MainWindow(QMainWindow):
         if not all(saved):
             # Do not interrupt processing on settings save failure; log warning only.
             logger.warning(
-                "No se pudieron guardar las opciones de la página de inicio (%s)",
+                "Could not save the home page options (%s)",
                 self.config_service.save_error,
             )
 
@@ -2589,7 +2579,7 @@ class MainWindow(QMainWindow):
         ]
         if not all(saved):
             logger.error(
-                "No se pudieron guardar los ajustes (%s)",
+                "Could not save the settings (%s)",
                 self.config_service.save_error,
             )
             ThemedMessageBox.warning(
@@ -2712,7 +2702,7 @@ class MainWindow(QMainWindow):
                 rows = store.recent_runs(limit=100)
         except HistoryError:
             rows = []
-            logger.warning("Historial no disponible en la página History")
+            logger.warning("History is not available on the History page")
         self.history_table.setRowCount(len(rows))
         for index, row in enumerate(rows):
             timestamp = str(row.get("timestamp") or "")[:19].replace("T", " ")
@@ -3146,13 +3136,13 @@ class MainWindow(QMainWindow):
             self.lbl_transcribe_sub.setText(
                 t(
                     "transcribe.subtitle",
-                    "Convierte audio o vídeo en subtítulos con Whisper local. "
-                    "El resultado alimenta Analytics, QA, limpieza y traducción.",
+                    "Converts audio or video into subtitles with local Whisper. "
+                    "The result feeds Analytics, QA, cleaning and translation.",
                 )
             )
             if not getattr(self, "current_media_path", None):
                 self.lbl_transcribe_file.setText(
-                    t("transcribe.no_file", "Ningún archivo seleccionado")
+                    t("transcribe.no_file", "No file selected")
                 )
             self.lbl_transcribe_model.setText(t("transcribe.model", "Modelo Whisper"))
             self.lbl_transcribe_lang.setText(
@@ -3160,7 +3150,7 @@ class MainWindow(QMainWindow):
             )
             self.lbl_transcribe_format.setText(t("transcribe.format", "Formato"))
             self.lbl_transcribe_device.setText(t("transcribe.device", "Dispositivo"))
-            self.btn_choose_media.setText(t("transcribe.btn_choose", "Elegir archivo"))
+            self.btn_choose_media.setText(t("transcribe.btn_choose", "Choose file"))
             self.btn_start_transcribe.setText(t("transcribe.btn_start", "Transcribir"))
             self._refresh_transcribe_availability()
 
@@ -3170,13 +3160,13 @@ class MainWindow(QMainWindow):
             self.lbl_pipeline_sub.setText(
                 t(
                     "pipeline.subtitle",
-                    "Transcripción → limpieza → analytics → QA → traducción "
-                    "opcional → QA final → exportación → burn-in opcional.",
+                    "Transcription → cleaning → analytics → QA → translation "
+                    "optional → final QA → export → optional burn-in.",
                 )
             )
             if not getattr(self, "pipeline_input_path", None):
                 self.lbl_pipeline_file.setText(
-                    t("pipeline.no_file", "Ningún archivo seleccionado")
+                    t("pipeline.no_file", "No file selected")
                 )
             self.lbl_pipeline_model.setText(t("pipeline.model", "Modelo Whisper"))
             self.lbl_pipeline_lang.setText(
@@ -3186,13 +3176,13 @@ class MainWindow(QMainWindow):
             self.lbl_pipeline_provider.setText(t("pipeline.provider", "Provider"))
             self.lbl_pipeline_format.setText(t("pipeline.format", "Formato"))
             self.lbl_pipeline_clean.setText(t("pipeline.clean", "Limpieza"))
-            self.lbl_pipeline_translate.setText(t("pipeline.translate", "Traducción"))
+            self.lbl_pipeline_translate.setText(t("pipeline.translate", "Translation"))
             self.lbl_pipeline_qa.setText(t("pipeline.qa", "QA"))
             self.lbl_pipeline_strict.setText(t("pipeline.strict", "QA estricto"))
             self.lbl_pipeline_burn.setText(t("pipeline.burn", "Burn-in"))
-            self.btn_choose_pipeline.setText(t("pipeline.btn_choose", "Elegir archivo"))
+            self.btn_choose_pipeline.setText(t("pipeline.btn_choose", "Choose file"))
             self.btn_choose_video_out.setText(
-                t("pipeline.btn_video_out", "Vídeo de salida…")
+                t("pipeline.btn_video_out", "Output video…")
             )
             self.btn_start_pipeline.setText(
                 t("pipeline.btn_start", "Ejecutar pipeline")
