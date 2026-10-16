@@ -140,7 +140,7 @@ def test_cross_origin_redirect_must_not_receive_the_api_key(server):
     )
     with pytest.raises(TranslationProviderError) as excinfo:
         provider.translate("hola", "auto", "es")
-    assert "redirección" in str(excinfo.value).lower()
+    assert "redirect rejected" in str(excinfo.value).lower()
 
     assert _AttackerHandler.seen == [], (
         f"the other origin was contacted: {_AttackerHandler.seen}"
