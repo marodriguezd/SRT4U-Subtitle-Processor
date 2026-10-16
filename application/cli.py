@@ -3,6 +3,7 @@
 import argparse
 import csv
 import io
+import ipaddress
 import json
 import sys
 from pathlib import Path
@@ -29,6 +30,25 @@ PIPELINE_OPTIONS = {
     "convert_to",
     "parallel",
 }
+
+
+def _is_loopback_bind_host(host: str) -> bool:
+    """Return True only for a literal loopback IP or the ``localhost`` name.
+
+    A string prefix such as ``127.`` is not a safe test: hostnames like
+    ``127.example.com`` would be trusted and could resolve elsewhere.
+    Wildcard addresses (``0.0.0.0``, ``::``) are never loopback.
+    """
+    candidate = host.strip()
+    if candidate.startswith("[") and candidate.endswith("]"):
+        candidate = candidate[1:-1]
+    if candidate.lower() == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(candidate)
+    except ValueError:
+        return False
+    return address.is_loopback and not address.is_unspecified
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1201,8 +1221,7 @@ def _run_serve(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
 
-    loopback_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
-    is_loopback = args.host in loopback_hosts or args.host.startswith("127.")
+    is_loopback = _is_loopback_bind_host(args.host)
     if not is_loopback and not getattr(args, "allow_remote", False):
         parser.error(
             f"binding to non-loopback interface '{args.host}' exposes an unauthenticated service; "

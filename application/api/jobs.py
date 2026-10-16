@@ -70,17 +70,20 @@ class JobManager:
     ) -> str:
         """Enqueue ``func``. ``on_drop`` releases resources (e.g. temp files)
         when a still-queued job is cancelled or dropped before it ever runs."""
-        drop_immediate: Optional[Callable[[], None]] = None
         job_id = uuid.uuid4().hex
+        # Admission is decided under the lock with an explicit reason, so the
+        # rejection path never depends on whether a cleanup callback was given.
+        rejection: Optional[str] = None
+        queued_count = 0
         with self._lock:
             if self._is_shutdown:
-                drop_immediate = on_drop
+                rejection = "shutdown"
             else:
                 queued_count = sum(
                     1 for j in self._jobs.values() if j["status"] == "queued"
                 )
                 if queued_count >= self._max_queued_jobs:
-                    drop_immediate = on_drop
+                    rejection = "full"
                 else:
                     self._jobs[job_id] = {
                         "job_id": job_id,
@@ -95,14 +98,15 @@ class JobManager:
                     if on_drop is not None:
                         self._on_drop_callbacks[job_id] = on_drop
 
-        if drop_immediate is not None:
-            try:
-                drop_immediate()
-            except Exception as exc:
-                logger.error(
-                    "Job drop cleanup failed on rejection (%s)", type(exc).__name__
-                )
-            if self._is_shutdown:
+        if rejection is not None:
+            if on_drop is not None:
+                try:
+                    on_drop()
+                except Exception as exc:
+                    logger.error(
+                        "Job drop cleanup failed on rejection (%s)", type(exc).__name__
+                    )
+            if rejection == "shutdown":
                 raise RuntimeError("JobManager has been shut down")
             raise JobQueueFullError(
                 f"Job queue is full ({queued_count}/{self._max_queued_jobs} queued)"

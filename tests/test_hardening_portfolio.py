@@ -112,6 +112,42 @@ def test_job_manager_admission_control_saturation():
         manager.shutdown()
 
 
+def test_job_manager_saturation_without_on_drop_still_rejects():
+    """Regression: a saturated queue must reject even when on_drop is None.
+
+    Previously the rejection branch was gated on the cleanup callback, so the
+    job was never registered yet an ID was returned and the job still ran.
+    """
+    from application.api.jobs import JobManager, JobQueueFullError
+
+    block = threading.Event()
+    ran = []
+    manager = JobManager(max_workers=1, max_queued_jobs=1)
+    try:
+        manager.submit("run", lambda: block.wait(5))
+        queued = manager.submit("q1", lambda: ran.append("q1"))
+
+        with pytest.raises(JobQueueFullError):
+            manager.submit("q2", lambda: ran.append("q2"))
+
+        assert manager.get(queued)["status"] == "queued"
+        assert len(manager.list()) == 2
+    finally:
+        block.set()
+        manager.shutdown()
+    assert "q2" not in ran
+
+
+def test_job_manager_shutdown_without_on_drop_raises():
+    """Regression: submitting after shutdown raises even without on_drop."""
+    from application.api.jobs import JobManager
+
+    manager = JobManager(max_workers=1, max_queued_jobs=2)
+    manager.shutdown()
+    with pytest.raises(RuntimeError, match="shut down"):
+        manager.submit("late", lambda: "never")
+
+
 def test_job_manager_queued_cancel_calls_on_drop_immediately():
     """Cancelling a queued job triggers on_drop immediately without waiting."""
     from application.api.jobs import JobManager

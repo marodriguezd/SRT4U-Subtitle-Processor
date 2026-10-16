@@ -426,6 +426,40 @@ def test_serve_rejects_non_loopback_without_flag(capsys):
     assert "binding to non-loopback interface" in err
 
 
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [
+        ("127.0.0.1", True),
+        ("127.8.9.10", True),
+        ("::1", True),
+        ("[::1]", True),
+        ("localhost", True),
+        ("LOCALHOST", True),
+        ("0.0.0.0", False),
+        ("::", False),
+        ("127.evil.example", False),
+        ("127.0.0.1.example.com", False),
+        ("127.0.0.256", False),
+        ("192.168.1.10", False),
+        ("example.com", False),
+        ("testserver", False),
+    ],
+)
+def test_serve_loopback_classification(host, expected):
+    import application.cli as cli
+
+    assert cli._is_loopback_bind_host(host) is expected
+
+
+def test_serve_rejects_ip_looking_hostname_without_flag(capsys):
+    import application.cli as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["serve", "--host", "127.evil.example"])
+    assert exc_info.value.code == 2
+    assert "binding to non-loopback interface" in capsys.readouterr().err
+
+
 def test_serve_allows_non_loopback_with_flag(monkeypatch):
     import application.cli as cli
 
