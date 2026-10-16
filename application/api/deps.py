@@ -74,6 +74,24 @@ async def save_upload(
 ) -> Path:
     """Stream an upload to a temp file with a size cap; caller must delete it."""
     tmp: Optional[Path] = None
+    handle = None
+
+    def cleanup() -> None:
+        # Close before unlinking: Windows does not allow deleting an open file.
+        # Cleanup must not mask the original upload/HTTP error.
+        nonlocal handle
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                pass
+            handle = None
+        if tmp is not None:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Could not remove a temporary upload file")
+
     try:
         handle = tempfile.NamedTemporaryFile(
             delete=False, suffix=suffix, prefix="srt4u-api-"
@@ -92,14 +110,13 @@ async def save_upload(
                 )
             handle.write(chunk)
         handle.close()
+        handle = None
         return tmp
     except HTTPException:
-        if tmp is not None and tmp.exists():
-            tmp.unlink(missing_ok=True)
+        cleanup()
         raise
     except Exception as exc:
-        if tmp is not None and tmp.exists():
-            tmp.unlink(missing_ok=True)
+        cleanup()
         logger.exception("Failed to save the upload")
         raise HTTPException(
             status_code=500, detail="could not process the upload"
