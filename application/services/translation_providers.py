@@ -336,9 +336,17 @@ class DeepLProvider(TranslationProvider):
             target_code = "EN-US"
         elif target_code == "PT":
             target_code = "PT-PT"
+        elif target_code in {"ZH-CN", "ZH-HANS"}:
+            # The UI uses Google's zh-CN locale; DeepL expects ZH-HANS
+            # for Simplified Chinese targets.
+            target_code = "ZH-HANS"
         payload = {"text": [text], "target_lang": target_code}
         if source_language and source_language != "auto":
-            payload["source_lang"] = source_language.upper()
+            source_code = source_language.upper()
+            if source_code in {"ZH-CN", "ZH-HANS"}:
+                # DeepL detects source Chinese without a regional/script variant.
+                source_code = "ZH"
+            payload["source_lang"] = source_code
         request = urllib.request.Request(
             url,
             data=json.dumps(payload).encode("utf-8"),
