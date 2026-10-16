@@ -554,7 +554,7 @@ class SubtitleQA:
         # text. Anything else stays inside the cue instead of becoming a
         # phantom block reported as a structural error.
         if file_format == "srt":
-            blocks = re.split(r"\r?\n\s*\r?\n(?=\s*\d+)", content.strip())
+            blocks = re.split(r"\r?\n\s*\r?\n(?=\s*\d+\s*(?:\r?\n))", content.strip())
         else:
             blocks = re.split(r"\r?\n\s*\r?\n", content.strip())
         cue_number = 0
@@ -579,7 +579,15 @@ class SubtitleQA:
                     lines = lines[1:]
                     if not lines:
                         continue
-                if lines[0].upper().startswith(("NOTE", "STYLE", "REGION")):
+                first_upper = lines[0].upper()
+                if (
+                    first_upper == "NOTE"
+                    or first_upper.startswith(("NOTE ", "NOTE\t"))
+                    or first_upper == "STYLE"
+                    or first_upper.startswith(("STYLE ", "STYLE\t"))
+                    or first_upper == "REGION"
+                    or first_upper.startswith(("REGION ", "REGION\t"))
+                ):
                     continue
                 if "-->" not in lines[0] and len(lines) > 1 and "-->" in lines[1]:
                     lines = lines[1:]

@@ -49,6 +49,7 @@ class TranslationService:
         *,
         fallbacks: Optional[Dict[str, List[str]]] = None,
         max_retries: int = 0,
+        retry_backoff: float = 0.0,
     ):
         self.config_service = config_service or ConfigService()
         if (
@@ -58,6 +59,7 @@ class TranslationService:
         ):
             raise ValueError("max_retries must be a non-negative integer")
         self.max_retries = max_retries
+        self.retry_backoff = max(0.0, float(retry_backoff))
         configured_fallbacks = (
             self.DEFAULT_FALLBACKS if fallbacks is None else fallbacks
         )
@@ -223,7 +225,7 @@ class TranslationService:
                             raw_error
                             if isinstance(raw_error, TranslationProviderError)
                             else ProviderUnknownError(
-                                f"{candidate}: error de provider ({type(raw_error).__name__})"
+                                f"{candidate}: provider error ({type(raw_error).__name__})"
                             )
                         )
                         last_error = exc
@@ -240,6 +242,14 @@ class TranslationService:
                                 provider_attempts,
                                 exc.error_type,
                             )
+                            if self.retry_backoff > 0:
+                                time.sleep(
+                                    min(
+                                        5.0,
+                                        self.retry_backoff
+                                        * (2 ** (provider_attempts - 1)),
+                                    )
+                                )
                             continue
                         raise
                 break
@@ -257,7 +267,7 @@ class TranslationService:
                     exc
                     if isinstance(exc, TranslationProviderError)
                     else ProviderUnknownError(
-                        f"{candidate}: error de provider ({type(exc).__name__})"
+                        f"{candidate}: provider error ({type(exc).__name__})"
                     )
                 )
                 last_error = safe_error

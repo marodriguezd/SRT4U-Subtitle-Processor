@@ -8,6 +8,7 @@ from ..deps import (
     new_service,
     remove_temp,
     safe_detail,
+    sanitize_upload_filename,
     save_upload,
     validate_extension,
     validate_provider,
@@ -70,7 +71,7 @@ async def translate(
             status_code=422, detail="max_retries must be between 0 and 10"
         )
     tmp_path = await save_upload(file, suffix)
-    filename = file.filename or f"input{suffix}"
+    filename = sanitize_upload_filename(file.filename, f"input{suffix}")
 
     def _work() -> dict:
         try:
@@ -120,9 +121,13 @@ async def translate(
         finally:
             remove_temp(tmp_path)
 
-    job_id = _jobs_from(request).submit(
-        "translate", _work, on_drop=lambda: remove_temp(tmp_path)
-    )
+    try:
+        job_id = _jobs_from(request).submit(
+            "translate", _work, on_drop=lambda: remove_temp(tmp_path)
+        )
+    except Exception:
+        remove_temp(tmp_path)
+        raise
     return JobCreatedResponse(job_id=job_id, status="queued")
 
 
@@ -174,7 +179,7 @@ async def process(
             status_code=422, detail="max_retries must be between 0 and 10"
         )
     tmp_path = await save_upload(file, suffix)
-    filename = file.filename or f"input{suffix}"
+    filename = sanitize_upload_filename(file.filename, f"input{suffix}")
 
     def _work() -> dict:
         try:
@@ -228,7 +233,11 @@ async def process(
         finally:
             remove_temp(tmp_path)
 
-    job_id = _jobs_from(request).submit(
-        "process", _work, on_drop=lambda: remove_temp(tmp_path)
-    )
+    try:
+        job_id = _jobs_from(request).submit(
+            "process", _work, on_drop=lambda: remove_temp(tmp_path)
+        )
+    except Exception:
+        remove_temp(tmp_path)
+        raise
     return JobCreatedResponse(job_id=job_id, status="queued")

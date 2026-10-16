@@ -66,6 +66,12 @@ class ConfigService:
                 "Could not load configuration (%s); falling back to default values",
                 type(exc).__name__,
             )
+            try:
+                import shutil
+
+                shutil.copy2(self.config_file, f"{self.config_file}.corrupt")
+            except Exception:
+                pass
 
     def save(self) -> bool:
         """Write configuration and credentials atomically with restricted permissions.

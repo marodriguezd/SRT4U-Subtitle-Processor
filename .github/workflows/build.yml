@@ -161,7 +161,7 @@ jobs:
 
   build-windows:
     name: Build Windows (.exe)
-    needs: test
+    needs: [test, compat-min-pyqt6]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -219,7 +219,7 @@ jobs:
 
   build-linux:
     name: Build Linux (.AppImage)
-    needs: test
+    needs: [test, compat-min-pyqt6]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -338,7 +338,7 @@ jobs:
 
   build-macos:
     name: Build macOS (.dmg)
-    needs: test
+    needs: [test, compat-min-pyqt6]
     runs-on: macos-14
     steps:
       - name: Checkout repository

@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from ..deps import remove_temp, safe_detail, save_upload
+from ..deps import remove_temp, safe_detail, sanitize_upload_filename, save_upload
 from ..jobs import JobError, JobManager
 from ..schemas import JobCreatedResponse, TranscriptionResultModel
 from ...services.history_store import HistoryStore
@@ -69,7 +69,7 @@ async def transcribe(
     if device not in {"auto", "cpu", "cuda"}:
         raise HTTPException(status_code=422, detail="device must be auto, cpu, or cuda")
     tmp_path = await save_upload(file, suffix, max_bytes=TRANSCRIBE_MAX_BYTES)
-    filename = file.filename or f"input{suffix}"
+    filename = sanitize_upload_filename(file.filename, f"input{suffix}")
 
     def _work() -> dict:
         try:
@@ -121,7 +121,11 @@ async def transcribe(
         finally:
             remove_temp(tmp_path)
 
-    job_id = _jobs_from(request).submit(
-        "transcription", _work, on_drop=lambda: remove_temp(tmp_path)
-    )
+    try:
+        job_id = _jobs_from(request).submit(
+            "transcription", _work, on_drop=lambda: remove_temp(tmp_path)
+        )
+    except Exception:
+        remove_temp(tmp_path)
+        raise
     return JobCreatedResponse(job_id=job_id, status="queued")

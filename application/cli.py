@@ -378,6 +378,11 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument(
         "--port", type=int, default=8000, help="listening port (default: 8000)"
     )
+    serve.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="allow binding to non-loopback network interfaces (unauthenticated)",
+    )
     return parser
 
 
@@ -1011,7 +1016,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
         if isinstance(payload, dict) and "segments" in payload:
             ratio = payload.get("ratio")
             suffix = f" ({ratio * 100:.0f}%)" if isinstance(ratio, float) else ""
-            print(f"... {payload['segments']} segmentos{suffix}", file=sys.stderr)
+            print(f"... {payload['segments']} segments{suffix}", file=sys.stderr)
 
     try:
         result = service.transcribe_file(
@@ -1036,6 +1041,22 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
                 source_language=args.language,
                 success=0,
                 error_type=getattr(exc, "error_type", "unknown"),
+            )
+        return 2
+    except Exception as exc:
+        print(f"ERROR: could not transcribe ({type(exc).__name__})", file=sys.stderr)
+        if not args.no_history:
+            record_safely(
+                "transcription",
+                args.db,
+                file_path=str(source),
+                file_format=args.target_format,
+                provider="whisper",
+                requested_provider="whisper",
+                model=args.model,
+                source_language=args.language,
+                success=0,
+                error_type="unknown",
             )
         return 2
     try:
@@ -1064,7 +1085,7 @@ def _run_transcribe(args: argparse.Namespace, parser: argparse.ArgumentParser) -
     metrics = result.metrics
     print(
         f"OK {source} -> {destination} "
-        f"({len(result.segments)} cues, idioma: {result.language})"
+        f"({len(result.segments)} cues, language: {result.language})"
     )
     if args.stats_json and metrics is not None:
         print(
@@ -1179,11 +1200,25 @@ def _run_serve(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int
         return 2
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
+
+    loopback_hosts = {"127.0.0.1", "localhost", "::1", "testserver"}
+    is_loopback = args.host in loopback_hosts or args.host.startswith("127.")
+    if not is_loopback and not getattr(args, "allow_remote", False):
+        parser.error(
+            f"binding to non-loopback interface '{args.host}' exposes an unauthenticated service; "
+            "pass --allow-remote to explicitly permit external access"
+        )
+    if not is_loopback:
+        print(
+            f"WARNING: SRT4U API is bound to non-loopback host '{args.host}' without authentication.",
+            file=sys.stderr,
+        )
+
     from .api.app import app as api_app
 
     print(
-        f"SRT4U API en http://{args.host}:{args.port} "
-        f"(docs en http://{args.host}:{args.port}/docs)"
+        f"SRT4U API running on http://{args.host}:{args.port} "
+        f"(docs at http://{args.host}:{args.port}/docs)"
     )
     uvicorn.run(api_app, host=args.host, port=args.port, log_level="info")
     return 0

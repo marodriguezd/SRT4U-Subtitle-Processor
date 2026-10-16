@@ -489,7 +489,7 @@ class MediaPipeline:
             ) from None
         except TranscriptionError as exc:
             raise PipelineStageError(
-                STAGE_TRANSCRIBE, exc.error_type, exc.error_type
+                STAGE_TRANSCRIBE, exc.error_type, str(exc)
             ) from exc
         result.transcription_result = transcription
         result.media_duration_ms = transcription.duration_ms
@@ -811,6 +811,7 @@ def run_burn_in_sync(
                     except Exception:
                         try:
                             process.kill()
+                            process.wait(timeout=1.0)
                         except Exception:
                             pass
                     raise TranscriptionCancelledError("pipeline cancelled")
@@ -835,7 +836,20 @@ def run_burn_in_sync(
                         )
             process.wait()
             if process.returncode != 0:
-                logger.error("FFmpeg failed (code %s)", process.returncode)
+                stderr_snippet = ""
+                try:
+                    if os.path.exists(stderr_log_path):
+                        with open(
+                            stderr_log_path, "r", encoding="utf-8", errors="replace"
+                        ) as f:
+                            stderr_snippet = f.read()[-500:]
+                except Exception:
+                    pass
+                logger.error(
+                    "FFmpeg failed (code %s): %s",
+                    process.returncode,
+                    stderr_snippet.strip() if stderr_snippet else "no stderr details",
+                )
                 raise PipelineStageError(
                     STAGE_BURN,
                     "burn_in_error",

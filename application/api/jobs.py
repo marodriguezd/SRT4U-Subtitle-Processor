@@ -20,6 +20,7 @@ logger = get_logger("api")
 #: bound and every finished job kept its full result payload alive for the
 #: lifetime of the server.
 DEFAULT_MAX_JOBS = 200
+DEFAULT_MAX_QUEUED_JOBS = 50
 DEFAULT_TTL_SECONDS = 3600.0
 
 #: States from which a job can never be evicted: it is still doing work, or the
@@ -35,6 +36,10 @@ class JobError(Exception):
     """Expected job failure carrying a client-safe message."""
 
 
+class JobQueueFullError(JobError):
+    """Admission control: rejected when the pending work queue is saturated."""
+
+
 class JobManager:
     """Submit callables, poll by id. Thread-safe via a single lock."""
 
@@ -43,6 +48,7 @@ class JobManager:
         max_workers: int = 2,
         *,
         max_jobs: int = DEFAULT_MAX_JOBS,
+        max_queued_jobs: int = DEFAULT_MAX_QUEUED_JOBS,
         ttl_seconds: float = DEFAULT_TTL_SECONDS,
     ):
         self._executor = ThreadPoolExecutor(
@@ -51,7 +57,10 @@ class JobManager:
         self._lock = threading.Lock()
         self._jobs: Dict[str, Dict[str, Any]] = {}
         self._max_jobs = max(1, max_jobs)
+        self._max_queued_jobs = max(1, max_queued_jobs)
         self._ttl_seconds = max(0.0, float(ttl_seconds))
+        self._is_shutdown = False
+        self._on_drop_callbacks: Dict[str, Callable[[], None]] = {}
 
     def submit(
         self,
@@ -60,40 +69,81 @@ class JobManager:
         on_drop: Optional[Callable[[], None]] = None,
     ) -> str:
         """Enqueue ``func``. ``on_drop`` releases resources (e.g. temp files)
-        when a still-queued job is cancelled before it ever runs."""
+        when a still-queued job is cancelled or dropped before it ever runs."""
+        drop_immediate: Optional[Callable[[], None]] = None
         job_id = uuid.uuid4().hex
         with self._lock:
-            self._jobs[job_id] = {
-                "job_id": job_id,
-                "operation": operation,
-                "status": "queued",
-                "created_at": _utc_now_iso(),
-                "finished_at": None,
-                "error": None,
-                "result": None,
-                "cancel_requested": False,
-            }
-        self._executor.submit(self._run, job_id, func, on_drop)
+            if self._is_shutdown:
+                drop_immediate = on_drop
+            else:
+                queued_count = sum(
+                    1 for j in self._jobs.values() if j["status"] == "queued"
+                )
+                if queued_count >= self._max_queued_jobs:
+                    drop_immediate = on_drop
+                else:
+                    self._jobs[job_id] = {
+                        "job_id": job_id,
+                        "operation": operation,
+                        "status": "queued",
+                        "created_at": _utc_now_iso(),
+                        "finished_at": None,
+                        "error": None,
+                        "result": None,
+                        "cancel_requested": False,
+                    }
+                    if on_drop is not None:
+                        self._on_drop_callbacks[job_id] = on_drop
+
+        if drop_immediate is not None:
+            try:
+                drop_immediate()
+            except Exception as exc:
+                logger.error(
+                    "Job drop cleanup failed on rejection (%s)", type(exc).__name__
+                )
+            if self._is_shutdown:
+                raise RuntimeError("JobManager has been shut down")
+            raise JobQueueFullError(
+                f"Job queue is full ({queued_count}/{self._max_queued_jobs} queued)"
+            )
+
+        try:
+            self._executor.submit(self._run, job_id, func)
+        except Exception:
+            with self._lock:
+                self._jobs.pop(job_id, None)
+                cleanup_cb = self._on_drop_callbacks.pop(job_id, None)
+            if cleanup_cb is not None:
+                try:
+                    cleanup_cb()
+                except Exception as exc:
+                    logger.error(
+                        "Job drop cleanup failed on submit failure (%s)",
+                        type(exc).__name__,
+                    )
+            raise
         return job_id
 
     def _run(
         self,
         job_id: str,
         func: Callable[[], Any],
-        on_drop: Optional[Callable[[], None]],
     ) -> None:
+        drop: Optional[Callable[[], None]] = None
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None or job["cancel_requested"]:
                 if job is not None:
                     job["status"] = "cancelled"
                     job["finished_at"] = _utc_now_iso()
+                    job["error"] = None
+                    job["result"] = None
                     self._prune_locked()
-                drop = on_drop
-                on_drop = None
+                drop = self._on_drop_callbacks.pop(job_id, None)
             else:
-                drop = None
                 job["status"] = "running"
+                self._on_drop_callbacks.pop(job_id, None)
         if drop is not None:
             try:
                 drop()
@@ -106,8 +156,14 @@ class JobManager:
             with self._lock:
                 job = self._jobs.get(job_id)
                 if job is not None:
-                    job["status"] = "cancelled" if job["cancel_requested"] else "failed"
-                    job["error"] = str(exc) or "job error"
+                    if job["cancel_requested"]:
+                        job["status"] = "cancelled"
+                        job["error"] = None
+                        job["result"] = None
+                    else:
+                        job["status"] = "failed"
+                        job["error"] = str(exc) or "job error"
+                        job["result"] = None
                     job["finished_at"] = _utc_now_iso()
                     self._prune_locked()
             return
@@ -118,9 +174,12 @@ class JobManager:
                 if job is not None:
                     if job["cancel_requested"]:
                         job["status"] = "cancelled"
+                        job["error"] = None
+                        job["result"] = None
                     else:
                         job["status"] = "failed"
-                        job["error"] = "error interno del job"
+                        job["error"] = "internal job error"
+                        job["result"] = None
                     job["finished_at"] = _utc_now_iso()
                     self._prune_locked()
             return
@@ -129,9 +188,12 @@ class JobManager:
             if job is not None:
                 if job["cancel_requested"]:
                     job["status"] = "cancelled"
+                    job["error"] = None
+                    job["result"] = None
                 else:
                     job["status"] = "completed"
                     job["result"] = result
+                    job["error"] = None
                 job["finished_at"] = _utc_now_iso()
                 self._prune_locked()
 
@@ -174,7 +236,7 @@ class JobManager:
         for job_id in to_drop:
             self._jobs.pop(job_id, None)
         if to_drop:
-            logger.debug("Jobs retencionados: %s eliminados", len(to_drop))
+            logger.debug("Pruned %d expired or excess jobs", len(to_drop))
 
     @staticmethod
     def _age_seconds(job: Dict[str, Any]) -> Optional[float]:
@@ -198,6 +260,7 @@ class JobManager:
 
     def cancel(self, job_id: str) -> Optional[str]:
         """Returns the resulting status, or None for unknown jobs."""
+        drop_cb: Optional[Callable[[], None]] = None
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -208,8 +271,24 @@ class JobManager:
             if job["status"] == "queued":
                 job["status"] = "cancelled"
                 job["finished_at"] = _utc_now_iso()
+                job["error"] = None
+                job["result"] = None
+                drop_cb = self._on_drop_callbacks.pop(job_id, None)
                 self._prune_locked()
-            return job["status"]
+            status = job["status"]
+        if drop_cb is not None:
+            try:
+                drop_cb()
+            except Exception as exc:
+                logger.error(
+                    "Job drop cleanup failed on cancel (%s)", type(exc).__name__
+                )
+        return status
+
+    def prune(self) -> None:
+        """Thread-safe public trigger for retention pruning."""
+        with self._lock:
+            self._prune_locked()
 
     def wait_for(
         self, job_id: str, timeout: float = 30.0, interval: float = 0.05
@@ -226,4 +305,24 @@ class JobManager:
         return self.get(job_id)
 
     def shutdown(self) -> None:
+        drops: List[Callable[[], None]] = []
+        with self._lock:
+            self._is_shutdown = True
+            for job_id, job in list(self._jobs.items()):
+                if job["status"] == "queued":
+                    job["status"] = "cancelled"
+                    job["finished_at"] = _utc_now_iso()
+                    job["error"] = None
+                    job["result"] = None
+                    cb = self._on_drop_callbacks.pop(job_id, None)
+                    if cb is not None:
+                        drops.append(cb)
+            self._prune_locked()
+        for drop_cb in drops:
+            try:
+                drop_cb()
+            except Exception as exc:
+                logger.error(
+                    "Job drop cleanup failed on shutdown (%s)", type(exc).__name__
+                )
         self._executor.shutdown(wait=False, cancel_futures=True)

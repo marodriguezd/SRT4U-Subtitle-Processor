@@ -12,7 +12,7 @@ from application.ui.burn_in_dialog import (
 from application.ui.main_window import MainWindow
 from application.ui.widgets import ProgressModal
 
-LANGUAGES = ["en", "es", "pt", "de", "it", "zh-CN"]
+LANGUAGES = ["en", "es", "pt", "de", "it", "fr", "zh-CN"]
 TOLERANCE_PX = 2
 FONT_SCALE = 1.5
 SETTINGS_PAGE = 5

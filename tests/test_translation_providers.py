@@ -786,11 +786,45 @@ def test_default_fallback_policy_is_explicit_and_deepl_to_google(monkeypatch):
     assert result.metrics.fallback_used is True
     assert result.metrics.fallback_error_type == "authentication"
 
-    # Strict pinning: no_fallback / fallbacks={} never leaves the requested
-    # provider (the privacy-conscious option documented in providers.md).
     strict = TranslationService(config_service=MemoryConfig(), fallbacks={})
     strict_result = strict.translate_with_metrics("hello", "es", provider="deepl")
     assert strict_result.metrics.success is False
     assert strict_result.metrics.provider == "deepl"
     assert strict_result.metrics.fallback_used is False
     assert strict_result.metrics.error_type == "authentication"
+
+
+def test_origin_port_normalization():
+    from application.services.translation_providers import _origin
+
+    assert _origin("https://api.deepl.com") == _origin("https://api.deepl.com:443")
+    assert _origin("http://localhost") == _origin("http://localhost:80")
+    assert _origin("http://localhost:8080") != _origin("http://localhost:80")
+
+
+def test_deepl_source_and_target_variant_normalization(monkeypatch):
+    from application.services.translation_providers import DeepLProvider
+
+    config = MemoryConfig(deepl_api_key="test-key", deepl_type="free")
+    provider = DeepLProvider(config_service=config)
+
+    captured_payloads = []
+
+    def mock_open(request, timeout):
+        import json
+
+        body = json.loads(request.data.decode("utf-8"))
+        captured_payloads.append(body)
+        return _response({"translations": [{"text": "ok"}]})
+
+    monkeypatch.setattr("application.services.translation_providers._open", mock_open)
+
+    # zh-TW target -> ZH-HANT
+    provider.translate("test", "en-US", "zh-TW")
+    assert captured_payloads[0]["target_lang"] == "ZH-HANT"
+    assert captured_payloads[0]["source_lang"] == "EN"
+
+    # pt-BR source -> PT, generic zh target -> ZH-HANS
+    provider.translate("test", "pt-BR", "zh")
+    assert captured_payloads[1]["target_lang"] == "ZH-HANS"
+    assert captured_payloads[1]["source_lang"] == "PT"

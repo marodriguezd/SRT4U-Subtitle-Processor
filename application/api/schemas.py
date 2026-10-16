@@ -174,12 +174,22 @@ class HistoryItemModel(BaseModel):
     requested_provider: Optional[str] = None
     model: Optional[str] = None
     number_of_cues: Optional[int] = None
+    characters_input: Optional[int] = None
+    characters_output: Optional[int] = None
+    words_input: Optional[int] = None
+    words_output: Optional[int] = None
     duration_ms: Optional[int] = None
+    media_duration_ms: Optional[int] = None
     success: Optional[bool] = None
     error_type: Optional[str] = None
     retry_count: Optional[int] = None
     fallback_used: Optional[bool] = None
     providers_used: Optional[List[str]] = None
+    fallback_error_type: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    estimated_cost: Optional[float] = None
     qa_errors: Optional[int] = None
     qa_warnings: Optional[int] = None
     translation_failures: Optional[int] = None
@@ -249,3 +259,36 @@ class TranscriptionResultModel(BaseModel):
     language: str = "auto"
     processed_items_count: int = 0
     metrics: Optional[TranscriptionMetricsModel] = None
+
+
+class PipelineStageModel(BaseModel):
+    name: str
+    status: str
+    duration_ms: int = 0
+    detail: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PipelineResultModel(BaseModel):
+    success: bool = False
+    cancelled: bool = False
+    failed_stage: Optional[str] = None
+    stages: List[PipelineStageModel] = Field(default_factory=list)
+    stages_completed: int = 0
+    transcription: Optional[Dict[str, Any]] = None
+    translation: Optional[Dict[str, Any]] = None
+    translation_failures: int = 0
+    analytics_before: Optional[Dict[str, Any]] = None
+    qa_before: Optional[Dict[str, Any]] = None
+    analytics_after: Optional[Dict[str, Any]] = None
+    qa_after: Optional[Dict[str, Any]] = None
+    cleaning: Dict[str, Any] = Field(default_factory=dict)
+    output_content: str = ""
+    output_format: str = "srt"
+    output_subtitle: Optional[str] = None
+    output_video: Optional[str] = None
+    total_duration_ms: int = 0
+    media_duration_ms: Optional[int] = None
+    parse_issues: List[Dict[str, Any]] = Field(default_factory=list)
+    errors: List[Dict[str, str]] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    input_filename: Optional[str] = None

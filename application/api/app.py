@@ -8,9 +8,10 @@ imports FastAPI.
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .jobs import JobManager
+from .jobs import JobManager, JobQueueFullError
 from .schemas import (
     APP_VERSION,
+    PipelineResultModel,
     ProcessResultModel,
     TranscriptionResultModel,
     TranslationResultModel,
@@ -41,6 +42,14 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
         version=APP_VERSION,
     )
     app.state.jobs = job_manager if job_manager is not None else JobManager()
+
+    @app.exception_handler(JobQueueFullError)
+    async def _queue_full(request: Request, exc: JobQueueFullError):  # noqa: ANN001, ANN202
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "job queue is full, please retry later"},
+            headers={"Retry-After": "30"},
+        )
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):  # noqa: ANN001, ANN202
@@ -78,6 +87,7 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
         ProcessResultModel,
         TranslationResultModel,
         TranscriptionResultModel,
+        PipelineResultModel,
     )
 
     def openapi_with_result_models():  # noqa: ANN202

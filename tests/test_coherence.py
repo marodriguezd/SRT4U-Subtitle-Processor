@@ -156,7 +156,7 @@ def test_burn_in_terminology_no_quema_in_cli_api():
         assert "quema" not in text.lower(), f"colloquial burn term in {path.name}"
 
 
-@pytest.mark.parametrize("lang", ["en", "es", "pt", "de", "it", "zh-CN"])
+@pytest.mark.parametrize("lang", ["en", "es", "pt", "de", "it", "fr", "zh-CN"])
 def test_format_placeholders_survive_translation(lang):
     catalogs = _i18n_catalogs()
     for key in (

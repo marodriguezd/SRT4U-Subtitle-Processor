@@ -399,3 +399,55 @@ def test_process_job_records_parse_issues_in_history(client):
     assert len(rows) == 1
     assert rows[0]["parse_issues"] == 1
     assert rows[0]["success"] == 1
+
+
+def test_job_queue_full_returns_503(client, monkeypatch):
+    from application.api.jobs import JobQueueFullError
+
+    def fail_submit(*args, **kwargs):
+        raise JobQueueFullError("Job queue is full")
+
+    monkeypatch.setattr(client.app.state.jobs, "submit", fail_submit)
+    response = _upload(
+        client, path="/api/v1/process", content="1\n00:00:01,000 --> 00:00:02,000\nHi\n"
+    )
+    assert response.status_code == 503
+    assert response.headers.get("retry-after") == "30"
+    assert "job queue is full" in response.json()["detail"].lower()
+
+
+def test_serve_rejects_non_loopback_without_flag(capsys):
+    import application.cli as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["serve", "--host", "0.0.0.0"])
+    assert exc_info.value.code == 2
+    err = capsys.readouterr().err
+    assert "binding to non-loopback interface" in err
+
+
+def test_serve_allows_non_loopback_with_flag(monkeypatch):
+    import application.cli as cli
+
+    called = {}
+
+    def mock_run(app, host, port, **kwargs):
+        called["host"] = host
+        called["port"] = port
+
+    monkeypatch.setattr("uvicorn.run", mock_run)
+    code = cli.main(["serve", "--host", "0.0.0.0", "--allow-remote"])
+    assert code == 0
+    assert called["host"] == "0.0.0.0"
+
+
+def test_sanitize_upload_filename():
+    from application.api.deps import sanitize_upload_filename
+
+    assert sanitize_upload_filename("../../evil.srt") == "evil.srt"
+    assert (
+        sanitize_upload_filename("C:\\windows\\system32\\calc.exe.srt")
+        == "calc.exe.srt"
+    )
+    assert sanitize_upload_filename("") == "upload.tmp"
+    assert sanitize_upload_filename("..") == "upload.tmp"

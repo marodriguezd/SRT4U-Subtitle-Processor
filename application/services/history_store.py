@@ -161,16 +161,23 @@ class HistoryStore:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or default_db_path()
-        parent = os.path.dirname(os.path.abspath(self.path))
-        try:
-            os.makedirs(parent, exist_ok=True)
-            if os.name != "nt":
-                os.chmod(parent, 0o700)
-        except OSError as exc:
-            raise HistoryError(f"cannot prepare history directory: {exc}") from exc
+        if self.path != ":memory:":
+            parent = os.path.dirname(os.path.abspath(self.path))
+            try:
+                os.makedirs(parent, exist_ok=True)
+                if os.name != "nt":
+                    os.chmod(parent, 0o700)
+            except OSError as exc:
+                raise HistoryError(f"cannot prepare history directory: {exc}") from exc
         try:
             self._conn = sqlite3.connect(self.path)
             self._conn.row_factory = sqlite3.Row
+            self._conn.execute("PRAGMA busy_timeout = 5000")
+            if self.path != ":memory:":
+                try:
+                    self._conn.execute("PRAGMA journal_mode = WAL")
+                except sqlite3.DatabaseError:
+                    pass
             self._conn.execute("PRAGMA foreign_keys = ON")
             self._migrate()
         except sqlite3.DatabaseError as exc:
@@ -201,6 +208,9 @@ class HistoryStore:
             ddl = _MIGRATIONS[version]
             try:
                 self._conn.execute("BEGIN IMMEDIATE")
+                if self._version() >= version:
+                    self._conn.commit()
+                    continue
                 for statement in _split_statements(ddl):
                     self._conn.execute(statement)
                 self._conn.execute(f"PRAGMA user_version = {version}")

@@ -41,7 +41,7 @@ from application.ui.main_window import MainWindow, ProcessWorker
 from application.services.i18n_service import t
 from application.ui.widgets import VideoPreviewPlayer
 
-MEDIA_DIR = os.environ.get("SRT4U_E2E_MEDIA", "/home/marodriguezd/Video_srt4u")
+MEDIA_DIR = os.environ.get("SRT4U_E2E_MEDIA", "")
 VIDEO_NAME = "S1pK5hmTzkE_1min.mp4"
 SRT_NAME = "S1pK5hmTzkE_1min.srt"
 
@@ -193,6 +193,7 @@ def test_03_cleaning_keeps_the_real_content_intact():
 
 
 # 3. Translation with the free engine
+@pytest.mark.network
 def test_04_free_translation_engine_on_real_subtitles():
     """
     The free engine must translate; without network it must report it cleanly.
@@ -388,10 +389,10 @@ def test_09_subtitles_are_actually_rendered_in_the_pixels(burned_video, tmp_path
 
         # The top of the frame only changes through re-encoding (compression
         # noise): far below the change introduced by the subtitle.
-        ratio_top = differences["arriba"] / max(1, sampled["arriba"])
+        ratio_top = differences["top"] / max(1, sampled["top"])
         assert ratio_top < 0.01, f"el reencode alteró demasiado arriba: {ratio_top:.2%}"
         # The subtitle band changes for real, and much more
-        assert differences["subtitulo"] > differences["arriba"] * 5
+        assert differences["subtitle"] > differences["top"] * 5
 
         # And there is legible text (bright pixels) in that band
         bright = sum(

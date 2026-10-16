@@ -9,6 +9,7 @@ from ..deps import (
     MAX_UPLOAD_BYTES,
     remove_temp,
     safe_detail,
+    sanitize_upload_filename,
     save_upload,
     validate_provider,
 )
@@ -107,7 +108,7 @@ async def pipeline(
         )
     limit = MAX_UPLOAD_BYTES if not is_media else 500 * 1024 * 1024
     tmp_path = await save_upload(file, suffix, max_bytes=limit)
-    filename = file.filename or f"input{suffix}"
+    filename = sanitize_upload_filename(file.filename, f"input{suffix}")
     # The export stage always writes to disk: point it at a sibling temp file
     # (deleted afterwards) so server paths never leak into the response.
     export_tmp = tmp_path.with_name(f"{tmp_path.stem}_pipeline.{output_format}")
@@ -167,5 +168,9 @@ async def pipeline(
         finally:
             _cleanup()
 
-    job_id = _jobs_from(request).submit("pipeline", _work, on_drop=_cleanup)
+    try:
+        job_id = _jobs_from(request).submit("pipeline", _work, on_drop=_cleanup)
+    except Exception:
+        _cleanup()
+        raise
     return JobCreatedResponse(job_id=job_id, status="queued")

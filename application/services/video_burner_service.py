@@ -81,6 +81,8 @@ class VideoBurnerService:
             exe_dir = os.path.dirname(sys.executable)
             candidates.append(os.path.join(exe_dir, "ffmpeg"))
             candidates.append(os.path.join(exe_dir, "ffmpeg.exe"))
+            candidates.append(os.path.join(exe_dir, "bin", "ffmpeg"))
+            candidates.append(os.path.join(exe_dir, "bin", "ffmpeg.exe"))
             candidates.append(os.path.join(exe_dir, "..", "Resources", "ffmpeg"))
 
         # 2. Local app directory bin/
@@ -342,6 +344,7 @@ class BurnInWorker(QThread):
                 )
                 try:
                     self._process.kill()
+                    self._process.wait(timeout=1.0)
                 except Exception as kill_exc:
                     logger.warning(
                         "Could not kill the FFmpeg process (%s)",
@@ -512,13 +515,23 @@ class BurnInWorker(QThread):
                 # D1: promote the finished encode over the final path only on
                 # success; the previous good file stays intact until this swap.
                 os.replace(temp_output, final_path)
-                logger.info("Burn-in completado: %s", self.output_path)
+                logger.info("Burn-in completed: %s", self.output_path)
                 self.progress_updated.emit(100.0, current_speed_str, "00:00")
                 self.finished_success.emit(self.output_path)
             else:
+                stderr_content = ""
+                try:
+                    if os.path.exists(stderr_log_path):
+                        with open(
+                            stderr_log_path, "r", encoding="utf-8", errors="replace"
+                        ) as f:
+                            stderr_content = f.read()[-500:]
+                except Exception:
+                    pass
                 logger.error(
-                    "FFmpeg exited with an error (code %s); technical details omitted",
+                    "FFmpeg exited with an error (code %s): %s",
                     self._process.returncode,
+                    stderr_content.strip() if stderr_content else "no stderr details",
                 )
                 self.failed.emit(
                     t("burn.error_ffmpeg_failed", code=self._process.returncode)

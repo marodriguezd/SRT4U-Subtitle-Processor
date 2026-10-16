@@ -52,11 +52,17 @@ def atomic_write_text(
         if fsync:
             os.fsync(handle.fileno())
         handle.close()
-        handle = None
         if permissions is not None:
             os.chmod(tmp_path, permissions)
+        elif os.path.exists(path):
+            try:
+                os.chmod(tmp_path, os.stat(path).st_mode & 0o777)
+            except OSError:
+                pass
         os.replace(tmp_path, path)
         tmp_path = None
+        if fsync:
+            _fsync_directory(directory)
     finally:
         if handle is not None:
             try:

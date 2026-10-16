@@ -65,10 +65,17 @@ class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 def _origin(url: str) -> tuple:
     parsed = urllib.parse.urlparse(url)
+    scheme = parsed.scheme.lower()
+    port = parsed.port
+    if port is None:
+        if scheme == "http":
+            port = 80
+        elif scheme == "https":
+            port = 443
     return (
-        parsed.scheme.lower(),
+        scheme,
         (parsed.hostname or "").lower(),
-        parsed.port,
+        port,
     )
 
 
@@ -259,6 +266,14 @@ class GoogleProvider(TranslationProvider):
 
     def translate(self, text, source_language, target_language, *, context=None):
         src = "auto" if source_language == "auto" else source_language
+        tl = target_language.strip()
+        if tl.lower() == "zh-cn":
+            tl = "zh-CN"
+        elif tl.lower() == "zh-tw":
+            tl = "zh-TW"
+        elif len(tl) == 2:
+            tl = tl.lower()
+        target_language = tl
         if self._deep_translator_enabled and GoogleTranslator:
             try:
                 translated = GoogleTranslator(
@@ -336,16 +351,21 @@ class DeepLProvider(TranslationProvider):
             target_code = "EN-US"
         elif target_code == "PT":
             target_code = "PT-PT"
-        elif target_code in {"ZH-CN", "ZH-HANS"}:
+        elif target_code in {"ZH", "ZH-CN", "ZH-HANS"}:
             # The UI uses Google's zh-CN locale; DeepL expects ZH-HANS
             # for Simplified Chinese targets.
             target_code = "ZH-HANS"
+        elif target_code in {"ZH-TW", "ZH-HK", "ZH-HANT"}:
+            target_code = "ZH-HANT"
         payload = {"text": [text], "target_lang": target_code}
         if source_language and source_language != "auto":
             source_code = source_language.upper()
-            if source_code in {"ZH-CN", "ZH-HANS"}:
+            if source_code.startswith("ZH"):
                 # DeepL detects source Chinese without a regional/script variant.
                 source_code = "ZH"
+            elif "-" in source_code:
+                # DeepL source languages do not accept regional variants (e.g. EN-US -> EN, PT-BR -> PT)
+                source_code = source_code.split("-")[0]
             payload["source_lang"] = source_code
         request = urllib.request.Request(
             url,
@@ -493,19 +513,17 @@ def _normalize_error(exc: Exception, provider: str) -> TranslationProviderError:
         if exc.code == 429:
             return ProviderRateLimitError(f"{provider}: rate limit exceeded (HTTP 429)")
         if exc.code >= 500:
-            return ProviderNetworkError(
-                f"{provider}: error transitorio HTTP {exc.code}"
-            )
-        return ProviderResponseError(f"{provider}: respuesta HTTP {exc.code}")
+            return ProviderNetworkError(f"{provider}: transient HTTP {exc.code}")
+        return ProviderResponseError(f"{provider}: HTTP response {exc.code}")
     if isinstance(exc, urllib.error.URLError) or isinstance(
         exc, (ConnectionError, OSError)
     ):
-        return ProviderNetworkError(f"{provider}: error de red ({type(exc).__name__})")
+        return ProviderNetworkError(f"{provider}: network error ({type(exc).__name__})")
     if isinstance(exc, (json.JSONDecodeError, KeyError, IndexError, TypeError)):
         return ProviderResponseError(
             f"{provider}: invalid response ({type(exc).__name__})"
         )
-    return ProviderUnknownError(f"{provider}: error inesperado ({type(exc).__name__})")
+    return ProviderUnknownError(f"{provider}: unexpected error ({type(exc).__name__})")
 
 
 ProviderRegistry.register("google", GoogleProvider)
