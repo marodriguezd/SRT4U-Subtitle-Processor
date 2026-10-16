@@ -152,6 +152,22 @@ def test_deepl_request_uses_config_without_logging_api_key(monkeypatch, caplog):
     assert key not in caplog.text
 
 
+def test_deepl_normalizes_simplified_chinese_language_codes(monkeypatch):
+    import application.services.translation_providers as providers
+
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data)
+        return _response({"translations": [{"text": "你好"}]})
+
+    monkeypatch.setattr(providers, "_open", fake_urlopen)
+    provider = DeepLProvider(MemoryConfig(deepl_api_key="secret"))
+    assert provider.translate("Hello", "zh-CN", "zh-CN") == "你好"
+    assert captured["payload"]["target_lang"] == "ZH-HANS"
+    assert captured["payload"]["source_lang"] == "ZH"
+
+
 def test_deepl_requires_key_and_normalizes_auth_and_rate_limit(monkeypatch):
     import application.services.translation_providers as providers
 
