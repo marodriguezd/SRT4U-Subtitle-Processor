@@ -89,3 +89,56 @@ def test_parse_txt_fixture(service):
     assert len(items) == 4
     assert "welcome to the show" in items[0].text
     assert items[1].start_ms > items[0].start_ms
+
+
+def test_parse_vtt_metadata_vs_identifier(service):
+    content = """WEBVTT
+
+NOTE This is a valid comment
+That spans multiple lines
+
+NOTED
+00:00:01.000 --> 00:00:02.000
+Valid cue with NOTED id
+
+REGIONAL
+00:00:03.000 --> 00:00:04.000
+Valid cue with REGIONAL id
+"""
+    items = service.parse_subtitles(content, "vtt")
+    assert len(items) == 2
+    assert "Valid cue with NOTED id" in items[0].text
+    assert "Valid cue with REGIONAL id" in items[1].text
+
+
+def test_parse_vtt_adjacent_cues_without_blank_lines(service):
+    content = """WEBVTT
+
+00:00:01.000 --> 00:00:02.000
+Line 1
+00:00:03.000 --> 00:00:04.000
+Line 2
+"""
+    items = service.parse_subtitles(content, "vtt")
+    assert len(items) == 2
+    assert items[0].text == "Line 1"
+    assert items[1].text == "Line 2"
+
+
+def test_negative_timestamp_clamping():
+    assert ms_to_srt_time(-500) == "00:00:00,000"
+    assert ms_to_vtt_time(-1000) == "00:00:00.000"
+
+
+def test_read_subtitle_file_encodings(tmp_path):
+    from application.services.subtitle_service import read_subtitle_file
+
+    p_bom = tmp_path / "bom.srt"
+    p_bom.write_bytes(b"\xef\xbb\xbf1\n00:00:01,000 --> 00:00:02,000\nHello\n")
+    assert "Hello" in read_subtitle_file(str(p_bom))
+
+    p_u16 = tmp_path / "u16.srt"
+    p_u16.write_bytes(
+        b"\xff\xfe" + "1\n00:00:01,000 --> 00:00:02,000\nUtf16\n".encode("utf-16-le")
+    )
+    assert "Utf16" in read_subtitle_file(str(p_u16))

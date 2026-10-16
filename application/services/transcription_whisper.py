@@ -9,6 +9,7 @@ Privacy: fully local inference, no network calls besides the one-time model
 download from Hugging Face (announced to the user before running).
 """
 
+import math
 import os
 import threading
 import time
@@ -44,8 +45,8 @@ INSTALL_HINT = "transcription unavailable: install the extra with python -m pip 
 #: for the default quantized checkpoints and are shown before any download.
 WHISPER_MODELS = {
     "tiny": ("~75 MB", "minimum, fast, low quality"),
-    "base": ("~145 MB", "ligero, calidad aceptable"),
-    "small": ("~465 MB", "equilibrio recomendado"),
+    "base": ("~145 MB", "lightweight, acceptable quality"),
+    "small": ("~465 MB", "recommended balance"),
     "medium": ("~1.5 GB", "better quality, slower"),
     "large-v3": ("~3 GB", "maximum quality, slow, more RAM"),
     "turbo": ("~1.6 GB", "fast with good quality"),
@@ -57,7 +58,7 @@ def _load_faster_whisper():
         from faster_whisper import WhisperModel  # type: ignore[import-not-found]
 
         return WhisperModel
-    except ImportError:
+    except (ImportError, OSError, RuntimeError, AttributeError):
         return None
 
 
@@ -98,7 +99,7 @@ class WhisperProvider(TranscriptionProvider):
         if config.model not in WHISPER_MODELS:
             raise TranscriptionModelError(
                 f"unsupported model: {config.model} "
-                f"(soportados: {', '.join(WHISPER_MODELS)})"
+                f"(supported: {', '.join(WHISPER_MODELS)})"
             )
         if cancel_event is not None and cancel_event.is_set():
             raise TranscriptionCancelledError("transcription cancelled")
@@ -122,7 +123,27 @@ class WhisperProvider(TranscriptionProvider):
                 download_root=os.environ.get("SRT4U_WHISPER_MODEL_DIR") or None,
             )
         except Exception as exc:
-            raise _normalize_error(exc, config.model) from exc
+            if (
+                device == "cuda"
+                and (config.device or "auto").strip().casefold() == "auto"
+            ):
+                logger.warning(
+                    "CUDA initialization failed for model '%s'; falling back to CPU (%s)",
+                    config.model,
+                    type(exc).__name__,
+                )
+                device = "cpu"
+                try:
+                    model = WhisperModel(
+                        config.model,
+                        device="cpu",
+                        compute_type="int8",
+                        download_root=os.environ.get("SRT4U_WHISPER_MODEL_DIR") or None,
+                    )
+                except Exception as cpu_exc:
+                    raise _normalize_error(cpu_exc, config.model) from cpu_exc
+            else:
+                raise _normalize_error(exc, config.model) from exc
         try:
             options = {
                 "language": config.normalized_language(),
@@ -215,7 +236,7 @@ def _optional_ms(seconds: object) -> Optional[int]:
         value = float(seconds)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         return None
     return int(value * 1000)
 

@@ -10,6 +10,8 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -83,6 +85,100 @@ def test_job_manager_running_cancel_discards_result():
     finally:
         release.set()
         manager.shutdown()
+
+
+def test_job_manager_admission_control_saturation():
+    """Admission control: saturated queue rejects new jobs and calls on_drop."""
+    from application.api.jobs import JobManager, JobQueueFullError
+
+    block = threading.Event()
+    dropped = []
+    manager = JobManager(max_workers=1, max_queued_jobs=2)
+    try:
+        # 1 running job, 2 queued jobs = queue saturated at 2
+        manager.submit("run", lambda: block.wait(5))
+        j1 = manager.submit("q1", lambda: "ok")
+        j2 = manager.submit("q2", lambda: "ok")
+
+        with pytest.raises(JobQueueFullError) as exc_info:
+            manager.submit("q3", lambda: "ok", on_drop=lambda: dropped.append("q3"))
+
+        assert "Job queue is full" in str(exc_info.value)
+        assert dropped == ["q3"]
+        assert manager.get(j1)["status"] == "queued"
+        assert manager.get(j2)["status"] == "queued"
+    finally:
+        block.set()
+        manager.shutdown()
+
+
+def test_job_manager_saturation_without_on_drop_still_rejects():
+    """Regression: a saturated queue must reject even when on_drop is None.
+
+    Previously the rejection branch was gated on the cleanup callback, so the
+    job was never registered yet an ID was returned and the job still ran.
+    """
+    from application.api.jobs import JobManager, JobQueueFullError
+
+    block = threading.Event()
+    ran = []
+    manager = JobManager(max_workers=1, max_queued_jobs=1)
+    try:
+        manager.submit("run", lambda: block.wait(5))
+        queued = manager.submit("q1", lambda: ran.append("q1"))
+
+        with pytest.raises(JobQueueFullError):
+            manager.submit("q2", lambda: ran.append("q2"))
+
+        assert manager.get(queued)["status"] == "queued"
+        assert len(manager.list()) == 2
+    finally:
+        block.set()
+        manager.shutdown()
+    assert "q2" not in ran
+
+
+def test_job_manager_shutdown_without_on_drop_raises():
+    """Regression: submitting after shutdown raises even without on_drop."""
+    from application.api.jobs import JobManager
+
+    manager = JobManager(max_workers=1, max_queued_jobs=2)
+    manager.shutdown()
+    with pytest.raises(RuntimeError, match="shut down"):
+        manager.submit("late", lambda: "never")
+
+
+def test_job_manager_queued_cancel_calls_on_drop_immediately():
+    """Cancelling a queued job triggers on_drop immediately without waiting."""
+    from application.api.jobs import JobManager
+
+    block = threading.Event()
+    dropped = []
+    manager = JobManager(max_workers=1, max_queued_jobs=5)
+    try:
+        manager.submit("run", lambda: block.wait(5))
+        q_id = manager.submit("q", lambda: "ok", on_drop=lambda: dropped.append(True))
+        assert manager.get(q_id)["status"] == "queued"
+        state = manager.cancel(q_id)
+        assert state == "cancelled"
+        assert dropped == [True]
+        assert manager.get(q_id)["status"] == "cancelled"
+    finally:
+        block.set()
+        manager.shutdown()
+
+
+def test_job_manager_submit_after_shutdown_calls_on_drop():
+    """Submitting to a shut-down manager triggers on_drop immediately."""
+    from application.api.jobs import JobManager
+
+    manager = JobManager(max_workers=1)
+    manager.shutdown()
+    dropped = []
+
+    with pytest.raises(RuntimeError):
+        manager.submit("t", lambda: "ok", on_drop=lambda: dropped.append("shut"))
+    assert dropped == ["shut"]
 
 
 # ------------------------------------------------- History migrations -------

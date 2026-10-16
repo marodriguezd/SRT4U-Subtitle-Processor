@@ -60,7 +60,9 @@ _TAG_MAP = (
 
 
 def escape_ass_braces(text: str) -> str:
-    """Escape user braces so they can never open an ASS override block."""
+    """Escape user braces so they cannot open arbitrary ASS override blocks."""
+    if not text or ("{" not in text and "}" not in text):
+        return text
     return text.replace("{", r"\{").replace("}", r"\}")
 
 

@@ -506,3 +506,25 @@ def test_history_page_renders_recent_runs(qapp, tmp_path, monkeypatch):
         assert window.lbl_history_empty.isVisible() is False
     finally:
         window.close()
+
+
+def test_in_memory_db_works():
+    store = HistoryStore(":memory:")
+    assert store._version() == 3
+    store.record_run("process", file_path="mem.srt", requested_provider="google")
+    assert len(store.recent_runs()) == 1
+    store.close()
+
+
+def test_atomic_write_preserves_mode_and_fsync(tmp_path):
+    from application.services.atomic_write import atomic_write_text
+
+    target = tmp_path / "secret.txt"
+    target.write_text("old")
+    if os.name != "nt":
+        os.chmod(target, 0o600)
+
+    atomic_write_text(str(target), "new", fsync=True)
+    assert target.read_text() == "new"
+    if os.name != "nt":
+        assert (os.stat(target).st_mode & 0o777) == 0o600

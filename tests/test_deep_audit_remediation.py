@@ -624,7 +624,9 @@ def test_ass_time_never_goes_backwards_in_the_wrong_direction():
 def test_job_manager_prunes_completed_jobs():
     from application.api.jobs import JobManager
 
-    manager = JobManager(max_workers=4, max_jobs=25)
+    # The queue bound must admit all 500 submissions so the test exercises
+    # pruning of completed jobs rather than admission control.
+    manager = JobManager(max_workers=4, max_jobs=25, max_queued_jobs=500)
     try:
         for _ in range(500):
             manager.submit("t", lambda: {"payload": "x" * 512})

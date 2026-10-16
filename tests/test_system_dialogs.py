@@ -21,7 +21,7 @@ from application.ui.file_dialogs import (
 from application.ui.message_boxes import ThemedMessageBox
 from application.ui.styles import Styles
 
-LANGUAGES = ["en", "es", "pt", "de", "it", "zh-CN"]
+LANGUAGES = ["en", "es", "pt", "de", "it", "fr", "zh-CN"]
 TOOLBAR_BUTTONS = [
     "backButton",
     "forwardButton",

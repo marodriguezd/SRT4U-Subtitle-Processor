@@ -77,5 +77,14 @@ def cancel_job(job_id: str, request: Request) -> JobStatusResponse:
         )
     manager.cancel(job_id)
     updated = manager.get(job_id)
-    assert updated is not None
+    if updated is None:
+        return JobStatusResponse(
+            job_id=job_id,
+            operation=job["operation"],
+            status="cancelled",
+            created_at=job.get("created_at"),
+            finished_at=job.get("finished_at"),
+            error=None,
+            result=None,
+        )
     return JobStatusResponse(**_public(updated))

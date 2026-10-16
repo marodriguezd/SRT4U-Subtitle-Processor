@@ -24,7 +24,7 @@ Release stable actuelle : **[v1.4.10](https://github.com/marodriguezd/SRT4U-Subt
 - **Interface multilingue (i18n)** :
   - Détection automatique de la langue du système au démarrage via `QLocale`.
   - Changement de langue en direct sans redémarrer l'app.
-  - 6 langues prises en charge : anglais (`en`), espagnol (`es`), portugais (`pt`), allemand (`de`), italien (`it`) et chinois simplifié (`zh-CN`).
+  - 7 langues prises en charge : anglais (`en`), espagnol (`es`), portugais (`pt`), allemand (`de`), italien (`it`), français (`fr`) et chinois simplifié (`zh-CN`).
   - Double accès : sélecteur rapide dans la barre supérieure et sélection persistante dans les Paramètres.
 - **Burn-In vidéo (export hardsub)** :
   - Incruste durablement les sous-titres dans les fichiers vidéo (`.mp4`, `.mkv`, `.webm`, etc.).

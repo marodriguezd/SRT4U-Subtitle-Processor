@@ -69,11 +69,42 @@ def validate_provider(provider: str) -> str:
     return name
 
 
+def sanitize_upload_filename(
+    filename: Optional[str], default: str = "upload.tmp"
+) -> str:
+    """Strip path traversal and Windows/POSIX directory components."""
+    if not filename:
+        return default
+    cleaned = filename.replace("\\", "/").rstrip("/").split("/")[-1].strip()
+    if not cleaned or cleaned in (".", ".."):
+        return default
+    return cleaned
+
+
 async def save_upload(
     upload: UploadFile, suffix: str, max_bytes: int = MAX_UPLOAD_BYTES
 ) -> Path:
     """Stream an upload to a temp file with a size cap; caller must delete it."""
     tmp: Optional[Path] = None
+    handle = None
+    success = False
+
+    def cleanup() -> None:
+        # Close before unlinking: Windows does not allow deleting an open file.
+        # Cleanup must not mask the original upload/HTTP error.
+        nonlocal handle
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                pass
+            handle = None
+        if tmp is not None:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Could not remove a temporary upload file")
+
     try:
         handle = tempfile.NamedTemporaryFile(
             delete=False, suffix=suffix, prefix="srt4u-api-"
@@ -92,18 +123,19 @@ async def save_upload(
                 )
             handle.write(chunk)
         handle.close()
+        handle = None
+        success = True
         return tmp
     except HTTPException:
-        if tmp is not None and tmp.exists():
-            tmp.unlink(missing_ok=True)
         raise
     except Exception as exc:
-        if tmp is not None and tmp.exists():
-            tmp.unlink(missing_ok=True)
         logger.exception("Failed to save the upload")
         raise HTTPException(
             status_code=500, detail="could not process the upload"
         ) from exc
+    finally:
+        if not success:
+            cleanup()
 
 
 def remove_temp(path: Optional[Path]) -> None:

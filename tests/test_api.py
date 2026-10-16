@@ -277,6 +277,47 @@ def test_upload_size_limit_and_cleanup(client, tmp_path):
     assert set(pathlib.Path("/tmp").glob("srt4u-api-*")) == before
 
 
+def test_save_upload_closes_temp_file_before_cleanup(monkeypatch):
+    """An oversized upload must close its temp file before unlinking it."""
+    import asyncio
+    from pathlib import Path
+
+    from fastapi import HTTPException
+
+    import application.api.deps as deps
+
+    handles = []
+    original_factory = deps.tempfile.NamedTemporaryFile
+    original_unlink = Path.unlink
+
+    def tracking_factory(*args, **kwargs):
+        handle = original_factory(*args, **kwargs)
+        handles.append(handle)
+        return handle
+
+    def assert_closed_before_unlink(path, *args, **kwargs):
+        if handles and str(path) == handles[0].name:
+            assert handles[0].closed, "upload temp file must be closed before unlink"
+        return original_unlink(path, *args, **kwargs)
+
+    class OversizedUpload:
+        filename = "large.srt"
+
+        async def read(self, size):
+            return b"xx"
+
+    monkeypatch.setattr(deps.tempfile, "NamedTemporaryFile", tracking_factory)
+    monkeypatch.setattr(Path, "unlink", assert_closed_before_unlink)
+
+    async def run():
+        with pytest.raises(HTTPException) as excinfo:
+            await deps.save_upload(OversizedUpload(), ".srt", max_bytes=1)
+        assert excinfo.value.status_code == 413
+
+    asyncio.run(run())
+    assert handles[0].closed
+
+
 def test_no_tracebacks_or_keys_in_errors(client):
     response = client.get("/api/v1/history/999999")
     assert response.status_code == 404
@@ -358,3 +399,89 @@ def test_process_job_records_parse_issues_in_history(client):
     assert len(rows) == 1
     assert rows[0]["parse_issues"] == 1
     assert rows[0]["success"] == 1
+
+
+def test_job_queue_full_returns_503(client, monkeypatch):
+    from application.api.jobs import JobQueueFullError
+
+    def fail_submit(*args, **kwargs):
+        raise JobQueueFullError("Job queue is full")
+
+    monkeypatch.setattr(client.app.state.jobs, "submit", fail_submit)
+    response = _upload(
+        client, path="/api/v1/process", content="1\n00:00:01,000 --> 00:00:02,000\nHi\n"
+    )
+    assert response.status_code == 503
+    assert response.headers.get("retry-after") == "30"
+    assert "job queue is full" in response.json()["detail"].lower()
+
+
+def test_serve_rejects_non_loopback_without_flag(capsys):
+    import application.cli as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["serve", "--host", "0.0.0.0"])
+    assert exc_info.value.code == 2
+    err = capsys.readouterr().err
+    assert "binding to non-loopback interface" in err
+
+
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [
+        ("127.0.0.1", True),
+        ("127.8.9.10", True),
+        ("::1", True),
+        ("[::1]", True),
+        ("localhost", True),
+        ("LOCALHOST", True),
+        ("0.0.0.0", False),
+        ("::", False),
+        ("127.evil.example", False),
+        ("127.0.0.1.example.com", False),
+        ("127.0.0.256", False),
+        ("192.168.1.10", False),
+        ("example.com", False),
+        ("testserver", False),
+    ],
+)
+def test_serve_loopback_classification(host, expected):
+    import application.cli as cli
+
+    assert cli._is_loopback_bind_host(host) is expected
+
+
+def test_serve_rejects_ip_looking_hostname_without_flag(capsys):
+    import application.cli as cli
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["serve", "--host", "127.evil.example"])
+    assert exc_info.value.code == 2
+    assert "binding to non-loopback interface" in capsys.readouterr().err
+
+
+def test_serve_allows_non_loopback_with_flag(monkeypatch):
+    import application.cli as cli
+
+    called = {}
+
+    def mock_run(app, host, port, **kwargs):
+        called["host"] = host
+        called["port"] = port
+
+    monkeypatch.setattr("uvicorn.run", mock_run)
+    code = cli.main(["serve", "--host", "0.0.0.0", "--allow-remote"])
+    assert code == 0
+    assert called["host"] == "0.0.0.0"
+
+
+def test_sanitize_upload_filename():
+    from application.api.deps import sanitize_upload_filename
+
+    assert sanitize_upload_filename("../../evil.srt") == "evil.srt"
+    assert (
+        sanitize_upload_filename("C:\\windows\\system32\\calc.exe.srt")
+        == "calc.exe.srt"
+    )
+    assert sanitize_upload_filename("") == "upload.tmp"
+    assert sanitize_upload_filename("..") == "upload.tmp"

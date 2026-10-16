@@ -24,7 +24,7 @@ Aktuelles stabiles Release: **[v1.4.10](https://github.com/marodriguezd/SRT4U-Su
 - **Mehrsprachige Oberfläche (i18n)**:
   - Automatische Systemspracherkennung beim Start via `QLocale`.
   - Live-Sprachwechsel zur Laufzeit ohne App-Neustart.
-  - 6 unterstützte Sprachen: Englisch (`en`), Spanisch (`es`), Portugiesisch (`pt`), Deutsch (`de`), Italienisch (`it`) und vereinfachtes Chinesisch (`zh-CN`).
+  - 7 unterstützte Sprachen: Englisch (`en`), Spanisch (`es`), Portugiesisch (`pt`), Deutsch (`de`), Italienisch (`it`), Französisch (`fr`) und vereinfachtes Chinesisch (`zh-CN`).
   - Dualer Zugang: Schnellumschalter in der oberen Leiste und persistente Auswahl in den Einstellungen.
 - **Video-Burn-In (Hardsub-Export)**:
   - Bettet Untertitel permanent in Videodateien ein (`.mp4`, `.mkv`, `.webm` usw.).

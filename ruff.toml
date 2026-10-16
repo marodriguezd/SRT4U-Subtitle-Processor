@@ -4,7 +4,7 @@
 #   E7 = pycodestyle: statements (E701, E711, E712, E721, E722, E731, E741, ...)
 #   E9 = pycodestyle: runtime/parse errors (E902, E999, ...)
 #   B  = flake8-bugbear (likely bugs and antipatterns)
-target-version = "py311"
+target-version = "py310"
 
 [lint]
 select = ["F", "E7", "E9", "B"]

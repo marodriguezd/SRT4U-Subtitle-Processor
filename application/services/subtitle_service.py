@@ -17,7 +17,27 @@ from . import timestamps
 logger = get_logger("subtitles")
 
 
+def read_subtitle_file(file_path: str) -> str:
+    """Read a subtitle file with encoding detection (BOM and common fallbacks)."""
+    with open(file_path, "rb") as f:
+        raw = f.read()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw[3:].decode("utf-8", errors="replace")
+    if raw.startswith(b"\xff\xfe"):
+        return raw[2:].decode("utf-16-le", errors="replace")
+    if raw.startswith(b"\xfe\xff"):
+        return raw[2:].decode("utf-16-be", errors="replace")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            return raw.decode("cp1252")
+        except UnicodeDecodeError:
+            return raw.decode("utf-8", errors="replace")
+
+
 def ms_to_srt_time(ms: int) -> str:
+    ms = max(0, int(ms))
     hours = ms // 3600000
     ms %= 3600000
     minutes = ms // 60000
@@ -28,6 +48,7 @@ def ms_to_srt_time(ms: int) -> str:
 
 
 def ms_to_vtt_time(ms: int) -> str:
+    ms = max(0, int(ms))
     hours = ms // 3600000
     ms %= 3600000
     minutes = ms // 60000
@@ -180,35 +201,35 @@ class SubtitleService:
     #: the dialogue "The rarbg group released it.".
     WHOLE_LINE_SPAM_PATTERNS = [
         # Attribution / credit lines.
-        r"(?i).*\bsubtitled?\s+by\b.*",
-        r"(?i).*\bsubtitulad[oa]s?\s+(?:por|de)\b.*",
-        r"(?i).*\bsubt[ií]tulos\s+(?:por|de|sincronizad[oa]s?\s+por)\b.*",
-        r"(?i).*\btraducci[oó]n\s+(?:de|por)\b.*",
-        r"(?i).*\bripped\s+by\b.*",
-        r"(?i).*\bencoded\s+by\b.*",
-        r"(?i).*\bsync(?:ed|hronized|hronizado|hronizad[oa]s?)\s+by\b.*",
-        r"(?i).*\b(?:downloaded|descargad[oa]o?)\s+from\b.*",
-        r"(?i).*\bdescargad[oa]s?\s+de\b.*",
-        r"(?i).*\brelease\s*:\s*\S+.*",
-        r"(?i).*\buploads?\s+(?:by|from)\b.*",
-        r"(?i).*\bsubtitled?\s+by\s*:.*",
+        r"(?i)^[\[\(]?\s*subtitled?\s+by\b.*",
+        r"(?i)^[\[\(]?\s*subtitulad[oa]s?\s+(?:por|de)\b.*",
+        r"(?i)^[\[\(]?\s*subt[ií]tulos\s+(?:por|de|sincronizad[oa]s?\s+por)\b.*",
+        r"(?i)^[\[\(]?\s*traducci[oó]n\s+(?:de|por)\b.*",
+        r"(?i)^[\[\(]?\s*ripped\s+by\b.*",
+        r"(?i)^[\[\(]?\s*encoded\s+by\b.*",
+        r"(?i)^[\[\(]?\s*sync(?:ed|hronized|hronizado|hronizad[oa]s?)\s+by\b.*",
+        r"(?i)^[\[\(]?\s*(?:downloaded|descargad[oa]o?)\s+from\b.*",
+        r"(?i)^[\[\(]?\s*descargad[oa]s?\s+de\b.*",
+        r"(?i)^[\[\(]?\s*release\s*:\s*\S+.*",
+        r"(?i)^[\[\(]?\s*uploads?\s+(?:by|from)\b.*",
+        r"(?i)^[\[\(]?\s*subtitled?\s+by\s*:.*",
         # Bare links: the line is nothing but the link.
-        r"(?i)https?://\S+",
-        r"(?i)www\.[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.[a-z]{2,}",
-        r"(?i)t\.me/[a-zA-Z0-9_\-]+",
-        r"(?i)joinchat/[a-zA-Z0-9_\-]+",
-        r"(?i)telegram:?\s*@\w+",
+        r"(?i)^https?://\S+$",
+        r"(?i)^www\.[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.[a-z]{2,}$",
+        r"(?i)^t\.me/[a-zA-Z0-9_\-]+$",
+        r"(?i)^joinchat/[a-zA-Z0-9_\-]+$",
+        r"(?i)^telegram:?\s*@\w+$",
         # Bare release-site tags, e.g. a cue that is only "YTS.MX".
-        r"(?i)(?:yts|rarbg|yify|opensubtitles|addic7ed|subscene)"
-        r"[\w.\-]*(?:\.(?:com|org|net|mx|to|ru|me|io|ly))?",
-        # Music / sound placeholders.
-        r"[-~]?♪.*?♪[-~]?",
-        r"♪+",
-        r"♫+",
+        r"(?i)^(?:yts|rarbg|yify|opensubtitles|addic7ed|subscene)"
+        r"[\w.\-]*(?:\.(?:com|org|net|mx|to|ru|me|io|ly))?$",
+        # Music / sound placeholders (descriptions, not lyrics).
+        r"[-~]?♪\s*(?:[^\n♪♫]*\b(?:music|música|soundtrack|theme|song)\b[^\n♪♫]*)?♪[-~]?",
+        r"^♪+$",
+        r"^♫+$",
         r"(?i)\[[^\]]*music[^\]]*\]",
         r"(?i)\([^\)]*music[^\)]*\)",
         # Site taglines.
-        r"(?i)we\s*compress\s*knowledge\s*for\s*you!?",
+        r"(?i)^we\s*compress\s*knowledge\s*for\s*you!?$",
     ]
 
     #: Lines that are spam only when they *advertise* something. The call to
@@ -231,8 +252,8 @@ class SubtitleService:
         rf"(?:{SOURCE_REFERENCE}).*",
         rf"(?i)^(?:please\s+)?(?:available|descarga(?:r|lo)?|disponible)\b"
         rf".*(?:{SOURCE_REFERENCE}).*",
-        r"(?i)^(?:watch|stream)\b.*\bfree\b.*",
-        r"(?i)^full\s+(?:movie|episode|season)\b.*",
+        r"(?i)^(?:watch|stream)\s+(?:this|online|now|free)\b.*\b(?:free|online|hd|movie|film|episode|season)\b.*",
+        r"(?i)^full\s+(?:movie|episode|season)\s+(?:available|watch|download|here|at|stream)\b.*",
     ]
 
     #: Explicit advertising with no link at all.
@@ -279,7 +300,7 @@ class SubtitleService:
             if ext in [".srt", ".vtt", ".ass", ".ssa", ".txt"]:
                 return "ass" if ext in [".ass", ".ssa"] else ext.lstrip(".")
 
-        stripped = content.strip()
+        stripped = (content or "").lstrip("\ufeff").strip()
         if stripped.startswith("WEBVTT"):
             return "vtt"
         if "[Script Info]" in content or "[Events]" in content:
@@ -291,6 +312,7 @@ class SubtitleService:
     def parse_subtitles(
         self, content: str, file_format: str = "srt"
     ) -> List[SubtitleItem]:
+        content = (content or "").lstrip("\ufeff")
         format_lower = file_format.lower()
         self.last_parse_issues = []
         self._last_ass_styles = {}
@@ -420,7 +442,7 @@ class SubtitleService:
                 if candidate and not candidate.isdigit():
                     self._add_issue(
                         "unattached_text",
-                        "texto anterior al primer timecode",
+                        "text precedes the first timecode",
                         offset + 1,
                         lines[offset],
                     )
@@ -447,19 +469,25 @@ class SubtitleService:
             # cue. Consume the whole block instead. STYLE blocks may contain
             # VTT selectors with '-->' is impossible, but a NOTE body can cite
             # timestamps, so the block skip is what matters — not the text.
-            if line.startswith(("NOTE", "STYLE", "REGION")) or line.startswith(
-                "WEBVTT"
+            if (
+                line == "NOTE"
+                or line.startswith(("NOTE ", "NOTE\t"))
+                or line == "STYLE"
+                or line.startswith(("STYLE ", "STYLE\t"))
+                or line == "REGION"
+                or line.startswith(("REGION ", "REGION\t"))
             ):
-                if (
-                    line == "WEBVTT"
-                    or line.startswith("WEBVTT ")
-                    or line.startswith("WEBVTT\t")
-                ):
-                    i += 1  # header line only; the file body is still cues
-                    continue
                 i += 1
                 while i < len(lines) and lines[i].strip():
                     i += 1
+                continue
+
+            if (
+                line == "WEBVTT"
+                or line.startswith("WEBVTT ")
+                or line.startswith("WEBVTT\t")
+            ):
+                i += 1  # header line only; the file body is still cues
                 continue
 
             match = ts_regex.search(line)
@@ -480,6 +508,8 @@ class SubtitleService:
                 text_lines = []
                 i += 1
                 while i < len(lines) and lines[i].strip():
+                    if ts_regex.search(lines[i]):
+                        break
                     text_lines.append(lines[i].strip())
                     i += 1
 
@@ -488,12 +518,8 @@ class SubtitleService:
                 )
                 text = "\n".join(text_lines)
                 if timings is None:
-                    self._add_issue(
-                        "cue_dropped",
-                        "the cue has an unusable timestamp",
-                        timing_line + 1,
-                        time_line_full,
-                    )
+                    # ``_safe_timestamps`` already recorded the specific reason;
+                    # adding a generic one here would double-count every block.
                     continue
                 start_ms, end_ms = timings
                 if not text.strip():
@@ -650,16 +676,14 @@ class SubtitleService:
 
     def qa_file(self, file_path: str) -> QAReport:
         """Read and parse one subtitle file, returning its standalone QA report."""
-        with open(file_path, "r", encoding="utf-8", errors="replace") as source_file:
-            content = source_file.read()
+        content = read_subtitle_file(file_path)
         file_format = self.detect_format(content, file_path)
         items = self.parse_subtitles(content, file_format)
         return self.qa_subtitles(items, file_format=file_format, source_content=content)
 
     def analyze_file(self, file_path: str) -> Tuple[SubtitleAnalytics, QAReport]:
         """Read, detect, and parse a subtitle file once before returning analytics and QA."""
-        with open(file_path, "r", encoding="utf-8", errors="replace") as source_file:
-            content = source_file.read()
+        content = read_subtitle_file(file_path)
         file_format = self.detect_format(content, file_path)
         items = self.parse_subtitles(content, file_format)
         return self.analyze_subtitles(
@@ -1076,8 +1100,7 @@ class SubtitleService:
         if progress_callback:
             progress_callback("step_reading", True)
 
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
+        content = read_subtitle_file(file_path)
 
         source_format = self.detect_format(content, file_path)
         out_format = target_format or source_format
