@@ -66,7 +66,13 @@ class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
 def _origin(url: str) -> tuple:
     parsed = urllib.parse.urlparse(url)
     scheme = parsed.scheme.lower()
-    port = parsed.port
+    try:
+        port = parsed.port
+    except ValueError:
+        # A malformed port (e.g. from a hostile Location header) must not raise
+        # inside the redirect handler; a sentinel origin never matches a valid one,
+        # so the cross-origin check rejects the redirect cleanly.
+        return (scheme, (parsed.hostname or "").lower(), "invalid-port")
     if port is None:
         if scheme == "http":
             port = 80

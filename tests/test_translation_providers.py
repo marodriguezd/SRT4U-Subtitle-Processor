@@ -802,6 +802,14 @@ def test_origin_port_normalization():
     assert _origin("http://localhost:8080") != _origin("http://localhost:80")
 
 
+def test_origin_malformed_port_does_not_raise_and_never_matches():
+    from application.services.translation_providers import _origin
+
+    bad = _origin("https://api.deepl.com:abc/x")
+    assert bad != _origin("https://api.deepl.com/x")
+    assert bad != _origin("https://api.deepl.com:443/x")
+
+
 def test_deepl_source_and_target_variant_normalization(monkeypatch):
     from application.services.translation_providers import DeepLProvider
 
