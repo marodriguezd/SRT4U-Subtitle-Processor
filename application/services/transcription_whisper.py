@@ -78,7 +78,7 @@ class WhisperProvider(TranscriptionProvider):
 
     @staticmethod
     def model_info(model: str) -> str:
-        size, description = WHISPER_MODELS.get(model, ("desconocido", "modelo"))
+        size, description = WHISPER_MODELS.get(model, ("unknown size", "model"))
         return f"'{model}' ({size}, {description})"
 
     def transcribe(
@@ -270,7 +270,7 @@ def _normalize_error(exc: Exception, model: str) -> TranscriptionError:
     ):
         return TranscriptionModelError(
             f"model '{model}' is not available "
-            f"(soportados: {', '.join(WHISPER_MODELS)}); "
+            f"(supported: {', '.join(WHISPER_MODELS)}); "
             "check your connection the first time; the model is downloaded once"
         )
     logger.warning("Whisper failed (%s)", type(exc).__name__)

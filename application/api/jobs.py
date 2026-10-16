@@ -135,9 +135,14 @@ class JobManager:
         func: Callable[[], Any],
     ) -> None:
         drop: Optional[Callable[[], None]] = None
+        job_is_dropped = False
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None or job["cancel_requested"]:
+            # A job already marked cancelled (by ``cancel`` or ``shutdown``) has
+            # had its drop callback consumed. Running it now would execute work
+            # whose temp inputs were already removed, so it must stop here.
+            if job is None or job["cancel_requested"] or job["status"] == "cancelled":
+                job_is_dropped = True
                 if job is not None:
                     job["status"] = "cancelled"
                     job["finished_at"] = _utc_now_iso()
@@ -148,11 +153,12 @@ class JobManager:
             else:
                 job["status"] = "running"
                 self._on_drop_callbacks.pop(job_id, None)
-        if drop is not None:
-            try:
-                drop()
-            except Exception as exc:
-                logger.error("Job drop cleanup failed (%s)", type(exc).__name__)
+        if job_is_dropped:
+            if drop is not None:
+                try:
+                    drop()
+                except Exception as exc:
+                    logger.error("Job drop cleanup failed (%s)", type(exc).__name__)
             return
         try:
             result = func()
