@@ -222,6 +222,51 @@ def test_history_migrates_v1_to_v3_without_losing_rows(tmp_path):
         assert "parse_issues" in rows[0]
 
 
+def _legacy_v2_db(path: Path) -> None:
+    """Create a genuine v2 database by applying the shipped v1 and v2 DDL."""
+    from application.services import history_store as hs
+
+    conn = sqlite3.connect(str(path))
+    conn.executescript(hs._MIGRATIONS[1])
+    conn.executescript(hs._MIGRATIONS[2])
+    conn.execute(
+        "INSERT INTO runs (timestamp, operation, file_path, success,"
+        " media_duration_ms) VALUES ('2026-02-01T00:00:00+00:00', 'process',"
+        " 'b.srt', 1, 60000)"
+    )
+    conn.execute("PRAGMA user_version = 2")
+    conn.commit()
+    conn.close()
+
+
+def test_history_migrates_v2_to_v3_preserving_media_duration(tmp_path):
+    from application.services.history_store import HistoryStore
+
+    db = tmp_path / "v2.db"
+    _legacy_v2_db(db)
+    with HistoryStore(str(db)) as store:
+        assert store._version() == 3
+        rows = store.recent_runs(limit=10)
+        assert len(rows) == 1
+        assert rows[0]["file_path"] == "b.srt"
+        assert rows[0]["media_duration_ms"] == 60000
+        assert rows[0]["parse_issues"] in (None, 0)
+
+
+def test_history_reopen_after_migration_is_idempotent(tmp_path):
+    from application.services.history_store import HistoryStore
+
+    db = tmp_path / "v2.db"
+    _legacy_v2_db(db)
+    with HistoryStore(str(db)):
+        pass
+    # A second open must neither re-run DDL (duplicate column would fail) nor
+    # lose or duplicate rows.
+    with HistoryStore(str(db)) as store:
+        assert store._version() == 3
+        assert len(store.recent_runs(limit=10)) == 1
+
+
 def test_history_schema_has_no_secret_columns(tmp_path):
     """The schema must offer nowhere to store texts, media or secrets."""
     from application.services.history_store import HistoryStore
