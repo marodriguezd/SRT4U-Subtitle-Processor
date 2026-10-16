@@ -6,6 +6,9 @@ and starts the event loop.
 import sys
 import os
 import ctypes
+import subprocess
+import tempfile
+import threading
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
 from application.logging_setup import (
@@ -79,7 +82,117 @@ def install_excepthook(log_path: str) -> None:
     sys.excepthook = _hook
 
 
+SMOKE_TEST_FLAG = "--smoke-test"
+SMOKE_TIMEOUT_SECONDS = 90
+SMOKE_FFMPEG_TIMEOUT_SECONDS = 20
+SMOKE_LOG_NAME = "srt4u-smoke.log"
+
+
+def _smoke_emit(message: str, log_file) -> None:
+    """Write one diagnostic line to the smoke log and to stderr when present.
+
+    ``--noconsole`` builds have no stderr, so the temporary log file is the
+    reliable record; stderr is only a convenience.
+    """
+    line = f"[smoke] {message}"
+    if sys.stderr is not None:
+        print(line, file=sys.stderr, flush=True)
+    log_file.write(line + "\n")
+    log_file.flush()
+
+
+def run_smoke_test() -> int:
+    """Start the packaged GUI once, check its runtime and FFmpeg, then exit.
+
+    Used by CI against the built artifacts. Config and history are redirected
+    to a temporary location so the check never touches the user's data, and
+    the function never shows dialogs or calls a translation provider.
+    Returns 0 only when every check passes.
+    """
+    log_path = os.path.join(tempfile.gettempdir(), SMOKE_LOG_NAME)
+    with open(log_path, "w", encoding="utf-8") as log_file:
+        # A hung startup must not hang CI: the watchdog ends the process.
+        watchdog = threading.Timer(
+            SMOKE_TIMEOUT_SECONDS,
+            lambda: (
+                _smoke_emit("watchdog expired", log_file),
+                os._exit(3),
+            ),
+        )
+        watchdog.daemon = True
+        watchdog.start()
+        try:
+            return _run_smoke_checks(log_file)
+        except Exception as exc:
+            _smoke_emit(f"FAILED: unexpected {type(exc).__name__}: {exc}", log_file)
+            return 1
+        finally:
+            watchdog.cancel()
+
+
+def _run_smoke_checks(log_file) -> int:
+    """Run the individual smoke checks; return 0 when all of them pass."""
+    from application.services.config_service import ConfigService
+    from application.services.video_burner_service import VideoBurnerService
+
+    failures = []
+
+    # Redirect user data before any service is constructed.
+    smoke_dir = tempfile.mkdtemp(prefix="srt4u-smoke-")
+    os.environ["SRT4U_HISTORY_DB"] = os.path.join(smoke_dir, "history.db")
+    ConfigService._get_config_dir = lambda self: smoke_dir
+
+    for rel in (os.path.join("assets", "icon.png"), "LICENSE"):
+        if os.path.exists(get_resource_path(rel)):
+            _smoke_emit(f"resource ok: {rel}", log_file)
+        else:
+            failures.append(f"missing resource: {rel}")
+
+    ffmpeg = VideoBurnerService.get_ffmpeg_path()
+    if not ffmpeg:
+        failures.append("FFmpeg not found")
+    else:
+        try:
+            res = subprocess.run(
+                [ffmpeg, "-version"],
+                capture_output=True,
+                timeout=SMOKE_FFMPEG_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            failures.append(f"FFmpeg did not run: {type(exc).__name__}")
+        else:
+            if res.returncode == 0 and b"ffmpeg version" in res.stdout:
+                _smoke_emit("ffmpeg -version ok", log_file)
+            else:
+                failures.append(f"ffmpeg -version exited {res.returncode}")
+
+    app = QApplication.instance() or QApplication([sys.argv[0]])
+    app.setApplicationName("SRT4U")
+    app.setFont(Styles.ui_font(10))
+    app.setStyleSheet(Styles.tooltip_qss())
+    window = GlassMainWindow()
+    window.show()
+    app.processEvents()
+    if window.isVisible():
+        _smoke_emit("main window shown", log_file)
+    else:
+        failures.append("main window not visible")
+    window.close()
+    window.deleteLater()
+    app.processEvents()
+
+    for failure in failures:
+        _smoke_emit(f"FAILED: {failure}", log_file)
+    if failures:
+        return 1
+    _smoke_emit("all checks passed", log_file)
+    return 0
+
+
 if __name__ == "__main__":
+    if SMOKE_TEST_FLAG in sys.argv[1:]:
+        sys.exit(run_smoke_test())
     log_path = setup_logging()
     # Before creating QApplication, to capture early startup messages as well
     install_qt_message_handler()
