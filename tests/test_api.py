@@ -277,6 +277,47 @@ def test_upload_size_limit_and_cleanup(client, tmp_path):
     assert set(pathlib.Path("/tmp").glob("srt4u-api-*")) == before
 
 
+def test_save_upload_closes_temp_file_before_cleanup(monkeypatch):
+    """An oversized upload must close its temp file before unlinking it."""
+    import asyncio
+    from pathlib import Path
+
+    from fastapi import HTTPException
+
+    import application.api.deps as deps
+
+    handles = []
+    original_factory = deps.tempfile.NamedTemporaryFile
+    original_unlink = Path.unlink
+
+    def tracking_factory(*args, **kwargs):
+        handle = original_factory(*args, **kwargs)
+        handles.append(handle)
+        return handle
+
+    def assert_closed_before_unlink(path, *args, **kwargs):
+        if handles and str(path) == handles[0].name:
+            assert handles[0].closed, "upload temp file must be closed before unlink"
+        return original_unlink(path, *args, **kwargs)
+
+    class OversizedUpload:
+        filename = "large.srt"
+
+        async def read(self, size):
+            return b"xx"
+
+    monkeypatch.setattr(deps.tempfile, "NamedTemporaryFile", tracking_factory)
+    monkeypatch.setattr(Path, "unlink", assert_closed_before_unlink)
+
+    async def run():
+        with pytest.raises(HTTPException) as excinfo:
+            await deps.save_upload(OversizedUpload(), ".srt", max_bytes=1)
+        assert excinfo.value.status_code == 413
+
+    asyncio.run(run())
+    assert handles[0].closed
+
+
 def test_no_tracebacks_or_keys_in_errors(client):
     response = client.get("/api/v1/history/999999")
     assert response.status_code == 404
