@@ -198,6 +198,18 @@ jobs:
         run: |
           Move-Item -Path "dist/SRT4U.exe" -Destination "dist/SRT4U-Windows-x64.exe"
 
+      - name: Smoke-test executable (launch, resources, bundled FFmpeg)
+        # Runs the built GUI binary in its hidden --smoke-test mode. The
+        # --noconsole build has no stderr, so the diagnostics come from the
+        # temporary log file, which is printed in both outcomes.
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          & "dist/SRT4U-Windows-x64.exe" --smoke-test
+          $code = $LASTEXITCODE
+          Get-Content -Path (Join-Path $env:TEMP "srt4u-smoke.log") -ErrorAction SilentlyContinue
+          exit $code
+
       - name: Stamp release version (provenance marker)
         # The stamp goes in a text file next to the binary: PyInstaller
         # binaries compress all Python code (PYZ/zlib), so grepping
@@ -319,6 +331,22 @@ jobs:
           tar -czvf SRT4U-Linux-x86_64.tar.gz SRT4U
           cd ..
 
+      - name: Smoke-test AppImage (launch, resources, bundled FFmpeg)
+        # Runs the packaged AppImage itself. APPIMAGE_EXTRACT_AND_RUN avoids
+        # needing FUSE on the runner; offscreen Qt needs no display server and
+        # the smoke path only covers startup, not interactive use.
+        timeout-minutes: 5
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          LOG="${TMPDIR:-/tmp}/srt4u-smoke.log"
+          rm -f "$LOG"
+          status=0
+          dist/SRT4U-Linux-x86_64.AppImage --smoke-test || status=$?
+          cat "$LOG" 2>/dev/null || true
+          exit $status
+
       - name: Stamp release version (provenance marker)
         # See the equivalent build-windows step: the stamp goes next to
         # the binary because the PyInstaller code is compressed. sed
@@ -374,6 +402,17 @@ jobs:
             --add-binary "ffmpeg:." \
             --icon "assets/icon.icns" \
             main.py
+
+      - name: Smoke-test .app executable (launch, resources, bundled FFmpeg)
+        # Executes the real binary inside the .app bundle, not the Python source.
+        timeout-minutes: 5
+        run: |
+          LOG="${TMPDIR:-/tmp}/srt4u-smoke.log"
+          rm -f "$LOG"
+          status=0
+          dist/SRT4U.app/Contents/MacOS/SRT4U --smoke-test || status=$?
+          cat "$LOG" 2>/dev/null || true
+          exit $status
 
       - name: Package into DMG
         run: |

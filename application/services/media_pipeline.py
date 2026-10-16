@@ -465,7 +465,7 @@ class MediaPipeline:
             return self._stage_burn(config, result, items, emit, cancel_event), {
                 "output_video": result.output_video
             }
-        raise PipelineStageError(stage, "unknown", f"etapa desconocida: {stage}")
+        raise PipelineStageError(stage, "unknown", f"unknown stage: {stage}")
 
     def _stage_transcribe(
         self,

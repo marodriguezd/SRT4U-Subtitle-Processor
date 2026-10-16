@@ -146,7 +146,7 @@ def remove_temp(path: Optional[Path]) -> None:
             pass
 
 
-def safe_detail(exc: Exception, fallback: str = "error interno") -> str:
+def safe_detail(exc: Exception, fallback: str = "internal error") -> str:
     """Map known errors to short public messages without exception internals."""
     from ..services.media_pipeline import PipelineConfigError
     from ..services.transcription_providers import TranscriptionError
@@ -166,7 +166,7 @@ def safe_detail(exc: Exception, fallback: str = "error interno") -> str:
         # D5: these messages are generated locally by ``PipelineConfig.validate``
         # from the caller's own request parameters — they never contain
         # tracebacks, server paths, credentials or content, so flattening them
-        # to "error interno" only hid which 422 cause the client must fix.
+        # to a generic message only hid which 422 cause the client must fix.
         message = str(exc).strip()
         return message or fallback
     if isinstance(exc, TranscriptionError):

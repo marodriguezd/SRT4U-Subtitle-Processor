@@ -71,7 +71,7 @@ class TranscriptionService:
         if suffix not in MEDIA_EXTENSIONS:
             raise TranscriptionFormatError(
                 f"unsupported media format: {suffix or '(no extension)'} "
-                f"(soportados: {', '.join(sorted(MEDIA_EXTENSIONS))})"
+                f"(supported: {', '.join(sorted(MEDIA_EXTENSIONS))})"
             )
         return suffix
 

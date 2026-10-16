@@ -25,7 +25,11 @@ import pytest
 from PyQt6.QtCore import QEventLoop, QTimer
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6.QtGui import QImage
-from PyQt6.QtMultimedia import QMediaPlayer
+
+try:
+    from PyQt6.QtMultimedia import QMediaPlayer
+except (ImportError, OSError):
+    QMediaPlayer = None  # type: ignore[assignment,misc]
 
 from application.services.config_service import ConfigService
 from application.services.i18n_service import get_i18n

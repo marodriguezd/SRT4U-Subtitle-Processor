@@ -637,13 +637,15 @@ def test_d5_safe_detail_keeps_pipeline_config_message():
         safe_detail(PipelineConfigError("output_format debe ser srt o vtt"))
         == "output_format debe ser srt o vtt"
     )
-    assert safe_detail(PipelineConfigError("")) == "error interno"
+    assert safe_detail(PipelineConfigError("")) == "internal error"
 
 
 def test_d5_safe_detail_still_sanitizes_other_exceptions():
     from application.api.deps import safe_detail
 
-    assert safe_detail(ValueError("internal path /home/user/secret")) == "error interno"
+    assert (
+        safe_detail(ValueError("internal path /home/user/secret")) == "internal error"
+    )
 
 
 def test_d5_pipeline_route_returns_useful_422_detail(client):

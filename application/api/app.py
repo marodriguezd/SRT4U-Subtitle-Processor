@@ -56,7 +56,7 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
         from .deps import logger as api_logger
 
         api_logger.error("Unhandled API error (%s)", type(exc).__name__)
-        return JSONResponse(status_code=500, content={"detail": "error interno"})
+        return JSONResponse(status_code=500, content={"detail": "internal error"})
 
     for module in (
         health,
