@@ -19,8 +19,17 @@ from PyQt6.QtWidgets import (
     QDialog,
     QPlainTextEdit,
 )
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PyQt6.QtMultimediaWidgets import QVideoWidget
+
+try:
+    from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PyQt6.QtMultimediaWidgets import QVideoWidget
+
+    MULTIMEDIA_AVAILABLE = True
+except (ImportError, OSError):
+    QMediaPlayer = None  # type: ignore[assignment,misc]
+    QAudioOutput = None  # type: ignore[assignment,misc]
+    QVideoWidget = None  # type: ignore[assignment,misc]
+    MULTIMEDIA_AVAILABLE = False
 
 from .icons import Icons
 from .styles import Styles, sync_minimum_size
@@ -763,15 +772,23 @@ class VideoPreviewPlayer(QFrame):
         self.setMinimumHeight(180)
         self.setAcceptDrops(True)
 
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput(self)
-        self.audio_output.setVolume(1.0)
-        self.player.setAudioOutput(self.audio_output)
-        self.player.tracksChanged.connect(self._on_tracks_changed)
+        if (
+            MULTIMEDIA_AVAILABLE
+            and QMediaPlayer is not None
+            and QAudioOutput is not None
+        ):
+            self.player = QMediaPlayer()
+            self.audio_output = QAudioOutput(self)
+            self.audio_output.setVolume(1.0)
+            self.player.setAudioOutput(self.audio_output)
+            self.player.tracksChanged.connect(self._on_tracks_changed)
+            self.player.mediaStatusChanged.connect(self._on_media_status_changed)
+            self.player.errorOccurred.connect(self._on_media_error)
+        else:
+            self.player = None
+            self.audio_output = None
         self._media_error = False
         self._media_duration_ms = 0
-        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
-        self.player.errorOccurred.connect(self._on_media_error)
         self.current_subtitles: List[SubtitleItem] = []
 
         self._setup_ui()
@@ -786,9 +803,13 @@ class VideoPreviewPlayer(QFrame):
         v_layout = QVBoxLayout(self.video_container)
         v_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.video_widget = QVideoWidget()
-        self.player.setVideoOutput(self.video_widget)
-        v_layout.addWidget(self.video_widget)
+        if MULTIMEDIA_AVAILABLE and QVideoWidget is not None:
+            self.video_widget = QVideoWidget()
+            if self.player is not None:
+                self.player.setVideoOutput(self.video_widget)
+            v_layout.addWidget(self.video_widget)
+        else:
+            self.video_widget = None
 
         self.sub_overlay = QLabel(t("preview.overlay_hint"), self.video_container)
         self.sub_overlay.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -807,12 +828,18 @@ class VideoPreviewPlayer(QFrame):
         """)
         self.sub_overlay.mousePressEvent = lambda e: (
             self._browse_video()
-            if (not self.player.source().isValid() or self.player.source().isEmpty())
+            if (
+                self.player is not None
+                and (
+                    not self.player.source().isValid() or self.player.source().isEmpty()
+                )
+            )
             else None
         )
 
         self.video_container.installEventFilter(self)
-        self.video_widget.installEventFilter(self)
+        if self.video_widget is not None:
+            self.video_widget.installEventFilter(self)
         layout.addWidget(self.video_container)
 
         ctrl_layout = QHBoxLayout()
@@ -954,6 +981,12 @@ class VideoPreviewPlayer(QFrame):
         self.sub_overlay.raise_()
 
     def _refresh_media_controls(self):
+        if self.player is None:
+            self.play_btn.setEnabled(False)
+            self.time_slider.setEnabled(False)
+            self.btn_mute.setEnabled(False)
+            self.vol_slider.setEnabled(False)
+            return
         source = self.player.source()
         has_source = source.isValid() and not source.isEmpty() and not self._media_error
         has_duration = self._media_duration_ms > 0
@@ -963,21 +996,24 @@ class VideoPreviewPlayer(QFrame):
         self.vol_slider.setEnabled(has_source)
 
     def _on_tracks_changed(self):
+        if self.player is None:
+            return
         if len(self.player.audioTracks()) > 0 and self.player.activeAudioTrack() == -1:
             self.player.setActiveAudioTrack(0)
 
     def _on_volume_changed(self, val: int):
         vol = val / 100.0
-        self.audio_output.setVolume(vol)
-        # Adjusting volume implies intent to listen: unmute unless volume is set to zero
-        if val > 0 and self.audio_output.isMuted():
-            self.audio_output.setMuted(False)
-        elif val == 0:
-            self.audio_output.setMuted(True)
+        if self.audio_output is not None:
+            self.audio_output.setVolume(vol)
+            # Adjusting volume implies intent to listen: unmute unless volume is set to zero
+            if val > 0 and self.audio_output.isMuted():
+                self.audio_output.setMuted(False)
+            elif val == 0:
+                self.audio_output.setMuted(True)
         self._update_mute_icon(val)
 
     def _toggle_mute(self):
-        if not self.btn_mute.isEnabled():
+        if not self.btn_mute.isEnabled() or self.audio_output is None:
             return
         is_muted = self.audio_output.isMuted()
         self.audio_output.setMuted(not is_muted)
@@ -987,7 +1023,8 @@ class VideoPreviewPlayer(QFrame):
             self._update_mute_icon(self.vol_slider.value())
 
     def _update_mute_icon(self, volume: int):
-        if self.audio_output.isMuted() or volume == 0:
+        muted = self.audio_output.isMuted() if self.audio_output is not None else False
+        if muted or volume == 0:
             icon_name = "volume_mute"
             tip = t("preview.unmute_tooltip")
         elif volume < 50:
@@ -1062,38 +1099,41 @@ class VideoPreviewPlayer(QFrame):
 
     def _connect_signals(self):
         self.play_btn.clicked.connect(self._toggle_playback)
-        self.player.playbackStateChanged.connect(self._sync_play_icon)
-        self.player.positionChanged.connect(self._on_position_changed)
-        self.player.durationChanged.connect(self._on_duration_changed)
+        if self.player is not None:
+            self.player.playbackStateChanged.connect(self._sync_play_icon)
+            self.player.positionChanged.connect(self._on_position_changed)
+            self.player.durationChanged.connect(self._on_duration_changed)
         self.time_slider.sliderMoved.connect(self._set_position)
 
     def load_video(self, video_path: str):
-        if os.path.exists(video_path):
-            self._media_error = False
-            self._media_duration_ms = 0
-            self.player.setSource(QUrl.fromLocalFile(video_path))
-            self.sub_overlay.setText(t("preview.video_loaded"))
-            self._reposition_overlay()
-            self.sub_overlay.show()
-            self.sub_overlay.raise_()
-            # New media loaded: reset visual controls to idle state
-            self.time_slider.setRange(0, 0)
-            self.time_slider.setValue(0)
-            self._update_time_label(0, 0)
-            self._refresh_media_controls()
-            self._sync_play_icon()
+        if not os.path.exists(video_path) or self.player is None:
+            return
+        self._media_error = False
+        self._media_duration_ms = 0
+        self.player.setSource(QUrl.fromLocalFile(video_path))
+        self.sub_overlay.setText(t("preview.video_loaded"))
+        self._reposition_overlay()
+        self.sub_overlay.show()
+        self.sub_overlay.raise_()
+        # New media loaded: reset visual controls to idle state
+        self.time_slider.setRange(0, 0)
+        self.time_slider.setValue(0)
+        self._update_time_label(0, 0)
+        self._refresh_media_controls()
+        self._sync_play_icon()
 
     def set_subtitles(self, subtitles: List[SubtitleItem]):
         self.current_subtitles = subtitles
         # Update overlay text based on current playback position
-        if self.player.position() > 0:
+        if self.player is not None and self.player.position() > 0:
             self._on_position_changed(self.player.position())
 
     def seek_to_ms(self, ms: int):
-        if not self.time_slider.isEnabled():
+        if not self.time_slider.isEnabled() or self.player is None:
             return
         was_playing = (
-            self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+            QMediaPlayer is not None
+            and self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
         )
         self.player.setPosition(ms)
         self._on_position_changed(ms)
@@ -1102,7 +1142,11 @@ class VideoPreviewPlayer(QFrame):
 
     def _sync_play_icon(self, _state=None):
         """Ensure play/pause icon reliably reflects playbackState (including EOS/error)."""
-        playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        playing = (
+            self.player is not None
+            and QMediaPlayer is not None
+            and self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        )
         self.play_btn.setIcon(
             Icons.get_icon(
                 "pause" if playing else "play",
@@ -1116,9 +1160,12 @@ class VideoPreviewPlayer(QFrame):
         self.play_btn.setAccessibleName(tip)
 
     def _toggle_playback(self):
-        if not self.play_btn.isEnabled():
+        if not self.play_btn.isEnabled() or self.player is None:
             return
-        if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+        if (
+            QMediaPlayer is not None
+            and self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        ):
             self.player.pause()
         else:
             self.player.play()
@@ -1127,7 +1174,8 @@ class VideoPreviewPlayer(QFrame):
     def _on_duration_changed(self, duration: int):
         self._media_duration_ms = max(0, duration)
         self.time_slider.setRange(0, self._media_duration_ms)
-        self._update_time_label(self.player.position(), self._media_duration_ms)
+        pos = self.player.position() if self.player is not None else 0
+        self._update_time_label(pos, self._media_duration_ms)
         self._refresh_media_controls()
 
     def _on_position_changed(self, pos: int):
@@ -1152,7 +1200,11 @@ class VideoPreviewPlayer(QFrame):
             self.sub_overlay.show()
             self.sub_overlay.raise_()
         else:
-            if self.player.source().isValid() and not self.player.source().isEmpty():
+            if (
+                self.player is not None
+                and self.player.source().isValid()
+                and not self.player.source().isEmpty()
+            ):
                 self.sub_overlay.setText("")
                 self.sub_overlay.hide()
             else:
@@ -1162,7 +1214,7 @@ class VideoPreviewPlayer(QFrame):
                 self.sub_overlay.raise_()
 
     def _set_position(self, pos: int):
-        if self.time_slider.isEnabled():
+        if self.time_slider.isEnabled() and self.player is not None:
             self.player.setPosition(pos)
 
     def _update_time_label(self, pos: int, dur: int):

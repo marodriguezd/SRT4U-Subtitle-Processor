@@ -938,7 +938,10 @@ class MainWindow(QMainWindow):
         self.diff_viewer.subtitles_edited.connect(self._on_subtitles_edited)
         self.diff_viewer.cue_selected.connect(self.video_player.seek_to_ms)
         self.diff_viewer.count_changed.connect(self._on_preview_count_changed)
-        self.video_player.player.positionChanged.connect(self._on_video_position_sync)
+        if self.video_player.player is not None:
+            self.video_player.player.positionChanged.connect(
+                self._on_video_position_sync
+            )
 
         splitter.addWidget(self.video_player)
         splitter.addWidget(self.diff_viewer)
@@ -2346,10 +2349,11 @@ class MainWindow(QMainWindow):
             return
 
         video_path = ""
-        source = self.video_player.player.source()
-        if source and source.isValid() and not source.isEmpty():
-            video_path = source.toLocalFile()
-        elif self.current_subtitle_path:
+        if self.video_player.player is not None:
+            source = self.video_player.player.source()
+            if source and source.isValid() and not source.isEmpty():
+                video_path = source.toLocalFile()
+        if not video_path and self.current_subtitle_path:
             matching = self.drop_zone._find_matching_video(self.current_subtitle_path)
             if matching:
                 video_path = matching
