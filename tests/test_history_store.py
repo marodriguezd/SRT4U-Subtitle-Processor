@@ -263,6 +263,29 @@ def test_default_managed_directory_is_hardened(tmp_path, monkeypatch):
     assert (os.stat(parent).st_mode & 0o777) == 0o700
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics required")
+def test_empty_path_falls_back_to_hardened_managed_directory(tmp_path, monkeypatch):
+    """Regression: ``HistoryStore("")`` uses the managed dir and hardens it."""
+    monkeypatch.delenv("SRT4U_HISTORY_DB", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    parent = os.path.dirname(os.path.abspath(default_db_path()))
+    assert not os.path.exists(parent), "precondition: managed dir must not exist"
+
+    # A lenient umask is the point: without the 0700 chmod, the freshly created
+    # directory would land on 0755, so the assertion below really pins it.
+    previous_umask = os.umask(0o022)
+    try:
+        with HistoryStore(""):
+            pass
+    finally:
+        os.umask(previous_umask)
+
+    assert (os.stat(parent).st_mode & 0o777) == 0o700
+    assert os.path.isfile(os.path.join(parent, "history.db"))
+
+
 class _Stats:
     translation_failures = 2
     parse_issues = 1

@@ -168,7 +168,7 @@ class HistoryStore:
         # that parent would silently rewrite the permissions of a directory
         # SRT4U does not own. The database file itself is not chmod-ed either:
         # a custom path inherits the umask the user chose for that location.
-        self._owns_directory = path is None and not os.environ.get("SRT4U_HISTORY_DB")
+        self._owns_directory = not path and not os.environ.get("SRT4U_HISTORY_DB")
         if self.path != ":memory:":
             parent = os.path.dirname(os.path.abspath(self.path))
             try:
