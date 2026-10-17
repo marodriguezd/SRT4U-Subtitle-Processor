@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.12] - 2026-10-17
+
+Maintenance and bug-fix release, published as tag `v1.4.12` (stable) with no
+new product functionality.
+
+### Fixed
+- **History (SQLite)**: opening the history store no longer changes the
+  permissions of the parent directory of a caller-supplied database path
+  (`--db`, `SRT4U_HISTORY_DB` or an explicit constructor argument); only the
+  application-managed SRT4U directory is hardened to `0700`, and a custom
+  location keeps the permissions its owner chose. Regression tests cover
+  explicit, relative, environment-override, default and empty paths.
+- **Real-Whisper test**: removed an always-true assertion so the opt-in test
+  no longer reports a passing FFmpeg check regardless of availability. The
+  documentation now states the verified requirement: faster-whisper decodes
+  media through the FFmpeg libraries bundled by PyAV, so the external `ffmpeg`
+  executable is not needed for transcription.
+
+### Added
+- **Python 3.10 CI coverage**: a dedicated CI job runs the pyproject-reading
+  coherence, packaging and hardening guards on the declared minimum Python
+  version, with a `tomli` fallback for `tomllib` (stdlib only from 3.11).
+- **Seven-language screenshot coverage**: the screenshot tool derives its
+  gallery matrix from `I18nService.SUPPORTED_LANGUAGES`, and the smoke test
+  verifies the full 74-shot gallery covers every declared language.
+
+### Changed
+- **Testing documentation**: added `docs/testing.md`, the integration matrix
+  for network-marked tests, real Whisper and real-media end-to-end paths with
+  their exact prerequisites and environment variables.
+
 ## [1.4.11] - 2026-10-17
 
 Stability, security and reliability release, published as tag `v1.4.11` (stable)

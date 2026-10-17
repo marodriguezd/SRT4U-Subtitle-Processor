@@ -1,45 +1,35 @@
-# Release Notes — SRT4U 1.4.11
+# Release Notes — SRT4U 1.4.12
 
-SRT4U Subtitle Processor **1.4.11** is published on GitHub as
-[tag/v1.4.11](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.11).
+SRT4U Subtitle Processor **1.4.12** is published on GitHub as
+[tag/v1.4.12](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.12).
 
-## What's in 1.4.11
+## What's in 1.4.12
 
-A stability, security and reliability update. No new product features; the
-feature set is unchanged from 1.4.10.
+A maintenance and bug-fix release. No new product functionality; the feature
+set is unchanged from 1.4.11.
 
-### Fixes and hardening
+### Fixed
 
-- **API uploads and jobs**: temporary upload files are closed before deletion
-  and cleaned on every error path; uploaded filenames lose directory
-  components; the job queue is bounded and returns HTTP 503 with
-  `Retry-After` when saturated; cancelled or rejected queued jobs always
-  release their temporary files; and a shutdown race that could run a dropped
-  job after its cleanup was fixed.
-- **Translation**: same-origin redirects now normalize default HTTP/HTTPS
-  ports and reject malformed ports from redirect headers instead of raising.
-- **History (SQLite)**: WAL mode and a busy timeout reduce lock errors,
-  migrations are race-safe under concurrent opens, and storage failures
-  surface as `HistoryError` without interrupting processing.
-- **Whisper**: with `device=auto`, a failed CUDA initialization now falls
-  back to CPU processing; an explicit `cuda` request still fails loudly.
-- **GUI**: the application starts even when Qt Multimedia is unavailable,
-  disabling playback controls instead of crashing; start, cancel, close,
-  batch and language workflows are covered by new GUI tests.
-- **Packaging**: cross-platform smoke tests launch the built Windows `.exe`,
-  Linux AppImage and macOS `.app` to verify bundled resources, FFmpeg and
-  startup before publication.
+- **History (SQLite)**: opening the history store no longer rewrites the
+  permissions of the parent directory of a caller-supplied database path
+  (`--db`, `SRT4U_HISTORY_DB` or an explicit path). Only the application-managed
+  SRT4U directory is hardened to `0700`; a custom location keeps the
+  permissions its owner chose.
+- **Testing and documentation**: an always-true FFmpeg assertion was removed
+  from the opt-in real-Whisper test, and the documentation now distinguishes
+  the external `ffmpeg` executable from the FFmpeg decoding libraries that
+  faster-whisper bundles via PyAV.
 
----
+### Added
 
-## Current published release
+- **Python 3.10 compatibility**: the pyproject-reading test guards fall back to
+  `tomli`, and a dedicated CI job runs them on the declared minimum Python
+  version.
 
-The latest published release is **v1.4.11** (this release).
+### Changed
 
-See [CHANGELOG.md](CHANGELOG.md) for the full, dated change list.
+- Screenshot tooling and the new integration-testing documentation now cover
+  all seven interface languages consistently.
 
-### macOS (Apple Silicon)
-
-The macOS DMG is **Apple Silicon (arm64)** only and will not launch on Intel Macs;
-no x86_64 build is available. Download links are in the assets table of
-[README.md](README.md).
+The macOS DMG remains **Apple Silicon (arm64)** only and will not launch on Intel Macs;
+no x86_64 build is available.
