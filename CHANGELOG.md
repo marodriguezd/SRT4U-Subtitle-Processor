@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.11] - 2026-10-17 (not yet published)
+
+Planned. Not yet released on GitHub; included here so the changelog is coherent
+with `pyproject.toml` and with the prepared state of the `main` branch.
+
+Stability, security and reliability release with no new product functionality.
+
+### Added
+- **Packaged-app smoke checks (CI)**: each build — Windows `.exe`, Linux
+  AppImage/tarball and macOS `.app` — is launched once in a hidden
+  `--smoke-test` mode that verifies bundled resources, the bundled FFmpeg and
+  the main window under a watchdog, with configuration and history redirected
+  to a temporary directory so no user data is touched.
+
+### Fixed
+- **API uploads**: temporary upload files are closed before removal
+  (Windows-safe) and cleaned on every error path; uploaded filenames are
+  stripped of path-traversal components.
+- **API jobs**: admission control bounds the pending queue (`JobQueueFullError`
+  → HTTP 503 with `Retry-After`); submissions after shutdown are rejected;
+  queued jobs cancelled or rejected release their temporary files exactly
+  once; a shutdown race that could still execute a dropped job whose inputs
+  were already removed was fixed.
+- **Translation redirects**: same-origin redirect handling normalizes default
+  HTTP/HTTPS ports so legitimate redirects keep working, and malformed ports
+  in `Location` headers are rejected cleanly instead of raising.
+- **Translation languages**: DeepL source/target codes are normalized for
+  Chinese (`ZH-HANS`/`ZH-HANT`) and regional variants.
+- **History (SQLite)**: WAL journal mode and a busy timeout reduce lock
+  errors; migrations re-check `user_version` inside `BEGIN IMMEDIATE` so
+  concurrent opens cannot replay DDL; `:memory:` databases are supported;
+  read-only or unwritable stores fail with `HistoryError` without breaking
+  execution.
+- **Whisper**: with `device=auto`, a CUDA initialization failure now retries
+  on CPU; an explicit `cuda` device still fails without silently falling
+  back; non-finite segment timestamps no longer produce invalid values.
+- **GUI**: Qt Multimedia is optional at startup — if it cannot be imported,
+  the application still launches and the preview controls are disabled;
+  start/cancel/close, batch, language, history and burn-in validation
+  workflows are covered by deterministic GUI tests.
+- **Persistence**: atomic writes fsync the parent directory; a corrupt
+  `settings.json` is preserved as `.corrupt` before defaults are restored.
+- **Diagnostics**: API, CLI, parser and QA user-facing messages are
+  consistently in English.
+
+### Changed
+- **CI dependencies**: GitHub Actions bumped (checkout 7.0.1, setup-python
+  7.0.0, upload-artifact 7.0.1, download-artifact 8.0.2, action-gh-release
+  3.0.3).
+
 ## [1.4.10] - 2026-10-07
 
 Maintenance release, published as tag `v1.4.10` (stable) with no new product
