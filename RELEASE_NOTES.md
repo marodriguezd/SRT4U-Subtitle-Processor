@@ -1,8 +1,7 @@
 # Release Notes — SRT4U 1.4.11
 
-SRT4U Subtitle Processor **1.4.11** is prepared on the `main` branch and is
-ready to be released, but it has **not yet been published** as a GitHub
-Release. See [CHANGELOG.md](CHANGELOG.md) for the detailed, dated change list.
+SRT4U Subtitle Processor **1.4.11** is published on GitHub as
+[tag/v1.4.11](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.11).
 
 ## What's in 1.4.11
 
@@ -35,12 +34,12 @@ feature set is unchanged from 1.4.10.
 
 ## Current published release
 
-The latest published release is v1.4.10
-([tag/v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10)).
-The next release will be v1.4.11 once the `v1.4.11` tag is pushed and the
-`release` job publishes it.
+The latest published release is **v1.4.11** (this release).
+
+See [CHANGELOG.md](CHANGELOG.md) for the full, dated change list.
 
 ### macOS (Apple Silicon)
 
-When v1.4.11 is published, its macOS DMG will be **Apple Silicon (arm64)**
-only and will not launch on Intel Macs; no x86_64 build will be produced.
+The macOS DMG is **Apple Silicon (arm64)** only and will not launch on Intel Macs;
+no x86_64 build is available. Download links are in the assets table of
+[README.md](README.md).

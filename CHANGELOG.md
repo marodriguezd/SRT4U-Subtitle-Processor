@@ -5,12 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.11] - 2026-10-17 (not yet published)
+## [1.4.11] - 2026-10-17
 
-Planned. Not yet released on GitHub; included here so the changelog is coherent
-with `pyproject.toml` and with the prepared state of the `main` branch.
-
-Stability, security and reliability release with no new product functionality.
+Stability, security and reliability release, published as tag `v1.4.11` (stable)
+with no new product functionality.
 
 ### Added
 - **Packaged-app smoke checks (CI)**: each build — Windows `.exe`, Linux
