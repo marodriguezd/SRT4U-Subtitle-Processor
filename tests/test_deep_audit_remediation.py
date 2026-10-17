@@ -630,8 +630,17 @@ def test_job_manager_prunes_completed_jobs():
     try:
         for _ in range(500):
             manager.submit("t", lambda: {"payload": "x" * 512})
+        # The cap can be reached while the last submissions are still queued or
+        # running (live jobs are never pruned), so the condition requires both
+        # the cap and a fully drained burst before asserting the survivors.
+        terminal = {"completed", "failed", "cancelled"}
         deadline = time.monotonic() + 20
-        while time.monotonic() < deadline and len(manager._jobs) > 25:
+        while time.monotonic() < deadline:
+            retained = list(manager._jobs.values())
+            if len(retained) <= 25 and all(
+                job["status"] in terminal for job in retained
+            ):
+                break
             time.sleep(0.05)
         assert len(manager._jobs) <= 25
         assert all(job["status"] == "completed" for job in manager._jobs.values())
@@ -685,11 +694,17 @@ def test_job_manager_final_prune_enforces_cap_without_live_jobs():
     try:
         for _ in range(20):
             manager.submit("t", lambda: "ok")
+        terminal = {"completed", "failed", "cancelled"}
         deadline = time.monotonic() + 10
-        while time.monotonic() < deadline and len(manager._jobs) > 3:
+        while time.monotonic() < deadline:
+            retained = list(manager._jobs.values())
+            if len(retained) <= 3 and all(
+                job["status"] in terminal for job in retained
+            ):
+                break
             time.sleep(0.02)
-        # Deterministic end state: submit is done, no job is live anymore, so
-        # one final prune must settle the dict at the cap.
+        # Deterministic end state: submit is done and no job is live, so one
+        # final prune must settle the dict at the cap.
         manager._prune_locked()
         assert len(manager._jobs) <= 3
         assert all(job["status"] == "completed" for job in manager._jobs.values())
