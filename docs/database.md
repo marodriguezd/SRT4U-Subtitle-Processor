@@ -13,6 +13,10 @@ registra un aviso en el log. JSON/CSV del benchmark coexisten sin cambios.
 para no tocar la BD real). Comandos `process`/`benchmark`/`history` aceptan
 `--db`; `process` admite `--no-history`.
 
+Solo el directorio gestionado por SRT4U (`SRT4U/`) recibe permisos `0700`.
+Una ruta personalizada (`--db` o `SRT4U_HISTORY_DB`) conserva los permisos de
+su directorio padre: SRT4U nunca hace `chmod` sobre un directorio ajeno.
+
 ## Schema (v3)
 
 - `runs`: una fila por ejecución — `timestamp`, `operation`, `file_path`,

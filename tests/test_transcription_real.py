@@ -5,12 +5,12 @@ Run explicitly with a downloaded model and local media::
     SRT4U_TEST_REAL_WHISPER=1 SRT4U_TEST_MEDIA=/path/clip.mp4 \
         python -m pytest tests/test_transcription_real.py -q -s
 
-Requires the ``transcription`` extra, FFmpeg-adjacent decodability, and a
-small model (``tiny`` by default). Potentially slow; local only.
+Requires the ``transcription`` extra and a small model (``tiny`` by default).
+faster-whisper decodes media through its bundled PyAV/FFmpeg libraries, so no
+external ``ffmpeg`` executable is needed. Potentially slow; local only.
 """
 
 import os
-import shutil
 
 import pytest
 
@@ -48,5 +48,4 @@ def test_real_whisper_transcribes_media(tmp_path):
     print(f"\nsegments={len(items)} language={result.language} saved={out}")
     assert result.metrics is not None
     print(f"metrics={result.metrics.to_dict()}")
-    assert shutil.which("ffmpeg") is not None or True
     assert TranscriptionConfig(model=model).model == model

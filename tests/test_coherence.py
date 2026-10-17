@@ -49,10 +49,9 @@ def test_transcribe_pipeline_pages_are_translated_not_fallback():
 
 
 def test_single_product_version_everywhere():
-    import tomllib
+    from _toml_compat import load
 
-    with open(ROOT / "pyproject.toml", "rb") as fh:
-        pyproject_version = tomllib.load(fh)["project"]["version"]
+    pyproject_version = load(ROOT / "pyproject.toml")["project"]["version"]
     assert pyproject_version == EXPECTED_VERSION
 
     # Single runtime source: application/version.py re-exports the release
@@ -172,10 +171,9 @@ def test_format_placeholders_survive_translation(lang):
 
 
 def _pyproject():
-    import tomllib
+    from _toml_compat import load
 
-    with open(ROOT / "pyproject.toml", "rb") as fh:
-        return tomllib.load(fh)
+    return load(ROOT / "pyproject.toml")
 
 
 def _normalize_requirement(requirement):
@@ -269,6 +267,7 @@ def test_ci_installs_the_api_extra_for_the_test_suite():
     `ModuleNotFoundError: No module named 'fastapi'` in test_api.py,
     test_pipeline.py and test_transcription.py, and the failure takes down `test`
     and `compat-min-pyqt6`, which in turn skips the three builds and the release.
+    The targeted Python 3.10 job runs the same guards and needs it too.
     """
     workflow = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
 
@@ -279,12 +278,19 @@ def test_ci_installs_the_api_extra_for_the_test_suite():
     ):
         assert "fastapi" in (ROOT / module).read_text(encoding="utf-8"), module
 
-    # Both jobs running the suite must install the extra.
+    # Every job running the suite must install the extra.
     test_job = workflow.split("\n  test:", 1)[1].split("\n  compat-min-pyqt6:", 1)[0]
-    compat_job = workflow.split("\n  compat-min-pyqt6:", 1)[1].split(
+    pyqt6_job = workflow.split("\n  compat-min-pyqt6:", 1)[1].split(
+        "\n  compat-min-python:", 1
+    )[0]
+    python_job = workflow.split("\n  compat-min-python:", 1)[1].split(
         "\n  build-windows:", 1
     )[0]
-    for name, block in (("test", test_job), ("compat-min-pyqt6", compat_job)):
+    for name, block in (
+        ("test", test_job),
+        ("compat-min-pyqt6", pyqt6_job),
+        ("compat-min-python", python_job),
+    ):
         assert '".[api]"' in block, f"job {name} must install the [api] extra"
         assert "python -m pytest" in block, name
 

@@ -201,6 +201,68 @@ def test_default_path_respects_platform_and_override(tmp_path, monkeypatch):
     assert default_db_path().endswith(os.path.join("SRT4U", "history.db"))
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics required")
+def test_custom_path_does_not_change_parent_directory_mode(tmp_path):
+    """Regression: a caller-supplied path must not chmod its parent dir."""
+    custom = tmp_path / "user_data"
+    custom.mkdir()
+    os.chmod(custom, 0o755)
+    assert (os.stat(custom).st_mode & 0o777) == 0o755
+
+    with HistoryStore(str(custom / "history.db")):
+        pass
+
+    assert (os.stat(custom).st_mode & 0o777) == 0o755
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics required")
+def test_relative_custom_path_does_not_change_cwd_mode(tmp_path, monkeypatch):
+    """Regression: ``HistoryStore("history.db")`` must not chmod the CWD."""
+    workdir = tmp_path / "project"
+    workdir.mkdir()
+    os.chmod(workdir, 0o755)
+    assert (os.stat(workdir).st_mode & 0o777) == 0o755
+    monkeypatch.chdir(workdir)
+
+    with HistoryStore("history.db"):
+        pass
+
+    assert (os.stat(workdir).st_mode & 0o777) == 0o755
+    assert (workdir / "history.db").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics required")
+def test_environment_override_does_not_change_parent_mode(tmp_path, monkeypatch):
+    """``SRT4U_HISTORY_DB`` is user-owned: its parent keeps its mode."""
+    custom = tmp_path / "shared"
+    custom.mkdir()
+    os.chmod(custom, 0o755)
+    assert (os.stat(custom).st_mode & 0o777) == 0o755
+    monkeypatch.setenv("SRT4U_HISTORY_DB", str(custom / "env.db"))
+
+    with HistoryStore():
+        pass
+
+    assert (os.stat(custom).st_mode & 0o777) == 0o755
+    assert (custom / "env.db").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics required")
+def test_default_managed_directory_is_hardened(tmp_path, monkeypatch):
+    """The app-managed SRT4U directory still receives mode 0700."""
+    monkeypatch.delenv("SRT4U_HISTORY_DB", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+    parent = os.path.dirname(os.path.abspath(default_db_path()))
+    assert not os.path.exists(parent), "precondition: managed dir must not exist"
+
+    with HistoryStore():
+        pass
+
+    assert (os.stat(parent).st_mode & 0o777) == 0o700
+
+
 class _Stats:
     translation_failures = 2
     parse_issues = 1

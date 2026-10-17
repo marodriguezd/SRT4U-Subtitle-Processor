@@ -9,7 +9,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 def test_project_cli_entrypoint_and_build_backend_metadata():
     script = """
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: same API from the dev extra
+    import tomli as tomllib
 from pathlib import Path
 metadata = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
 assert metadata['project']['scripts']['srt4u'] == 'application.cli:main'

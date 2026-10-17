@@ -159,6 +159,39 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/ -q -m "not network"
 
+  # Validate the declared `requires-python = ">=3.10"` floor with the guards
+  # that read pyproject.toml. `tomllib` is stdlib only from 3.11, so on 3.10
+  # the [dev] extra installs `tomli` and tests/_toml_compat.py selects it
+  # (the analytics-packaging subprocess has the same fallback inline).
+  compat-min-python:
+    name: Compatibility (minimum Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1
+
+      - name: Install dependencies (base + api + dev)
+        run: |
+          python -m pip install --upgrade pip
+          python --version
+          pip install -r requirements.txt ".[api]" ".[dev]"
+
+      - name: Run the pyproject-reading guards on Python 3.10
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/test_coherence.py tests/test_analytics_packaging.py tests/test_hardening_portfolio.py -q -m "not network"
+
   build-windows:
     name: Build Windows (.exe)
     needs: [test, compat-min-pyqt6]

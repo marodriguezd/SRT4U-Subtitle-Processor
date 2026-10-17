@@ -392,10 +392,9 @@ def test_dependabot_covers_actions_and_pip():
 
 
 def test_coverage_floor_is_configured_and_realistic():
-    import tomllib
+    from _toml_compat import load
 
-    with open(ROOT / "pyproject.toml", "rb") as fh:
-        project = tomllib.load(fh)
+    project = load(ROOT / "pyproject.toml")
     assert "pytest-cov" in " ".join(project["project"]["optional-dependencies"]["dev"])
     floor = project["tool"]["coverage"]["report"]["fail_under"]
     assert 50 <= floor <= 85, floor  # honest floor for a GUI+headless suite
