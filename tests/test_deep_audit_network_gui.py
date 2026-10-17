@@ -333,7 +333,7 @@ NEW_KEYS = (
 
 @pytest.mark.parametrize("key", NEW_KEYS)
 def test_new_error_key_exists_in_every_catalog(key):
-    """M10: every user-facing error string must exist in all six languages."""
+    """M10: every user-facing error string must exist in all seven languages."""
     catalogs = _catalogs()
     for lang, catalog in catalogs.items():
         assert key in catalog, f"{key} missing in {lang}"
@@ -344,7 +344,7 @@ def test_new_error_key_exists_in_every_catalog(key):
 def test_new_error_key_is_actually_translated(key):
     """M10: a key that is identical to English is not translated."""
     catalogs = _catalogs()
-    for lang in ("es", "pt", "de", "it", "zh-CN"):
+    for lang in ("es", "pt", "de", "it", "fr", "zh-CN"):
         assert catalogs[lang][key] != catalogs["en"][key], (
             f"{key} untranslated in {lang}"
         )

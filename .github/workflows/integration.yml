@@ -1,0 +1,40 @@
+name: Integration Tests (manual)
+
+# Manual-only integration checks. This workflow never triggers on push,
+# pull_request or tags, so it cannot slow down normal CI or interfere with
+# the tag-based release pipeline; it runs the `network`-marked tests on a
+# runner with FFmpeg. See docs/testing.md for the full integration matrix.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  network:
+    name: Network integration (manual)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt ".[api]" pytest
+
+      - name: Run network-marked integration tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests/ -q -m network

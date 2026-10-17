@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
 
 from application.services.config_service import ConfigService  # noqa: E402
-from application.services.i18n_service import get_i18n, t  # noqa: E402
+from application.services.i18n_service import I18nService, get_i18n, t  # noqa: E402
 from application.services.subtitle_service import SubtitleItem  # noqa: E402
 from application.ui.burn_in_dialog import (  # noqa: E402
     BurnInDialog,
@@ -33,8 +33,11 @@ from application.ui.styles import Styles  # noqa: E402
 from application.ui.widgets import ProgressModal  # noqa: E402
 
 WINDOW_PAGES = [(0, "home"), (5, "settings"), (7, "about")]
-WINDOW_LANGS = ["en", "de", "pt"]
-DIALOG_LANGS = ["en", "es", "pt", "de", "it", "zh-CN"]
+# Single source of truth for the visual matrix: the interface languages
+# declared by the i18n service. Do not duplicate the list here.
+UI_LANGS = list(I18nService.SUPPORTED_LANGUAGES)
+WINDOW_LANGS = UI_LANGS
+DIALOG_LANGS = UI_LANGS
 
 
 def parse_args() -> argparse.Namespace:

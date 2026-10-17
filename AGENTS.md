@@ -93,7 +93,7 @@ without it and transcription reports the optional-extra install hint.
   consumers, burn-in dialog; no business logic.
 - `tests/` — full suite + fixtures (never write into `tests/fixtures/`).
 - `docs/` — product docs (`cli/api/analytics/qa/transcription/pipeline/
-  database/providers/benchmarking/benchmark_analysis/tech-debt`). Product
+  database/providers/benchmarking/benchmark_analysis/testing/tech-debt`). Product
   documentation: do NOT move.
 - `analysis/`, `notebooks/` — benchmark analysis (stdlib core; pandas/
   matplotlib only as optional analysis-env bridges).
@@ -110,8 +110,8 @@ without it and transcription reports the optional-extra install hint.
 - No PyQt/FastAPI in the domain; providers decoupled behind registries.
 - Optional dependencies must stay truly optional (lazy imports + clear
   install hints, e.g. `python -m pip install '.[transcription]'`).
-- UI strings go through `i18n_service.py`; the six catalogs must have identical
-  keys and compatible placeholders (en es pt de it zh-CN). Never leave a
+- UI strings go through `i18n_service.py`; the seven catalogs must have identical
+  keys and compatible placeholders (en es pt de it fr zh-CN). Never leave a
   hardcoded fallback in another language. Spanish reference is
   es-ES (archivo, vídeo, configuración).
 - Comments and docstrings: write all docstrings (PEP 257), CLI helps, API
@@ -157,9 +157,12 @@ CI runs the same selection: the `test` job executes the suite with
 
 Relevant smokes: `srt4u --version`, `srt4u <cmd> --help`, API
 `GET /api/v1/health` + OpenAPI path count, GUI offscreen
-(`QT_QPA_PLATFORM=offscreen`, 11 pages × 6 languages). Opt-in extras:
-real-Whisper test (`SRT4U_TEST_REAL_WHISPER=1`), real-media e2e
-(`SRT4U_E2E_MEDIA`). Suite redirects `ConfigService` to a temp dir; keep it so.
+(`QT_QPA_PLATFORM=offscreen`, 11 pages × 7 languages). Opt-in integration
+paths (network marker, real Whisper with `SRT4U_TEST_REAL_WHISPER=1`,
+real-media e2e with `SRT4U_E2E_MEDIA`, the manual `Integration Tests
+(manual)` workflow and the unverified-by-default paths) are documented in
+`docs/testing.md`; a skipped test is never a pass. Suite redirects
+`ConfigService` to a temp dir; keep it so.
 
 ## 9. Installation dependencies (from `pyproject.toml`, Python `>=3.10`)
 
@@ -247,7 +250,7 @@ maintained strictly in professional English.
 
 Single source chain: `pyproject.toml` (authoritative) →
 `application/version.py` (`APP_VERSION`) → CLI `--version` → API
-metadata/OpenAPI/health → GUI `about.version_pill` (all six catalogs derive
+metadata/OpenAPI/health → GUI `about.version_pill` (all seven catalogs derive
 it). No runtime module repeats the version literal.
 `AppUserModelID …1.1` is a Windows taskbar identity, not a version display —
 do not "fix" it. Historical `1.1.0` references (CHANGELOG entry, release

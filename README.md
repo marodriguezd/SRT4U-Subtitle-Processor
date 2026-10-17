@@ -154,12 +154,14 @@ Deep dives: [docs/providers.md](docs/providers.md), [docs/benchmarking.md](docs/
 
 ## Running Tests
 
-The test suite covers parsing, cleaning, cross-format conversion, free translation, UI flows, UI layout regression (clipped-text detection in 6 languages × 2 themes), and dialog geometry invariants:
+The test suite covers parsing, cleaning, cross-format conversion, free translation, UI flows, UI layout regression (clipped-text detection in 7 languages × 2 themes), and dialog geometry invariants:
 
 ```bash
 pytest tests/ -m "not network"  # no network, keys, or Whisper models needed
 pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # same suite with coverage (floor: 62%, see [tool.coverage.report])
 ```
+
+The default suite is deterministic: no network, API keys, Whisper models or media fixtures. Opt-in integration suites (free Google translation, real Whisper, real-media end-to-end) and their exact environment variables are documented in [docs/testing.md](docs/testing.md).
 
 ---
 
@@ -167,13 +169,13 @@ pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # sa
 
 ### Screenshot Gallery Generator
 
-`tools/regenerate_screenshots.py` regenerates the offscreen visual-verification gallery used during UI review: the main window pages (Home, Settings, About) × languages × dark/light themes, plus the burn-in dialog, progress modals, themed file dialog (dark/light) and message box per language.
+`tools/regenerate_screenshots.py` regenerates the offscreen visual-verification gallery used during UI review: the main window pages (Home, Settings, About) × the 7 UI languages × dark/light themes, plus the burn-in dialog, progress modals, themed file dialog (dark/light) and message box per language.
 
 ```bash
 QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
 ```
 
-- Output defaults to `/tmp/srt4u-shots` (46 PNGs with the 6 UI languages); previous PNGs in the target directory are overwritten.
+- Output defaults to `/tmp/srt4u-shots` (74 PNGs with the 7 UI languages); previous PNGs in the target directory are overwritten.
 - The Qt offscreen platform is used when no display is available, and the FFmpeg burn-in worker is neutralized, so the tool is safe to run headless.
 - Each dialog's resulting size and declared minimum size are printed as a quick geometry sanity check (`size == min` expected).
 - The tool is protected against bit-rot by the `tests/test_screenshot_tool.py` smoke test, which runs it in a subprocess on every CI test job.

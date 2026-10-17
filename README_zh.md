@@ -166,12 +166,14 @@ CLI 以 `--stats` 或 `--stats-json` 打印，`estimated_cost` 保持 `null`—�
 ## 运行测试
 
 测试套件覆盖解析、清理、跨格式转换、免费翻译、UI 流程、UI 布局回归
-（6 语言 × 2 主题的截断文本检测）与对话框几何不变式：
+（7 语言 × 2 主题的截断文本检测）与对话框几何不变式：
 
 ```bash
 pytest tests/ -m "not network"  # 无需网络、密钥或 Whisper 模型
 pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # 同套件带覆盖率（下限 62%，见 [tool.coverage.report]）
 ```
+
+默认测试套件是确定性的：不需要网络、API 密钥、Whisper 模型或媒体素材。可选集成套件（Google 免费翻译、真实 Whisper、真实媒体端到端）及其确切环境变量见 [docs/testing.md](docs/testing.md)。
 
 ---
 
@@ -180,14 +182,14 @@ pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # �
 ### 截图画廊生成器
 
 `tools/regenerate_screenshots.py` 重新生成 UI 评审用的离屏可视验证画廊：
-主窗口页面（Home、Settings、About）× 语言 × 深/浅主题，外加烧录对话框、
+主窗口页面（Home、Settings、About）× 7 种 UI 语言 × 深/浅主题，外加烧录对话框、
 进度弹窗、主题化文件对话框（深/浅）与每语言消息框。
 
 ```bash
 QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
 ```
 
-- 输出默认到 `/tmp/srt4u-shots`（6 UI 语言共 46 PNG）；目标目录旧 PNG 被覆盖。
+- 输出默认到 `/tmp/srt4u-shots`（7 种 UI 语言共 74 PNG）；目标目录旧 PNG 被覆盖。
 - 无显示器时使用 Qt offscreen 平台，且 FFmpeg 烧录 worker 已被禁用，可 headless 安全运行。
 - 打印每对话框的结果尺寸与声明最小尺寸作快速几何 sanity 检查（期望 `size == min`）。
 - 该工具由 `tests/test_screenshot_tool.py` 烟雾测试防 bit-rot，每个 CI 测试任务都在子进程中运行它。

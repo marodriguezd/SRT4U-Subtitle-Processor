@@ -56,7 +56,7 @@ def test_single_product_version_everywhere():
     assert pyproject_version == EXPECTED_VERSION
 
     # Single runtime source: application/version.py re-exports the release
-    # version; API schemas, app metadata, the six GUI version pills and the
+    # version; API schemas, app metadata, the seven GUI version pills and the
     # CLI --version all derive from it instead of repeating the literal.
     from application.version import APP_VERSION
 
