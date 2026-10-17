@@ -13,7 +13,7 @@
 
 桌面应用，用于翻译、编辑、清理与转换字幕文件（`.srt`、`.vtt`、`.ass`/`.ssa`、`.txt`），带实时同步视频播放器与直接视频烧录导出。
 
-当前稳定版：**[v1.4.11](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.11)**。详情见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
+当前稳定版：**[v1.4.12](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.12)**。详情见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
 
 ![SRT4U 预览](assets/preview_en.png)
 
@@ -117,15 +117,15 @@ python -m application.cli serve  # 文档见 http://127.0.0.1:8000/docs
 
 ### 预编译二进制
 
-当前稳定版为 **[v1.4.11](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.11)**（非预发布）。GitHub Actions 为每个稳定 `v*` 标签构建并附加以下资产：
+当前稳定版为 **[v1.4.12](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.12)**（非预发布）。GitHub Actions 为每个稳定 `v*` 标签构建并附加以下资产：
 
 | 资产 | 平台 | 架构 |
 |---|---|---|
-| [`SRT4U-Windows-x64.exe`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.11/SRT4U-Windows-x64.exe) | Windows 10/11 | x86_64 |
-| [`SRT4U-Linux-x86_64.AppImage`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.11/SRT4U-Linux-x86_64.AppImage) | Linux | x86_64 |
-| [`SRT4U-Linux-x86_64.tar.gz`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.11/SRT4U-Linux-x86_64.tar.gz) | Linux | x86_64 |
-| [`SRT4U-macOS.dmg`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.11/SRT4U-macOS.dmg) | macOS（Apple Silicon） | **仅 arm64**——无法在 Intel Mac 启动 |
-| [`checksums.txt`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.11/checksums.txt) | 上述资产的 SHA-256 校验和 | — |
+| [`SRT4U-Windows-x64.exe`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-Windows-x64.exe) | Windows 10/11 | x86_64 |
+| [`SRT4U-Linux-x86_64.AppImage`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-Linux-x86_64.AppImage) | Linux | x86_64 |
+| [`SRT4U-Linux-x86_64.tar.gz`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-Linux-x86_64.tar.gz) | Linux | x86_64 |
+| [`SRT4U-macOS.dmg`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-macOS.dmg) | macOS（Apple Silicon） | **仅 arm64**——无法在 Intel Mac 启动 |
+| [`checksums.txt`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/checksums.txt) | 上述资产的 SHA-256 校验和 | — |
 
 CI 构建捆绑版本锁定的静态 FFmpeg 可执行文件，开箱即用支持烧录；平台运行时库要求仍然适用。
 源码安装（上一节）需要在 `PATH` 有可用的 FFmpeg 方可烧录。

@@ -61,9 +61,10 @@ está disponible → `model_unavailable` controlado, sin trazas al usuario.
 ## Formatos de entrada
 
 Vídeo: mp4, mkv, webm, mov, avi, m4v, mpg, mpeg. Audio: mp3, wav, m4a, ogg,
-oga, opus, flac, aac, wma. Sin parser propio: el backend decodifica (FFmpeg
-vía sus dependencias); si FFmpeg falta o el archivo es ilegible →
-`ffmpeg_unavailable` / `invalid_file`.
+oga, opus, flac, aac, wma. Sin parser propio: el backend decodifica con las
+bibliotecas FFmpeg que faster-whisper empaqueta vía PyAV; no hace falta el
+ejecutable `ffmpeg` del sistema. Si la decodificación falla o el archivo es
+ilegible → `ffmpeg_unavailable` / `invalid_file`.
 
 ## CLI
 
@@ -149,9 +150,10 @@ de abortar). Los jobs en memoria se pierden al reiniciar.
 
 - App base (PyInstaller) compila **sin** faster-whisper: el import perezoso y
   el extra opcional lo garantizan; la GUI detecta la ausencia y la explica.
-- Variante con transcripción: incluir el extra `transcription` + FFmpeg en el
-  sistema/instalador; **no** empaquetar modelos (se descargan una vez con
-  aviso, ~75 MB–3 GB según modelo).
+- Variante con transcripción: incluir el extra `transcription` (suficiente:
+  PyAV empaqueta las bibliotecas de decodificación; el ejecutable FFmpeg solo
+  es necesario para el burn-in); **no** empaquetar modelos (se descargan una
+  vez con aviso, ~75 MB–3 GB según modelo).
 - CTranslate2 aporta ruedas para Win/Linux/macOS x86_64 y ARM; CUDA solo
   donde haya drivers; CPU `int8` como denominador común.
 

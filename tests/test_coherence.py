@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-EXPECTED_VERSION = "1.4.11"
+EXPECTED_VERSION = "1.4.12"
 OPERATIONS = {"process", "analyze", "qa", "benchmark", "transcription", "pipeline"}
 
 
@@ -86,7 +86,7 @@ def test_single_product_version_everywhere():
 
 
 def test_runtime_version_literal_lives_only_in_single_source():
-    """The 1.4.11 literal lives only in pyproject.toml + application/version.py;
+    """The 1.4.12 literal lives only in pyproject.toml + application/version.py;
     every other runtime module derives it via APP_VERSION."""
     # Restrict to application/*.py (the tested scope). pyproject.toml is
     # the authoritative source and lives at the repo root, so it is not
@@ -94,7 +94,7 @@ def test_runtime_version_literal_lives_only_in_single_source():
     offenders = []
     for path in (ROOT / "application").rglob("*.py"):
         text = path.read_text(encoding="utf-8")
-        if text.count("1.4.11"):
+        if text.count("1.4.12"):
             offenders.append(str(path.relative_to(ROOT)))
     assert offenders == ["application/version.py"], offenders
 

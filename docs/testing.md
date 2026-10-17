@@ -49,8 +49,10 @@ anything.
 
 ## Real Whisper inference (opt-in)
 
-Prerequisites: the transcription extra, FFmpeg, a local media file and a model
-(downloaded once on first use; never bundled).
+Prerequisites: the transcription extra, a local media file and a model
+(downloaded once on first use; never bundled). faster-whisper decodes media
+through its bundled PyAV/FFmpeg libraries, so the external `ffmpeg` executable
+is not required for transcription.
 
 ```bash
 python -m pip install '.[transcription]'
@@ -72,8 +74,10 @@ passed.
 
 ## Real-media end-to-end (opt-in)
 
-Prerequisites: FFmpeg/ffprobe on `PATH` and a fixture directory with exactly
-these files:
+Prerequisites: the external `ffmpeg` and `ffprobe` executables on `PATH`
+(burn-in and metadata inspection invoke the binaries, not the decoding
+libraries bundled by the transcription extra) and a fixture directory with
+exactly these files:
 
 - `S1pK5hmTzkE_1min.mp4` — 1920×1080, 60 fps, with audio, 60 s.
 - `S1pK5hmTzkE_1min.srt` — 25 cues with overlaps and a 1 s gap.
