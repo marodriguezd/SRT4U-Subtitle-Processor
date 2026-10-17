@@ -32,7 +32,7 @@ env:
   # the binary, not the semantic banner of FFmpeg itself; the docs describe
   # it as a download pin, never as an FFmpeg semantic version.
   # When publishing: bump pyproject.toml and application/version.py together
-  # (the CLI, the API, the six `about.version_pill` and this comment derive
+  # (the CLI, the API, the seven `about.version_pill` and this comment derive
   # from them); the release job compares the tag against pyproject.toml and
   # cancels on mismatch.
   FFMPEG_VERSION: "b6.1.1"

@@ -2417,7 +2417,7 @@ class I18nService(QObject):
     def detect_system_language(self) -> str:
         """Detect system language using QLocale and environment variables.
 
-        Returns one of the supported codes ('es', 'en', 'pt', 'de', 'it', 'zh-CN').
+        Returns one of the supported codes ('es', 'en', 'pt', 'de', 'it', 'fr', 'zh-CN').
         Falls back to 'en' when unrecognized.
         """
         locale_str = ""

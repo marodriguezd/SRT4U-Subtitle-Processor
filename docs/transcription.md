@@ -164,4 +164,6 @@ SRT4U_TEST_REAL_WHISPER=1 SRT4U_TEST_MEDIA=clip.mp4 \
 ```
 
 El test real exige extra instalado, medio local y modelo `tiny` (lento
-potencialmente); nunca corre en la suite normal.
+potencialmente); nunca corre en la suite normal. Matriz completa de
+integración (marker `network`, Whisper real y e2e con media real):
+[testing.md](testing.md).

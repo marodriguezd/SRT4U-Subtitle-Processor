@@ -11,9 +11,9 @@ conversion across the 4 formats, video metadata, ASS generation, burn-in
 player and the UI flows (process, convert, batch,
 settings).
 
-Files are located via `SRT4U_E2E_MEDIA` (defaulting to the user's media
-directory) and the whole module is skipped when they are missing, so the
-suite stays runnable in CI without that media.
+Files are located via `SRT4U_E2E_MEDIA` (required: the directory must contain
+the expected video and subtitle files) and the whole module is skipped when
+they are missing, so the suite stays runnable in CI without that media.
 """
 
 import os
@@ -762,12 +762,12 @@ def test_19_home_options_are_persisted(qapp, tmp_path):
 
 
 def test_20_every_ui_language_processes_the_real_file(qapp, tmp_path):
-    """All 6 UI languages with the real content, no clipping or errors."""
+    """All 7 UI languages with the real content, no clipping or errors."""
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
         original = handle.read()
 
-    for language in ("en", "es", "pt", "de", "it", "zh-CN"):
+    for language in ("en", "es", "pt", "de", "it", "fr", "zh-CN"):
         win = MainWindow()
         win.i18n.set_language(language, save_to_config=False)
         win._switch_page(1)

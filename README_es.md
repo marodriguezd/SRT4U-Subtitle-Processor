@@ -154,12 +154,14 @@ Guías detalladas: [docs/providers.md](docs/providers.md), [docs/benchmarking.md
 
 ## Pruebas automatizadas
 
-La flota de tests evalúa parseo, limpieza, conversiones entre formatos, traducción gratuita, flujos de interfaz, regresión de layout (detección de texto recortado en 6 idiomas × 2 temas) e invariantes de geometría de diálogos:
+La flota de tests evalúa parseo, limpieza, conversiones entre formatos, traducción gratuita, flujos de interfaz, regresión de layout (detección de texto recortado en 7 idiomas × 2 temas) e invariantes de geometría de diálogos:
 
 ```bash
 pytest tests/ -m "not network"  # sin red, claves ni modelos Whisper
 pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # misma suite con cobertura (mínimo: 62 %, ver [tool.coverage.report])
 ```
+
+La suite por defecto es determinista: sin red, claves de API, modelos Whisper ni material multimedia. Las suites de integración opt-in (traducción gratuita de Google, Whisper real, e2e con media real) y sus variables de entorno están documentadas en [docs/testing.md](docs/testing.md).
 
 ---
 
@@ -167,13 +169,13 @@ pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # mi
 
 ### Generador de galería de capturas
 
-`tools/regenerate_screenshots.py` regenera la galería de verificación visual offscreen utilizada en la revisión de UI: páginas de la ventana principal (Inicio, Ajustes, Acerca de) × idiomas × temas oscuro/claro, más el diálogo de burn-in, los modales de progreso, el diálogo de archivos tematizado (oscuro/claro) y un message box por idioma.
+`tools/regenerate_screenshots.py` regenera la galería de verificación visual offscreen utilizada en la revisión de UI: páginas de la ventana principal (Inicio, Ajustes, Acerca de) × los 7 idiomas de UI × temas oscuro/claro, más el diálogo de burn-in, los modales de progreso, el diálogo de archivos tematizado (oscuro/claro) y un message box por idioma.
 
 ```bash
 QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--langs en,es,...]
 ```
 
-- La salida va por defecto a `/tmp/srt4u-shots` (46 PNG con los 6 idiomas de UI); los PNG previos del directorio se sobrescriben.
+- La salida va por defecto a `/tmp/srt4u-shots` (74 PNG con los 7 idiomas de UI); los PNG previos del directorio se sobrescriben.
 - Usa la plataforma offscreen de Qt si no hay display disponible y neutraliza el worker de FFmpeg, por lo que puede ejecutarse headless sin riesgo.
 - Imprime el tamaño resultante y el mínimo declarado de cada diálogo como comprobación rápida de geometría (se espera `size == min`).
 - La utilidad está protegida contra degradación por el test de humo `tests/test_screenshot_tool.py`, que la ejecuta en un subproceso en cada job de tests de CI.
