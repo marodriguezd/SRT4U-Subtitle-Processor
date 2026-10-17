@@ -1,30 +1,46 @@
-# Release Notes — SRT4U 1.4.10
+# Release Notes — SRT4U 1.4.11
 
-SRT4U Subtitle Processor **1.4.10** is published on GitHub as
-[tag/v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10).
+SRT4U Subtitle Processor **1.4.11** is prepared on the `main` branch and is
+ready to be released, but it has **not yet been published** as a GitHub
+Release. See [CHANGELOG.md](CHANGELOG.md) for the detailed, dated change list.
 
-## What's in 1.4.10
+## What's in 1.4.11
 
-A maintenance release with no new product functionality.
+A stability, security and reliability update. No new product features; the
+feature set is unchanged from 1.4.10.
 
-### Fixes
+### Fixes and hardening
 
-- **GPL license fallback**: when the bundled/local `LICENSE` file cannot be found,
-  the About page now opens the official GNU GPL v3 page instead of the obsolete
-  Creative Commons BY-NC-SA 4.0 URL.
-
-The application behavior and feature set are otherwise unchanged from 1.4.9.
+- **API uploads and jobs**: temporary upload files are closed before deletion
+  and cleaned on every error path; uploaded filenames lose directory
+  components; the job queue is bounded and returns HTTP 503 with
+  `Retry-After` when saturated; cancelled or rejected queued jobs always
+  release their temporary files; and a shutdown race that could run a dropped
+  job after its cleanup was fixed.
+- **Translation**: same-origin redirects now normalize default HTTP/HTTPS
+  ports and reject malformed ports from redirect headers instead of raising.
+- **History (SQLite)**: WAL mode and a busy timeout reduce lock errors,
+  migrations are race-safe under concurrent opens, and storage failures
+  surface as `HistoryError` without interrupting processing.
+- **Whisper**: with `device=auto`, a failed CUDA initialization now falls
+  back to CPU processing; an explicit `cuda` request still fails loudly.
+- **GUI**: the application starts even when Qt Multimedia is unavailable,
+  disabling playback controls instead of crashing; start, cancel, close,
+  batch and language workflows are covered by new GUI tests.
+- **Packaging**: cross-platform smoke tests launch the built Windows `.exe`,
+  Linux AppImage and macOS `.app` to verify bundled resources, FFmpeg and
+  startup before publication.
 
 ---
 
 ## Current published release
 
-The latest published release is **v1.4.10** (this release).
-
-See [CHANGELOG.md](CHANGELOG.md) for the full, dated change list.
+The latest published release is v1.4.10
+([tag/v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10)).
+The next release will be v1.4.11 once the `v1.4.11` tag is pushed and the
+`release` job publishes it.
 
 ### macOS (Apple Silicon)
 
-The macOS DMG is **Apple Silicon (arm64)** only and will not launch on Intel Macs;
-no x86_64 build is available. Download links are in the assets table of
-[README.md](README.md).
+When v1.4.11 is published, its macOS DMG will be **Apple Silicon (arm64)**
+only and will not launch on Intel Macs; no x86_64 build will be produced.

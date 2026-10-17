@@ -13,7 +13,7 @@
 
 Desktop app to translate, edit, clean, and convert subtitle files (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) with a real-time synchronized video player and direct video burn-in export.
 
-Current stable release: **[v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10)**. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for details.
+Current stable release: **[v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10)**. The next release will be v1.4.11 once it is published; see [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ![SRT4U Preview](assets/preview_en.png)
 
@@ -133,6 +133,8 @@ The current stable release is **[v1.4.10](https://github.com/marodriguezd/SRT4U-
 The CI builds bundle a version-pinned static FFmpeg executable, so burn-in
 works out of the box; platform runtime-library requirements still apply.
 Source installs (previous section) need a usable FFmpeg on `PATH` for burn-in.
+
+The next release, v1.4.11, is prepared on `main` but not yet published (no GitHub Release exists for it yet).
 
 ---
 

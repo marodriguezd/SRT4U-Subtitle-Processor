@@ -13,7 +13,7 @@
 
 Aplicación de escritorio para traducir, editar, limpiar y convertir archivos de subtítulos (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) con reproductor de vídeo sincronizado en tiempo real e incrustación directa en vídeo (Burn-In / Hardsub).
 
-Release estable actual: **[v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10)**. Ver [RELEASE_NOTES.md](RELEASE_NOTES.md) para más detalles.
+Release estable actual: **[v1.4.10](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.10)**. La próxima release será v1.4.11 cuando se publique; ver [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ![Vista previa de SRT4U](assets/preview_es.png)
 
@@ -133,6 +133,8 @@ Las compilaciones de CI incluyen un ejecutable de FFmpeg estático fijado por
 versión, así que el burn-in funciona sin pasos extra; los requisitos de
 bibliotecas del sistema siguen aplicando. Una instalación desde código fuente
 (sección anterior) necesita FFmpeg disponible en `PATH` para el burn-in.
+
+La próxima release, v1.4.11, está preparada en `main` pero aún no se ha publicado (todavía no existe ningún GitHub Release para ella).
 
 ---
 
