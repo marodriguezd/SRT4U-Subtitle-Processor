@@ -161,11 +161,19 @@ class HistoryStore:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or default_db_path()
+        # Only the application-managed location (``~/.config/SRT4U`` and its
+        # platform equivalents) is ours to harden. An explicit path — the
+        # constructor argument or its ``SRT4U_HISTORY_DB`` equivalent — can
+        # point anywhere (CWD, a repository, a shared folder), and chmod-ing
+        # that parent would silently rewrite the permissions of a directory
+        # SRT4U does not own. The database file itself is not chmod-ed either:
+        # a custom path inherits the umask the user chose for that location.
+        self._owns_directory = not path and not os.environ.get("SRT4U_HISTORY_DB")
         if self.path != ":memory:":
             parent = os.path.dirname(os.path.abspath(self.path))
             try:
                 os.makedirs(parent, exist_ok=True)
-                if os.name != "nt":
+                if os.name != "nt" and self._owns_directory:
                     os.chmod(parent, 0o700)
             except OSError as exc:
                 raise HistoryError(f"cannot prepare history directory: {exc}") from exc
