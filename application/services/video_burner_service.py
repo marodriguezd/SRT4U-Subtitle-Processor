@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Tuple
@@ -24,6 +26,37 @@ logger = get_logger("burner")
 
 _FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)")
 _FFMPEG_DIMENSIONS_RE = re.compile(r"Stream.*Video:.*,\s*(\d{2,5})x(\d{2,5})")
+
+_active_destinations = set()
+_active_destinations_lock = threading.Lock()
+
+
+def make_unique_burn_temp(output_path: str) -> str:
+    """Generate a unique temporary filename in the target directory preserving format extension.
+
+    Contains 'srt4u-burn-tmp' to satisfy cleanup tracking and test assertions.
+    """
+    final_path = os.path.abspath(output_path)
+    ext = os.path.splitext(final_path)[1]
+    token = uuid.uuid4().hex[:12]
+    return f"{final_path}.srt4u-burn-tmp-{token}{ext}"
+
+
+def acquire_burn_destination(output_path: str) -> bool:
+    """Register destination in active set. Returns False if already active."""
+    canon = os.path.normcase(os.path.abspath(output_path))
+    with _active_destinations_lock:
+        if canon in _active_destinations:
+            return False
+        _active_destinations.add(canon)
+        return True
+
+
+def release_burn_destination(output_path: str) -> None:
+    """Release destination from active set."""
+    canon = os.path.normcase(os.path.abspath(output_path))
+    with _active_destinations_lock:
+        _active_destinations.discard(canon)
 
 
 def paths_refer_to_same_file(first: str, second: str) -> bool:
@@ -366,6 +399,12 @@ class BurnInWorker(QThread):
             logger.error("No working FFmpeg binary found; cannot burn in subtitles")
             self.failed.emit(t("burn.error_no_ffmpeg"))
             return
+        if not acquire_burn_destination(self.output_path):
+            logger.error(
+                "A burn-in operation is already in progress for %s", self.output_path
+            )
+            self.failed.emit(t("burn.error_prepare"))
+            return
 
         temp_dir: Optional[str] = None
         temp_output: Optional[str] = None
@@ -396,9 +435,7 @@ class BurnInWorker(QThread):
             # promote it with ``os.replace`` only after a clean exit; every other
             # path removes just the temp.
             final_path = os.path.abspath(self.output_path)
-            temp_output = (
-                f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
-            )
+            temp_output = make_unique_burn_temp(self.output_path)
 
             ass_content = VideoBurnerService.generate_ass_script(
                 self.subtitle_items, self.options, video_width=vw, video_height=vh
@@ -556,6 +593,7 @@ class BurnInWorker(QThread):
             if not self._is_cancelled:
                 self.failed.emit(t("burn.error_exception"))
         finally:
+            release_burn_destination(self.output_path)
             if self._process is not None and self._process.poll() is None:
                 try:
                     self._process.terminate()

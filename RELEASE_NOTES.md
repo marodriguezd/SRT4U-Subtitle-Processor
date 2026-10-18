@@ -14,7 +14,7 @@ Initial major release of SRT4U Subtitle Processor: a fast, local-first, robust t
 - **Interchangeable Providers**: Google Translate, DeepL, OpenAI-compatible LLMs (Ollama, OpenRouter, OpenAI) with cycle-safe fallback chains and opt-in retries.
 - **Whisper Transcription & Media Pipeline**: Optional local speech-to-text via `faster-whisper` and full end-to-end media processing pipeline.
 - **Deterministic Quality Assurance & Analytics**: Strict QA gates, reading speed (CPS/CPL), timing overlap detection, and zero-data-loss subtitle format conversion.
-- **Optimized & Hardened**: Consolidated $O(N)$ analytics passes, precompiled regular expressions, vector icon caching, and comprehensive test suite with 100% green coverage.
+- **Optimized & Hardened**: Consolidated $O(N)$ analytics passes, precompiled regular expressions, vector icon caching, concurrency-safe burn-in, and 100% passing test suite (752 tests passed, ~82% coverage).
 
 The macOS DMG remains **Apple Silicon (arm64)** only and will not launch on Intel Macs;
 no x86_64 build is available.

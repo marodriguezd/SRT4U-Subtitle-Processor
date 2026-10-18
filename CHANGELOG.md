@@ -16,7 +16,8 @@ Consolidated major release of SRT4U Subtitle Processor.
 
 ### Optimized
 - **Performance**: consolidated analytics loop, precompiled regexes, vector icon cache, and fast file I/O.
-- **Robustness**: 745 automated tests with zero warnings and 100% green status.
+- **Robustness**: 752 automated tests passing 100% green (26 skipped, 3 deselected, 1 upstream starlette.testclient deprecation warning, ~82% code coverage).
+- **FFmpeg Burn-in Concurrency**: unique temporary file generation per operation and active destination locking to prevent race conditions during concurrent burn-in executions.
 
 ## [1.4.12] - 2026-10-17
 

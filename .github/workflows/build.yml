@@ -194,7 +194,7 @@ jobs:
 
   build-windows:
     name: Build Windows (.exe)
-    needs: [test, compat-min-pyqt6]
+    needs: [test, compat-min-pyqt6, compat-min-python]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -264,7 +264,7 @@ jobs:
 
   build-linux:
     name: Build Linux (.AppImage)
-    needs: [test, compat-min-pyqt6]
+    needs: [test, compat-min-pyqt6, compat-min-python]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -399,7 +399,7 @@ jobs:
 
   build-macos:
     name: Build macOS (.dmg)
-    needs: [test, compat-min-pyqt6]
+    needs: [test, compat-min-pyqt6, compat-min-python]
     runs-on: macos-14
     steps:
       - name: Checkout repository
@@ -471,7 +471,7 @@ jobs:
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-windows, build-linux, build-macos, compat-min-pyqt6]
+    needs: [build-windows, build-linux, build-macos, test, compat-min-pyqt6, compat-min-python]
     runs-on: ubuntu-latest
     # The only writer to the repo: every other job runs on
     # `contents: read`, so a compromised test or build cannot publish.
@@ -537,11 +537,12 @@ jobs:
           echo "Generated Checksums:"
           cat checksums.txt
 
-      - name: Create Release
+      - name: Create Draft Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           name: "SRT4U ${{ github.ref_name }} — Subtitle Processor & Translator"
           body_path: RELEASE_NOTES.md
+          draft: true
           prerelease: false  # only vMAJOR.MINOR.PATCH reaches here (release_check guarantees it)
           files: |
             release-dist/SRT4U-Windows-x64.exe
@@ -549,4 +550,26 @@ jobs:
             release-dist/SRT4U-Linux-x86_64.tar.gz
             release-dist/SRT4U-macOS.dmg
             release-dist/checksums.txt
+
+      - name: Verify Release Assets & Checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "Verifying local checksums against built assets..."
+          cd release-dist
+          sha256sum -c checksums.txt
+          echo "Verifying draft release exists on GitHub..."
+          gh release view "$TAG"
+
+      - name: Publish Stable Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "Promoting draft release to public stable release..."
+          gh release edit "$TAG" --draft=false
+          echo "Release $TAG successfully published as stable."
 

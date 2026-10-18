@@ -726,7 +726,10 @@ def run_burn_in_sync(
         from .video_burner_service import (
             BurnInOptions,
             VideoBurnerService,
+            acquire_burn_destination,
+            make_unique_burn_temp,
             paths_refer_to_same_file,
+            release_burn_destination,
         )
     except ImportError as exc:
         raise PipelineStageError(
@@ -745,26 +748,25 @@ def run_burn_in_sync(
         raise PipelineStageError(
             STAGE_BURN, "ffmpeg_unavailable", "FFmpeg is not available on the system"
         )
-    if cancel_event is not None and cancel_event.is_set():
-        raise TranscriptionCancelledError("pipeline cancelled")
-    out_dir = os.path.dirname(os.path.abspath(output_path))
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
-    duration_ms = VideoBurnerService.get_video_duration_ms(video_path, ffmpeg_bin)
-    duration_sec = duration_ms / 1000.0 if duration_ms else 0.0
-    width, height = VideoBurnerService.get_video_dimensions(video_path, ffmpeg_bin)
-    temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
-    temp_output = None
+    if not acquire_burn_destination(output_path):
+        raise PipelineStageError(
+            STAGE_BURN,
+            "destination_busy",
+            f"A burn-in operation for {output_path} is already in progress",
+        )
+    temp_dir = None
     try:
-        # D1: FFmpeg must never open the final destination. It used to receive
-        # ``output_path`` directly with ``-y``, so encoding truncated any file
-        # already sitting there and the failure/cancel branches then *deleted*
-        # it — destroying the user's previous good video. Encode into a sibling
-        # temporary file instead and promote it with ``os.replace`` only after
-        # FFmpeg exits 0; every failure path removes the temp and never touches
-        # the final path (same contract as ``atomic_write_text``).
+        if cancel_event is not None and cancel_event.is_set():
+            raise TranscriptionCancelledError("pipeline cancelled")
+        out_dir = os.path.dirname(os.path.abspath(output_path))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        duration_ms = VideoBurnerService.get_video_duration_ms(video_path, ffmpeg_bin)
+        duration_sec = duration_ms / 1000.0 if duration_ms else 0.0
+        width, height = VideoBurnerService.get_video_dimensions(video_path, ffmpeg_bin)
+        temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
         final_path = os.path.abspath(output_path)
-        temp_output = f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
+        temp_output = make_unique_burn_temp(output_path)
         ass_content = VideoBurnerService.generate_ass_script(
             items, BurnInOptions(), video_width=width, video_height=height
         )
@@ -879,10 +881,12 @@ def run_burn_in_sync(
                     os.remove(temp_output)
             except OSError:
                 logger.warning("Could not delete the temporary pipeline video")
-    finally:
-        import shutil
+            if temp_dir:
+                import shutil
 
-        shutil.rmtree(temp_dir, ignore_errors=True)
+                shutil.rmtree(temp_dir, ignore_errors=True)
+    finally:
+        release_burn_destination(output_path)
     if progress_callback is not None:
         progress_callback({"ratio": 1.0})
     return output_path
