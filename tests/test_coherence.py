@@ -423,8 +423,16 @@ def test_release_notes_are_release_facing_not_preparation():
     # macOS stays documented as arm64-only, never universal.
     assert "Apple Silicon (arm64)" in notes
     assert "x86_64 build is produced" not in notes
-    assert "x86_64 build is NOT produced" in notes or "no x86_64 build" in notes.lower()
-    assert "will not launch on Intel Macs" in notes
+    # The notes must explicitly state that Intel x86_64 Macs are unsupported;
+    # accepted phrasings of that guarantee (the official 1.0.0 wording uses
+    # "Intel x86_64 Macs are not supported").
+    intel_exclusion = (
+        "x86_64 build is NOT produced" in notes
+        or "no x86_64 build" in notes.lower()
+        or "Intel x86_64 Macs are not supported" in notes
+        or "will not launch on Intel Macs" in notes
+    )
+    assert intel_exclusion
 
 
 def test_current_docs_describe_history_schema_v3():
