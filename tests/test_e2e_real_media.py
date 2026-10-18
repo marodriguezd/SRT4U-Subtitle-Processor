@@ -685,6 +685,15 @@ def test_17_batch_processing_with_real_files(qapp, tmp_path):
     win.toggle_translate.setChecked(False)
     win.toggle_clean.setChecked(True)
     win._run_batch_processing()
+    # Batch work runs on a QThread (A-4): pump until it reports completion.
+    worker = win.batch_worker
+    assert worker is not None
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline and win._batch_running:
+        qapp.processEvents()
+        time.sleep(0.01)
+    assert not win._batch_running
+    assert worker.wait(120_000)
     qapp.processEvents()
 
     for index in range(3):

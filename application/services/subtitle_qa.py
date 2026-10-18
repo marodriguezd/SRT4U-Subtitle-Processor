@@ -22,7 +22,6 @@ from typing import (
 from . import timestamps as ts
 from .timestamps import (
     ass_dialogue_timing_to_ms,
-    ass_timestamp_to_ms,
     srt_timestamp_to_ms,
     vtt_timestamp_to_ms,
 )
@@ -387,14 +386,12 @@ class _FormattingRule(SubtitleQARule):
                     )
 
             # ASS override blocks start with '{\\'; natural braces are ignored.
-            residual_text = re.sub(r"\{\\[^}]*\}", "", item.text)
-            unmatched_open = len(re.findall(r"\{\\", residual_text))
-            unmatched_close = len(re.findall(r"\\[a-zA-Z][^}]*\}", residual_text))
-            incomplete_html = re.search(
-                r"</?(?:b|i|u|s|strike|em|strong|font|br|ruby|rt|c)(?:\s[^<>]*)?$",
-                item.text,
-                re.IGNORECASE,
-            )
+            # The patterns are class-level and compiled once (M-5): resolving
+            # them per cue made every rule pass re-run the regex cache lookup.
+            residual_text = SubtitleQA._ASS_BLOCK.sub("", item.text)
+            unmatched_open = len(SubtitleQA._ASS_OPEN.findall(residual_text))
+            unmatched_close = len(SubtitleQA._ASS_CLOSE.findall(residual_text))
+            incomplete_html = SubtitleQA._INCOMPLETE_HTML.search(item.text)
             if unmatched_open or unmatched_close:
                 findings.append(
                     QAFinding(
@@ -441,6 +438,14 @@ class SubtitleQA:
         r"<(/?)(b|i|u|s|strike|em|strong|font|br|ruby|rt|c)(?:\s[^>]*)?(/?)>",
         re.IGNORECASE,
     )
+    #: ASS brace-balance helpers for ``_FormattingRule`` (compiled once).
+    _ASS_BLOCK = re.compile(r"\{\\[^}]*\}")
+    _ASS_OPEN = re.compile(r"\{\\")
+    _ASS_CLOSE = re.compile(r"\\[a-zA-Z][^}]*\}")
+    _INCOMPLETE_HTML = re.compile(
+        r"</?(?:b|i|u|s|strike|em|strong|font|br|ruby|rt|c)(?:\s[^<>]*)?$",
+        re.IGNORECASE,
+    )
     DEFAULT_RULES: Tuple[SubtitleQARule, ...] = (
         _CueIndexRule(),
         _TimingRule(),
@@ -457,7 +462,7 @@ class SubtitleQA:
         self.rules = rules or QARules()
         self.rule_set = tuple(rule_set if rule_set is not None else self.DEFAULT_RULES)
         if any(not isinstance(rule, SubtitleQARule) for rule in self.rule_set):
-            raise TypeError("rule_set solo puede contener instancias de SubtitleQARule")
+            raise TypeError("rule_set may only contain SubtitleQARule instances")
 
     def validate(
         self,
@@ -717,33 +722,6 @@ class SubtitleQA:
         start_ms = vtt_timestamp_to_ms(match.group(1))
         end_ms = vtt_timestamp_to_ms(match.group(2))
         return start_ms is not None and end_ms is not None and end_ms > start_ms
-
-    @staticmethod
-    def _clock_to_ms(clock, fraction):
-        """Legacy two-part helper kept for API compatibility.
-
-        The shared ``timestamps`` module owns the grammar now; this helper
-        delegates to it so any external caller cannot re-introduce a divergent
-        component bound.
-        """
-        parts = [int(part) for part in clock.split(":")]
-        if len(parts) == 2:
-            minutes, seconds = parts
-            hours = 0
-        elif len(parts) == 3:
-            hours, minutes, seconds = parts
-        else:
-            return None
-        if minutes > 59 or seconds > 59:
-            return None
-        return ((hours * 60 + minutes) * 60 + seconds) * 1000 + int(
-            fraction.ljust(3, "0")
-        )
-
-    @classmethod
-    def _ass_time_to_ms(cls, value):
-        """Legacy ASS conversion; delegates to the shared grammar (D4)."""
-        return ass_timestamp_to_ms(value)
 
     @classmethod
     def _validate_ass_source(cls, content, findings):

@@ -80,10 +80,37 @@ class QualityMetricsModel(BaseModel):
 
 
 class ProcessingMetricsModel(BaseModel):
+    """Analytics processing block (``SubtitleAnalyticsService``).
+
+    ``parse_issues`` is not produced by analytics: the parser reports it
+    through ``ProcessingResult.parse_issues`` (``/process`` and the pipeline),
+    while ``/analyze`` only returns analytics. It therefore stays ``None``
+    here instead of defaulting to a misleading ``0``.
+    """
+
     processing_time_seconds: float = 0.0
     lines_removed: int = 0
     translation_failures: int = 0
+    parse_issues: Optional[int] = None
+
+
+class ProcessStatsModel(BaseModel):
+    """``ProcessingStats`` of a ``/process`` run (read/clean/translate/format).
+
+    The first six fields mirror the domain dataclass. ``processing_time_seconds``
+    and ``lines_removed`` are the historical analytics names for the same
+    values and are kept so existing clients do not break; they are now
+    populated instead of always reporting zero.
+    """
+
+    total_lines: int = 0
+    deleted_lines: int = 0
+    processed_items_count: int = 0
+    elapsed_time: float = 0.0
+    translation_failures: int = 0
     parse_issues: int = 0
+    processing_time_seconds: float = 0.0
+    lines_removed: int = 0
 
 
 class SubtitleAnalyticsModel(BaseModel):
@@ -131,7 +158,7 @@ class TranslationResultModel(BaseModel):
 class ProcessResultModel(BaseModel):
     output_content: str
     output_format: str
-    stats: ProcessingMetricsModel
+    stats: ProcessStatsModel
     processed_items_count: int = 0
     translation_metrics: Optional[TranslationMetricsModel] = None
     qa: Optional[QAReportModel] = None
@@ -275,7 +302,9 @@ class PipelineResultModel(BaseModel):
     stages: List[PipelineStageModel] = Field(default_factory=list)
     stages_completed: int = 0
     transcription: Optional[Dict[str, Any]] = None
-    translation: Optional[Dict[str, Any]] = None
+    # Matches ``PipelineResult.to_dict()``: the pipeline reports the aggregate
+    # translation metrics under ``translation_metrics`` (never ``translation``).
+    translation_metrics: Optional[Dict[str, Any]] = None
     translation_failures: int = 0
     analytics_before: Optional[Dict[str, Any]] = None
     qa_before: Optional[Dict[str, Any]] = None

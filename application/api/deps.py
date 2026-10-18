@@ -1,5 +1,6 @@
 """Shared API plumbing: uploads, service factories, error mapping."""
 
+import asyncio
 import os
 import tempfile
 from pathlib import Path
@@ -19,6 +20,11 @@ logger = get_logger("api")
 
 SUPPORTED_EXTENSIONS = {".srt", ".vtt", ".ass", ".ssa", ".txt"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+#: Upload chunks are coalesced up to this size before touching the disk, which
+#: keeps the blocking write off the event loop without paying a thread hop per
+#: 64 KiB read (a full 5 MB upload drops from ~80 writes to 5).
+_UPLOAD_WRITE_BATCH = 1024 * 1024
 
 
 def new_service() -> SubtitleService:
@@ -111,6 +117,7 @@ async def save_upload(
         )
         tmp = Path(handle.name)
         received = 0
+        pending = bytearray()
         while True:
             chunk = await upload.read(65536)
             if not chunk:
@@ -121,7 +128,12 @@ async def save_upload(
                     status_code=413,
                     detail=f"file too large (limit {max_bytes} bytes)",
                 )
-            handle.write(chunk)
+            pending.extend(chunk)
+            if len(pending) >= _UPLOAD_WRITE_BATCH:
+                await asyncio.to_thread(handle.write, bytes(pending))
+                pending.clear()
+        if pending:
+            await asyncio.to_thread(handle.write, bytes(pending))
         handle.close()
         handle = None
         success = True

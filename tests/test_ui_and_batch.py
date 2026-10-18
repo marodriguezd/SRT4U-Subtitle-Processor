@@ -155,6 +155,60 @@ def test_subtitle_card_and_diff_viewer(qapp):
     assert viewer.get_processed_subtitles()[0].text == "Hola universo"
 
 
+def test_highlight_matches_first_cue_even_with_overlaps(qapp):
+    """A4: the cached fast path must not change which cue wins.
+
+    The reference is the original rule: the first cue in list order whose
+    interval contains the position, even when cues overlap or are unsorted.
+    """
+    cues = [
+        SubtitleItem(index=1, start_ms=0, end_ms=4000, text="long first"),
+        SubtitleItem(index=2, start_ms=1000, end_ms=2000, text="overlap"),
+        SubtitleItem(index=3, start_ms=500, end_ms=9000, text="late start"),
+        SubtitleItem(index=4, start_ms=9500, end_ms=9900, text="tail"),
+    ]
+    viewer = SubtitleDiffViewer()
+    viewer.show()
+    viewer.load_subtitles(cues, list(cues))
+
+    positions = [0, 600, 1200, 1500, 1999, 2000, 3000, 4001, 6000, 9001, 9600]
+    for pos in positions + list(reversed(positions)):
+        viewer.highlight_cue_at_ms(pos, auto_scroll=False)
+        expected = next(
+            (
+                card
+                for card in viewer.cards
+                if card.edited_item.start_ms <= pos <= card.edited_item.end_ms
+            ),
+            None,
+        )
+        assert viewer.active_card is expected, pos
+
+
+def test_preview_search_updates_counter_before_relayout(qapp):
+    """A3: the counter is immediate; the visibility pass is debounced."""
+    win = MainWindow()
+    win.i18n.set_language("es", save_to_config=False)
+    items = [
+        SubtitleItem(index=1, start_ms=0, end_ms=1000, text="Hola mundo"),
+        SubtitleItem(index=2, start_ms=2000, end_ms=3000, text="Adiós mundo"),
+        SubtitleItem(index=3, start_ms=4000, end_ms=5000, text="Sin coincidencia"),
+    ]
+    win.diff_viewer.load_subtitles(items, copy.deepcopy(items))
+
+    win.preview_search_input.setText("mundo")
+    # Counter is already correct for the pending query...
+    assert win.lbl_preview_sub_counter.text().startswith("Mostrando 2")
+    # ...while no card has been hidden yet.
+    assert all(not card.isHidden() for card in win.diff_viewer.cards)
+
+    win._apply_preview_filter()
+    assert [card.isHidden() for card in win.diff_viewer.cards] == [False, False, True]
+    assert win.lbl_preview_sub_counter.text().startswith("Mostrando 2")
+    win._search_timer.stop()
+    win.close()
+
+
 def test_preview_page_studio_integration(qapp):
     win = MainWindow()
     win._switch_page(1)  # Preview / Studio page
@@ -176,3 +230,50 @@ def test_preview_page_studio_integration(qapp):
     assert win.lbl_preview_sub_counter.text().startswith("Mostrando 0")
     win.preview_search_input.setText("")
     assert "Total:" in win.lbl_preview_sub_counter.text()
+
+
+def test_diff_viewer_materializes_only_the_visible_window(qapp):
+    """B5: a long file must not build one widget tree per cue up front."""
+    cues = [
+        SubtitleItem(
+            index=position + 1,
+            start_ms=position * 2000,
+            end_ms=position * 2000 + 1800,
+            text=f"Cue {position}",
+        )
+        for position in range(600)
+    ]
+    viewer = SubtitleDiffViewer()
+    viewer.resize(900, 600)
+    viewer.show()
+    viewer.load_subtitles(cues, list(cues))
+    qapp.processEvents()
+
+    # len() reports every cue without building a card for each one...
+    assert len(viewer.cards) == 600
+    assert viewer.cue_count == 600
+    assert viewer.materialized_count < 100
+
+    # ...while indexing still hands back the real, editable card.
+    first = viewer.cards[0]
+    assert first.edited_item.text == "Cue 0"
+    assert viewer.materialized_count < 100
+
+    # Edits live in the cue model, so releasing the widget keeps them.
+    first.edit_text.setPlainText("Edited cue")
+    assert viewer.get_processed_subtitles()[0].text == "Edited cue"
+
+    viewer.scroll_area.verticalScrollBar().setValue(300 * 60)
+    qapp.processEvents()
+    assert viewer.card_at(300).edited_item.text == "Cue 300"
+    rebuilt = viewer.card_at(0)
+    assert rebuilt.edit_text.toPlainText() == "Edited cue"
+
+    # Filtering stays data driven and reports the same counts as before.
+    visible, total = viewer.filter_subtitles("Cue 30")
+    assert (visible, total) == (11, 600)
+    assert viewer.cards[0].isHidden()
+    assert not viewer.cards[30].isHidden()
+    viewer.filter_subtitles("")
+    visible, total = viewer.filter_subtitles("")
+    assert (visible, total) == (600, 600)

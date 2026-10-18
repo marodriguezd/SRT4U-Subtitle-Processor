@@ -16,7 +16,11 @@ from ..deps import (
 from ..jobs import JobError, JobManager
 from ..schemas import JobCreatedResponse, ProcessResultModel, TranslationResultModel
 from ...services.history_store import record_result_safely
-from ...services.subtitle_service import ProcessingResult, ProcessingStats
+from ...services.subtitle_service import (
+    ProcessingResult,
+    ProcessingStats,
+    read_subtitle_file,
+)
 from ...services.translation_service import TranslationService
 
 router = APIRouter(tags=["translate"])
@@ -29,6 +33,27 @@ _translate_note = (
 
 def _jobs_from(request: Request) -> JobManager:
     return request.app.state.jobs
+
+
+def _stats_payload(stats: ProcessingStats) -> dict:
+    """Map ``ProcessingStats`` onto the served stats contract (B2).
+
+    The previous code passed ``stats.__dict__`` to a model that declared the
+    *analytics* field names, so pydantic dropped ``total_lines``,
+    ``deleted_lines`` and ``elapsed_time`` and left ``lines_removed`` /
+    ``processing_time_seconds`` at their zero defaults. The mapping is now
+    explicit, and the two historical aliases carry the real values.
+    """
+    return {
+        "total_lines": stats.total_lines,
+        "deleted_lines": stats.deleted_lines,
+        "processed_items_count": stats.processed_items_count,
+        "elapsed_time": stats.elapsed_time,
+        "translation_failures": stats.translation_failures,
+        "parse_issues": stats.parse_issues,
+        "processing_time_seconds": stats.elapsed_time,
+        "lines_removed": stats.deleted_lines,
+    }
 
 
 def _empty_metrics(provider: str, target_language: str) -> dict:
@@ -75,7 +100,9 @@ async def translate(
 
     def _work() -> dict:
         try:
-            content = tmp_path.read_text(encoding="utf-8", errors="replace")
+            # Same decoding policy as the CLI/GUI: BOM, UTF-16 and CP1252 are
+            # detected instead of replaced with U+FFFD.
+            content = read_subtitle_file(str(tmp_path))
             service = new_service()
             service.translation_service = TranslationService(
                 max_retries=max_retries,
@@ -210,7 +237,7 @@ async def process(
             payload = ProcessResultModel(
                 output_content=result.output_content,
                 output_format=target_format or tmp_path.suffix.lstrip("."),
-                stats=result.stats.__dict__,
+                stats=_stats_payload(result.stats),
                 processed_items_count=result.stats.processed_items_count,
                 translation_metrics=(
                     result.translation_metrics.to_dict()

@@ -25,6 +25,24 @@ def manager():
         mgr.shutdown()
 
 
+def test_app_shutdown_releases_the_job_manager():
+    """B6: the app lifecycle owns the pool, not the process lifetime.
+
+    ``JobManager.shutdown()`` existed but no code path called it, so every app
+    instance (and every test) leaked its executor threads.
+    """
+    from fastapi.testclient import TestClient
+
+    from application.api.app import create_app
+
+    mgr = JobManager(max_workers=1)
+    app = create_app(job_manager=mgr)
+    with TestClient(app):
+        assert mgr.submit("process", lambda: "ok")
+    with pytest.raises(RuntimeError, match="shut down"):
+        mgr.submit("process", lambda: "ok")
+
+
 def test_shutdown_drops_queued_job_and_worker_never_runs_it(monkeypatch, manager):
     """A job cancelled by shutdown must not run even if its worker reaches it later.
 

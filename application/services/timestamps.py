@@ -74,7 +74,7 @@ def _clock_to_ms(hours: str, minutes: str, seconds: str) -> int:
     """Validate range bounds and convert validated clock components to ms."""
     if int(minutes) > 59 or int(seconds) > 59:
         raise ValueError(
-            f"minutos/segundos fuera de rango (00-59): {hours}:{minutes}:{seconds}"
+            f"minutes/seconds out of range (00-59): {hours}:{minutes}:{seconds}"
         )
     return (int(hours) * 3600 + int(minutes) * 60 + int(seconds)) * 1000
 

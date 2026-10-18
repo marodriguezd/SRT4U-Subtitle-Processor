@@ -498,10 +498,19 @@ class HistoryStore:
         only_fallbacks: bool = False,
         since: Optional[str] = None,
         until: Optional[str] = None,
+        benchmark_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Newest-first rows; every filter is a bound parameter, never SQL text."""
         query = "SELECT * FROM runs WHERE 1 = 1"
         params: List[Any] = []
+        if benchmark_id is not None:
+            if benchmark_id == "unknown":
+                # ``benchmark_summaries`` groups NULL ids under "unknown", so
+                # fetching that group must cover both representations.
+                query += " AND (benchmark_id IS NULL OR benchmark_id = 'unknown')"
+            else:
+                query += " AND benchmark_id = ?"
+                params.append(benchmark_id)
         if provider:
             query += " AND requested_provider = ?"
             params.append(provider)
@@ -545,6 +554,38 @@ class HistoryStore:
         except sqlite3.DatabaseError as exc:
             raise HistoryError(f"cannot query history: {exc}") from exc
         return [_row_to_dict(row) for row in rows]
+
+    def benchmark_summaries(self) -> List[Dict[str, Any]]:
+        """Aggregate stored benchmarks in SQL (one row per benchmark id).
+
+        The API used to read every benchmark row (``limit=100000``) and group it
+        in Python. Grouping happens in SQLite instead; only (benchmark,
+        provider) pairs travel back, which is bounded by the catalogue size.
+        """
+        query = (
+            "SELECT COALESCE(benchmark_id, 'unknown') AS benchmark_id, "
+            "COUNT(*) AS runs, MIN(timestamp) AS first_seen, "
+            "GROUP_CONCAT(DISTINCT requested_provider) AS providers "
+            "FROM runs WHERE operation = 'benchmark' "
+            "GROUP BY COALESCE(benchmark_id, 'unknown') "
+            "ORDER BY benchmark_id"
+        )
+        try:
+            rows = self._conn.execute(query).fetchall()
+        except sqlite3.DatabaseError as exc:
+            raise HistoryError(f"cannot query history: {exc}") from exc
+        summaries = []
+        for row in rows:
+            providers = [name for name in (row["providers"] or "").split(",") if name]
+            summaries.append(
+                {
+                    "benchmark_id": row["benchmark_id"],
+                    "runs": row["runs"] or 0,
+                    "providers": sorted(providers),
+                    "first_seen": row["first_seen"],
+                }
+            )
+        return summaries
 
     def run_stats(
         self, provider: Optional[str] = None, since: Optional[str] = None

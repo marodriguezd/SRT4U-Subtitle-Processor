@@ -110,7 +110,7 @@ def test_cli_qa_human_strict_summary_marks_warning_failure(tmp_path):
     source.write_text("1\\n00:00:00,000 --> 00:00:00,500\\nShort\\n", encoding="utf-8")
     result = run_cli("qa", source, "--strict")
     assert result.returncode == 1
-    assert "QA: problemas encontrados" in result.stdout
+    assert "QA: problems found" in result.stdout
 
 
 def test_cli_qa_csv_flag_and_json_csv_conflict(tmp_path):

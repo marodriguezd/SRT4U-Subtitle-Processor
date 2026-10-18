@@ -79,16 +79,14 @@ async def transcribe(
             except TranscriptionError as exc:
                 raise JobError(safe_detail(exc)) from exc
 
-            def _progress(step: str, payload: object) -> None:
-                return None
-
+            # No progress stream is exposed by the jobs contract, so the
+            # backend runs without a callback instead of discarding payloads.
             result = service.transcribe_file(
                 str(tmp_path),
                 provider_name="whisper",
                 model=model,
                 language=language,
                 device=device,
-                progress_callback=_progress,
             )
             content = service.render(result, output_format)
             try:

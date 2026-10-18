@@ -252,7 +252,7 @@ def load_benchmark_dataset(path: Optional[str] = None) -> Dict[str, Any]:
             "source": "builtin",
             "cues": list(DEFAULT_BENCHMARK_CUES),
         }
-    from .subtitle_service import SubtitleService
+    from .subtitle_service import SubtitleService, read_subtitle_file
 
     candidate = Path(path).expanduser()
     if not candidate.exists():
@@ -271,7 +271,7 @@ def load_benchmark_dataset(path: Optional[str] = None) -> Dict[str, Any]:
     if not files:
         raise ValueError(f"no subtitle files found in dataset: {path}")
     for item in files:
-        content = item.read_text(encoding="utf-8", errors="replace")
+        content = read_subtitle_file(str(item))
         file_format = service.detect_format(content, str(item))
         for cue in service.parse_subtitles(content, file_format):
             text = cue.text.strip()

@@ -25,7 +25,12 @@ from typing import Any, Callable, Dict, List, Optional
 from ..logging_setup import get_logger
 from .atomic_write import atomic_write_text
 from .config_service import ConfigService
-from .subtitle_service import SubtitleCancelledError, SubtitleItem, SubtitleService
+from .subtitle_service import (
+    SubtitleCancelledError,
+    SubtitleItem,
+    SubtitleService,
+    read_subtitle_file,
+)
 from .transcription_models import TranscriptionResult
 from .transcription_providers import (
     TranscriptionCancelledError,
@@ -190,18 +195,9 @@ class PipelineConfig:
         if self.output_video and _same_file_path(subtitle_output, self.output_video):
             raise PipelineConfigError("video and subtitle outputs must be different")
 
-        for output_path, description in (
-            (subtitle_output, "output"),
-            (self.output_video, "output video"),
-        ):
-            if output_path:
-                parent = os.path.dirname(os.path.abspath(output_path))
-                try:
-                    os.makedirs(parent, exist_ok=True)
-                except OSError as exc:
-                    raise PipelineConfigError(
-                        f"could not prepare the directory for {description}"
-                    ) from exc
+        # Validation is side-effect free (S-6): directories are created by the
+        # export/burn stages when the run actually writes something, so a
+        # rejected configuration or a cancelled run leaves no artifacts behind.
         return self
 
     def is_media_input(self) -> bool:
@@ -499,8 +495,11 @@ class MediaPipeline:
         self, config: PipelineConfig, result: PipelineResult
     ) -> List[SubtitleItem]:
         try:
-            with open(config.input_media, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
+            # One decoding policy for every entry point: BOM/UTF-16/CP1252
+            # detection lives in ``read_subtitle_file``, so the pipeline can
+            # never re-introduce mojibake on a legacy subtitle the GUI/CLI read
+            # correctly.
+            content = read_subtitle_file(config.input_media)
             file_format = self.subtitle_service.detect_format(
                 content, config.input_media
             )
@@ -681,7 +680,7 @@ class MediaPipeline:
         except PipelineStageError:
             raise
         except Exception as exc:
-            logger.error("Burn-in fallido (%s)", type(exc).__name__)
+            logger.error("Burn-in failed (%s)", type(exc).__name__)
             raise PipelineStageError(
                 STAGE_BURN, "burn_in_error", "subtitle burn-in failed"
             ) from exc

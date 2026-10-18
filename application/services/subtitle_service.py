@@ -33,6 +33,25 @@ _ASS_DIALOGUE_RE = re.compile(
 )
 
 
+def _combine_patterns(patterns: List[re.Pattern]) -> re.Pattern:
+    """Fold several compiled patterns into one alternation (same semantics).
+
+    ``any(pattern.fullmatch(text))`` and ``any(pattern.search(text))`` are exact
+    logical ORs, so a single alternation returns the same verdict with one regex
+    call instead of one call per pattern. ``(?i)`` is module-global when written
+    at the start of a source pattern, so each branch that carries it is wrapped
+    in a scoped ``(?i:...)`` group to keep its flags local to that branch.
+    """
+    branches = []
+    for pattern in patterns:
+        source = pattern.pattern
+        if source.startswith("(?i)"):
+            branches.append(f"(?i:{source[4:]})")
+        else:
+            branches.append(f"(?:{source})")
+    return re.compile("|".join(branches))
+
+
 def read_subtitle_file(file_path: str) -> str:
     """Read a subtitle file with encoding detection (BOM and common fallbacks)."""
     with open(file_path, "rb") as f:
@@ -302,6 +321,10 @@ class SubtitleService:
         self.advertisement_patterns = [
             re.compile(p) for p in self.ADVERTISEMENT_PATTERNS
         ]
+        #: (pattern count, compiled alternation) cache. ``spam_patterns`` stays
+        #: part of the public surface, so the entry remembers how many patterns
+        #: it was built from and is rebuilt when that count changes.
+        self._spam_matcher: Optional[tuple] = None
         #: Structural problems found by the last parse. Never silently empty.
         self.last_parse_issues: List[ParseIssue] = []
         #: Style definitions recovered by the last ASS parse, so a round trip
@@ -392,18 +415,17 @@ class SubtitleService:
         # Hours are unbounded so that >99h media round trips through SRT (L5).
         # The pattern comes from the shared grammar module (D4): the exact
         # component grammar QA validates with.
-        ts_regex = _SRT_TIMING_RE
-
-        def find_timing(value: str):
-            match = ts_regex.search(value)
-            return match if match else None
+        # ``re.Pattern.search`` already returns ``None`` on no match, so the
+        # loop calls it directly: the previous ``find_timing`` wrapper added one
+        # Python frame per scanned line (A6).
+        search_timing = _SRT_TIMING_RE.search
 
         index = 0
         position = 0
         total = len(lines)
         first_timing_line = None
         while position < total:
-            match = find_timing(lines[position])
+            match = search_timing(lines[position])
             if match is None:
                 position += 1
                 continue
@@ -415,7 +437,7 @@ class SubtitleService:
             )
             position += 1
             text_lines: List[str] = []
-            while position < total and find_timing(lines[position]) is None:
+            while position < total and search_timing(lines[position]) is None:
                 candidate = lines[position]
                 # A bare number immediately followed by the next cue's timecode
                 # is that cue's index, not dialogue. Stop before it.
@@ -423,7 +445,7 @@ class SubtitleService:
                     lookahead = position + 1
                     while lookahead < total and not lines[lookahead].strip():
                         lookahead += 1
-                    if lookahead < total and find_timing(lines[lookahead]):
+                    if lookahead < total and search_timing(lines[lookahead]):
                         break
                 text_lines.append(candidate)
                 position += 1
@@ -449,7 +471,7 @@ class SubtitleService:
         # Text that precedes the very first timecode belongs to no cue; report
         # it instead of dropping it without a trace. A bare cue number is the
         # index of the first cue, not lost content.
-        if first_timing_line:
+        if first_timing_line is not None and first_timing_line > 0:
             for offset in range(first_timing_line):
                 candidate = lines[offset].strip()
                 if candidate and not candidate.isdigit():
@@ -694,17 +716,34 @@ class SubtitleService:
             items, file_format=file_format, source_content=content
         )
 
+    def _whole_line_spam_matcher(self) -> re.Pattern:
+        """Whole-line spam alternation, rebuilt when ``spam_patterns`` changes."""
+        cached = self._spam_matcher
+        if cached is not None and cached[0] == len(self.spam_patterns):
+            return cached[1]
+        matcher = _combine_patterns(self.spam_patterns)
+        self._spam_matcher = (len(self.spam_patterns), matcher)
+        return matcher
+
     def is_spam_line(self, line: str) -> bool:
         """Classify one subtitle line as spam.
 
         A line is only removed when the *whole line* is spam, or when it opens
         with a call to action and names a source. Merely mentioning a site, a
         URL or a release tag inside a sentence is dialogue, not spam.
+
+        The whole-line group is evaluated as one compiled alternation (M-4):
+        ``any(pattern.fullmatch(...))`` is a logical OR, so the verdict is
+        identical with a single regex call instead of 25. The promotional and
+        advertising groups deliberately keep their per-pattern ``search``
+        loops: merging them was measured to be *slower* (their ``^`` anchors
+        and ``.*`` tails let each pattern fail fast, while one alternation
+        loses the start-of-string optimisation).
         """
         stripped = (line or "").strip()
         if not stripped:
             return False
-        if any(pattern.fullmatch(stripped) for pattern in self.spam_patterns):
+        if self._whole_line_spam_matcher().fullmatch(stripped):
             return True
         if any(pattern.search(stripped) for pattern in self.promotional_patterns):
             return True
@@ -975,18 +1014,31 @@ class SubtitleService:
                 provider for record in ordered for provider in record.providers_used
             )
         )
-        input_texts = [item.text.strip() for item in items if item.text.strip()]
-        output_texts = [r.item.text.strip() for r in ordered if r.item.text.strip()]
+        # One strip per cue (A5): the comprehension used to strip twice to test
+        # and to keep the value, and the metrics recomputed ``split()`` per
+        # pass. Counters are accumulated in a single loop instead.
+        input_texts = [text for text in (item.text.strip() for item in items) if text]
+        output_texts = [
+            text for text in (record.item.text.strip() for record in ordered) if text
+        ]
+        characters_input = words_input = 0
+        for text in input_texts:
+            characters_input += len(text)
+            words_input += len(text.split())
+        characters_output = words_output = 0
+        for text in output_texts:
+            characters_output += len(text)
+            words_output += len(text.split())
         failed = bool(failed_records)
         self.last_translation_metrics = TranslationMetrics.aggregate(
             translation_metrics,
             source_language=source_language,
             target_language=target_language,
             number_of_cues=len(input_texts),
-            characters_input=sum(len(text) for text in input_texts),
-            characters_output=sum(len(text) for text in output_texts),
-            words_input=sum(len(text.split()) for text in input_texts),
-            words_output=sum(len(text.split()) for text in output_texts),
+            characters_input=characters_input,
+            characters_output=characters_output,
+            words_input=words_input,
+            words_output=words_output,
             duration_ms=(
                 int((time.perf_counter() - self._last_translation_started_at) * 1000)
                 if self._last_translation_started_at is not None

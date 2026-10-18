@@ -36,6 +36,54 @@ def test_clean_srt_spam_removal(service):
     assert len(cleaned) < len(items)
 
 
+def test_combined_spam_matcher_is_equivalent_to_per_pattern_checks(service):
+    """M-4: the single alternation must return the historical verdict.
+
+    The optimisation is only safe if ``is_spam_line`` still answers exactly
+    like ``any(fullmatch)`` over the whole-line list plus ``any(search)`` over
+    the promotional/advertising lists, for both spam and real dialogue.
+    """
+    corpus = [
+        "Subtitled by AnimeFansubPro",
+        "SUBTITULADO POR ALGUIEN",
+        "Subtítulos sincronizados por alguien",
+        "Traducción de alguien",
+        "www.city.com",
+        "https://example.org/path",
+        "t.me/channel",
+        "telegram: @channel",
+        "YTS.MX",
+        "rarbg",
+        "opensubtitles.org",
+        "♪",
+        "♪ music ♪",
+        "[music]",
+        "(music playing)",
+        "We compress knowledge for you!",
+        "Visit us at www.site.org for more.",
+        "Please download from t.me/x",
+        "Watch this free online HD movie now",
+        "Your free subtitles are available on our site",
+        "Donate to our project",
+        "Rate this movie on IMDb",
+        "I went to www.city.com yesterday.",
+        "The rarbg group released it.",
+        "I downloaded it from opensubtitles.",
+        "Hello, how are you?",
+        "Señor, ¿qué pasa?",
+        "♪ La la la ♪",
+        "",
+        "   ",
+    ]
+    for line in corpus:
+        expected = (
+            any(p.fullmatch(line.strip()) for p in service.spam_patterns)
+            or any(p.search(line.strip()) for p in service.promotional_patterns)
+            or any(p.search(line.strip()) for p in service.advertisement_patterns)
+        )
+        assert service.is_spam_line(line) is expected, line
+
+
 def test_clean_vtt_spam_removal(service):
     path = os.path.join(FIXTURES_DIR, "sample.vtt")
     with open(path, "r", encoding="utf-8") as f:

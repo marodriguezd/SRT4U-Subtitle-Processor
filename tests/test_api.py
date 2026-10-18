@@ -130,6 +130,41 @@ def test_translate_job_lifecycle(client, mock_provider):
     assert "sk-" not in json.dumps(job)
 
 
+def test_translate_job_preserves_legacy_encoded_subtitle(client, monkeypatch):
+    """B1: the translate job decodes the upload like the rest of the product.
+
+    The route used to read the temp file as UTF-8 with ``errors="replace"``,
+    so a CP1252 upload reached the provider (and the response) as U+FFFD.
+    """
+
+    class EchoProvider(TranslationProvider):
+        name = "echo"
+
+        def translate(self, text, source_language, target_language, *, context=None):
+            return text
+
+        def translate_detailed(
+            self, text, source_language, target_language, *, context=None
+        ):
+            return ProviderResponse(text, model="echo")
+
+    monkeypatch.setattr(
+        ProviderRegistry, "get", lambda name, config_service=None: EchoProvider()
+    )
+    raw = "1\n00:00:01,000 --> 00:00:02,000\nSeñor, ¿qué pasa? Acción.\n".encode(
+        "cp1252"
+    )
+    response = client.post(
+        "/api/v1/translate",
+        files={"file": ("legacy.srt", raw, "text/plain")},
+        data={"target_language": "es"},
+    )
+    assert response.status_code == 202
+    job = _wait_job(client, response.json()["job_id"])
+    assert job["status"] == "completed"
+    assert job["result"]["text"] == "Señor, ¿qué pasa? Acción."
+
+
 def test_translate_validation(client):
     response = _upload(
         client,
@@ -381,6 +416,53 @@ def test_process_job_result_carries_parse_issue_structure(client, mock_provider)
     job = _wait_job(client, clean.json()["job_id"])
     assert job["status"] == "completed"
     assert job["result"]["parse_issues"] == []
+
+
+def test_process_job_reports_real_processing_stats(client):
+    """B2: ``stats`` carries the real ``ProcessingStats`` values.
+
+    ``total_lines``/``deleted_lines``/``elapsed_time`` used to be dropped by
+    the response model, and the historical ``lines_removed`` /
+    ``processing_time_seconds`` aliases reported zero regardless of the run.
+    """
+    content = (
+        "1\n00:00:01,000 --> 00:00:02,000\nHello world\n"
+        "\n"
+        "2\n00:00:03,000 --> 00:00:04,000\nSubtitled by Spammer\n"
+    )
+    response = _upload(client, path="/api/v1/process", content=content, clean="true")
+    assert response.status_code == 202
+    job = _wait_job(client, response.json()["job_id"])
+    assert job["status"] == "completed"
+    stats = job["result"]["stats"]
+    assert stats["total_lines"] == 2
+    assert stats["deleted_lines"] == 1
+    assert stats["processed_items_count"] == 1
+    assert stats["lines_removed"] == 1
+    assert stats["processing_time_seconds"] == stats["elapsed_time"]
+    assert stats["elapsed_time"] >= 0
+
+
+def test_analyze_does_not_invent_parse_issue_count(client):
+    """B3: ``/analyze`` cannot count parse issues, so it reports ``null``.
+
+    The schema used to declare ``processing.parse_issues: int = 0``, which
+    made every analysis claim the parser had discarded nothing.
+    """
+    response = _upload(client)
+    assert response.status_code == 200
+    assert response.json()["analytics"]["processing"]["parse_issues"] is None
+
+
+def test_pipeline_result_schema_matches_payload(client):
+    """B3: the documented pipeline payload uses ``translation_metrics``."""
+    from application.services.media_pipeline import PipelineResult
+
+    schema = create_app().openapi()["components"]["schemas"]["PipelineResultModel"]
+    properties = schema["properties"]
+    assert "translation_metrics" in properties
+    assert "translation" not in properties
+    assert "translation_metrics" in PipelineResult().to_dict()
 
 
 def test_process_job_records_parse_issues_in_history(client):

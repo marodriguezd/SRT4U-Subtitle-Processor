@@ -94,6 +94,15 @@ def _pump_until(qapp, predicate, timeout=WAIT):
     return False
 
 
+def _wait_for_batch(window, qapp):
+    """Wait for the batch worker: pump queued signals, then join the thread."""
+    worker = getattr(window, "batch_worker", None)
+    assert worker is not None, "batch worker was not started"
+    assert _pump_until(qapp, lambda: not window._batch_running), "batch timed out"
+    assert worker.wait(int(WAIT * 1000))
+    qapp.processEvents()
+
+
 def test_navigation_switches_every_page_and_returns_home(window):
     for index in range(PAGE_COUNT):
         window._switch_page(index)
@@ -161,6 +170,7 @@ def test_batch_processes_every_file_and_marks_each_completed(
     assert window.batch_table.rowCount() == len(sources)
 
     window._run_batch_processing()
+    _wait_for_batch(window, qapp)
 
     completed = main_window_module.t("batch.status_completed")
     for row, source in enumerate(sources):
@@ -168,6 +178,45 @@ def test_batch_processes_every_file_and_marks_each_completed(
         assert processed.exists()
         assert window.batch_table.item(row, 3).text() == completed
     assert len(infos) == 1
+
+
+def test_batch_worker_stops_after_a_cooperative_cancel(
+    window, qapp, tmp_path, monkeypatch, infos
+):
+    """A-4: cancelling mid-batch stops before the next file is started."""
+    sources = []
+    for name in ("a.srt", "b.srt", "c.srt"):
+        path = tmp_path / name
+        path.write_text(SAMPLE_SRT, encoding="utf-8")
+        sources.append(str(path))
+    monkeypatch.setattr(
+        main_window_module, "ask_open_files", lambda *args, **kwargs: sources
+    )
+    window.toggle_translate.setChecked(False)
+    window._add_batch_files()
+
+    original = window.subtitle_service.process_subtitles
+    started = []
+
+    def _process_and_cancel(*args, **kwargs):
+        started.append(kwargs.get("file_path"))
+        result = original(*args, **kwargs)
+        window.cancel_batch()
+        return result
+
+    monkeypatch.setattr(
+        window.subtitle_service, "process_subtitles", _process_and_cancel
+    )
+
+    window._run_batch_processing()
+    _wait_for_batch(window, qapp)
+
+    assert started == [sources[0]]
+    assert window.batch_table.item(0, 3).text() == main_window_module.t(
+        "batch.status_completed"
+    )
+    # A cancelled batch is not reported as a completed one.
+    assert infos == []
 
 
 def test_batch_with_no_rows_informs_and_does_nothing(window, infos):
@@ -206,6 +255,7 @@ def test_history_page_lists_recorded_runs_and_filters_by_operation(
     window.toggle_translate.setChecked(False)
     window._add_batch_files()
     window._run_batch_processing()
+    _wait_for_batch(window, qapp)
 
     window._refresh_history()
     assert window.history_table.rowCount() >= 1

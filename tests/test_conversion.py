@@ -1,6 +1,6 @@
 import os
 import pytest
-from application.services.subtitle_service import SubtitleService
+from application.services.subtitle_service import SubtitleService, read_subtitle_file
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -8,6 +8,27 @@ FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 @pytest.fixture
 def service():
     return SubtitleService()
+
+
+def test_read_subtitle_file_detects_legacy_encodings(tmp_path):
+    """One decoding policy for GUI, CLI, API and pipeline (B1).
+
+    CP1252 and UTF-16 subtitles used to reach the pipeline/API/GUI through
+    ``encoding="utf-8", errors="replace"``, which silently turned every
+    accented character into U+FFFD. The shared helper must recover them.
+    """
+    text = "1\n00:00:01,000 --> 00:00:02,000\nSeñor, ¿qué pasa? Acción.\n"
+    for name, encoding in (
+        ("legacy.srt", "cp1252"),
+        ("utf16.srt", "utf-16"),
+        ("bom.srt", "utf-8-sig"),
+    ):
+        path = tmp_path / name
+        path.write_bytes(text.encode(encoding))
+        content = read_subtitle_file(str(path))
+        assert "Señor, ¿qué pasa? Acción." in content, encoding
+        items = SubtitleService().parse_subtitles(content, "srt")
+        assert items[0].text == "Señor, ¿qué pasa? Acción.", encoding
 
 
 def test_srt_to_all_formats(service):

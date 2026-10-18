@@ -177,6 +177,10 @@ class Icons:
     DEFAULT_ACTIVE = "#818CF8"
     DEFAULT_SUCCESS = "#10B981"
 
+    #: Hard ceiling for the pixmap cache: today's palette is small, but the
+    #: cache keys include caller-supplied colors, so it must not grow without
+    #: bound for the lifetime of the process.
+    _CACHE_LIMIT = 256
     _PIXMAP_CACHE: Dict[Tuple[str, str, int, int], QPixmap] = {}
 
     @classmethod
@@ -190,6 +194,8 @@ class Icons:
         cache_key = (name, color, size, scale)
         if cache_key in cls._PIXMAP_CACHE:
             return cls._PIXMAP_CACHE[cache_key]
+        if len(cls._PIXMAP_CACHE) >= cls._CACHE_LIMIT:
+            cls._PIXMAP_CACHE.clear()
 
         raw_svg = _SVG_ICONS.get(name)
         if not raw_svg:

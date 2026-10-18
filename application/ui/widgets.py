@@ -3,6 +3,8 @@ Glassmorphism visual components matching the SRT4U mockup with high contrast and
 """
 
 import os
+from bisect import bisect_left, bisect_right
+from collections.abc import Sequence
 from typing import Optional, List
 from PyQt6.QtCore import Qt, QRectF, QSize, pyqtSignal, QUrl, QPoint, QEvent
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPaintEvent
@@ -642,6 +644,48 @@ class SubtitleCard(QFrame):
         return q in orig or q in edit
 
 
+class _CardSequence(Sequence):
+    """Sequence view over diff cards that materializes a card when accessed.
+
+    The viewer keeps one lightweight placeholder per cue and builds real
+    ``SubtitleCard`` widgets only inside the viewport, so ``len()`` reports the
+    cue count without paying widget cost. Indexing or iterating still returns
+    real cards, which keeps tests, scripts and screenshot tooling working.
+    """
+
+    def __init__(self, viewer: "SubtitleDiffViewer") -> None:
+        self._viewer = viewer
+
+    def __len__(self) -> int:
+        return self._viewer.cue_count
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return [
+                self._viewer.card_at(position)
+                for position in range(*index.indices(len(self)))
+            ]
+        if not isinstance(index, int):
+            raise TypeError("card indices must be integers or slices")
+        if index < 0:
+            index += len(self)
+        return self._viewer.card_at(index)
+
+
+#: Rows kept alive outside the viewport on each side, so a normal scroll does
+#: not thrash widget creation while a drag across a long file still stays cheap.
+_SCROLL_MARGIN_PX = 700
+
+
+#: Placeholder height used before a card exists, derived from the cue text.
+#: The real card replaces it as soon as it is materialized, so this only has
+#: to keep the scrollbar and the scroll anchors approximately right.
+def _placeholder_height(text: str) -> int:
+    lines = max(1, text.count("\n") + 1)
+    body = max(40, min(140, lines * 22 + 18))
+    return 16 + 24 + 6 + body
+
+
 class SubtitleDiffViewer(QWidget):
     cue_selected = pyqtSignal(int)
     subtitles_edited = pyqtSignal(list)
@@ -651,11 +695,36 @@ class SubtitleDiffViewer(QWidget):
         super().__init__(parent)
         self.original_items: List[SubtitleItem] = []
         self.processed_items: List[SubtitleItem] = []
-        self.cards: List[SubtitleCard] = []
+        #: Lazy sequence: ``len()`` is free, indexing materializes that card.
+        self.cards: Sequence[SubtitleCard] = _CardSequence(self)
         self.active_card: Optional[SubtitleCard] = None
+        # One row widget per cue: either a placeholder or a materialized card.
+        self._rows: List[QWidget] = []
+        self._live: dict = {}
+        self._heights: List[int] = []
+        self._hidden: List[bool] = []
+        self._offsets: List[int] = [0]
+        self._offsets_dirty = False
+        self._original_by_index: dict = {}
         self._current_filter: str = ""
+        self._active_position: Optional[int] = None
+        #: ``_prefix_max_end[i]`` is the largest ``end_ms`` of cues ``0..i-1``
+        #: (``-1`` for the first cue). It bounds the fast path in
+        #: ``highlight_cue_at_ms`` without assuming cues are sorted.
+        self._prefix_max_end: List[int] = []
+        self._materializing = False
 
         self._setup_ui()
+
+    @property
+    def cue_count(self) -> int:
+        """Number of cues currently loaded (materialized or not)."""
+        return len(self.processed_items)
+
+    @property
+    def materialized_count(self) -> int:
+        """Number of cards currently built; every other cue is a placeholder."""
+        return len(self._live)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -681,6 +750,7 @@ class SubtitleDiffViewer(QWidget):
 
         self.scroll_area.setWidget(self.cards_container)
         layout.addWidget(self.scroll_area)
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._on_scroll)
 
     def load_subtitles(
         self, original_items: List[SubtitleItem], processed_items: List[SubtitleItem]
@@ -688,77 +758,280 @@ class SubtitleDiffViewer(QWidget):
         self.original_items = original_items or []
         self.processed_items = processed_items or []
         self.active_card = None
+        self._active_position = None
+        self._prefix_max_end = []
+        self._original_by_index = {item.index: item for item in self.original_items}
 
         self.cards_container.setUpdatesEnabled(False)
         try:
-            while self.cards_layout.count() > 1:
-                child = self.cards_layout.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
-            self.cards.clear()
-
-            orig_map = {item.index: item for item in self.original_items}
+            self._clear_rows()
+            max_end_so_far = -1
             for idx, proc_item in enumerate(self.processed_items):
-                orig_item = orig_map.get(proc_item.index)
-                if orig_item is None and idx < len(self.original_items):
-                    orig_item = self.original_items[idx]
-                if orig_item is None:
-                    orig_item = proc_item
-
-                card = SubtitleCard(orig_item, proc_item)
-                card.jump_clicked.connect(self.cue_selected.emit)
-                card.text_changed.connect(self._on_card_edited)
-                self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
-                self.cards.append(card)
+                placeholder = QWidget()
+                placeholder.setFixedHeight(_placeholder_height(proc_item.text))
+                self.cards_layout.insertWidget(idx, placeholder)
+                hidden = bool(self._current_filter) and not self._matches(
+                    idx, self._current_filter
+                )
+                placeholder.setVisible(not hidden)
+                self._rows.append(placeholder)
+                self._heights.append(placeholder.height())
+                self._hidden.append(hidden)
+                self._prefix_max_end.append(max_end_so_far)
+                max_end_so_far = max(max_end_so_far, proc_item.end_ms)
+            self._recompute_offsets()
         finally:
             self.cards_container.setUpdatesEnabled(True)
 
-        if self._current_filter:
-            self.filter_subtitles(self._current_filter)
-        else:
-            self.count_changed.emit(len(self.cards), len(self.cards))
+        # A new document starts at its first cue, not at the previous offset.
+        self.scroll_area.verticalScrollBar().setValue(0)
+        self._materialize_visible()
+        visible = len(self._rows) - sum(self._hidden)
+        self.count_changed.emit(visible, len(self._rows))
+
+    def _clear_rows(self) -> None:
+        self._live.clear()
+        self.active_card = None
+        while self.cards_layout.count() > 1:
+            child = self.cards_layout.takeAt(0)
+            widget = child.widget()
+            if widget is not None:
+                # Reparent before deleting: the layout keeps no ownership and
+                # deleteLater() alone would leave the widget visible on some
+                # platforms until the event loop runs.
+                widget.setParent(None)
+                widget.deleteLater()
+        self._rows = []
+        self._heights = []
+        self._hidden = []
+        self._offsets = [0]
+
+    def _original_for(self, position: int) -> SubtitleItem:
+        processed = self.processed_items[position]
+        original = self._original_by_index.get(processed.index)
+        if original is None and position < len(self.original_items):
+            original = self.original_items[position]
+        return original if original is not None else processed
+
+    def _matches(self, position: int, query: str) -> bool:
+        needle = query.lower()
+        edited = self.processed_items[position].text.lower()
+        if needle in edited:
+            return True
+        return needle in self._original_for(position).text.lower()
+
+    def card_at(self, position: int) -> SubtitleCard:
+        """Return the card for ``position``, materializing it on demand."""
+        if position < 0 or position >= len(self._rows):
+            raise IndexError("card position out of range")
+        live = self._live.get(position)
+        if live is not None:
+            return live
+
+        card = SubtitleCard(
+            self._original_for(position), self.processed_items[position]
+        )
+        card.jump_clicked.connect(self.cue_selected.emit)
+        card.text_changed.connect(self._on_card_edited)
+        self._swap_row(position, card)
+        self._live[position] = card
+        card.setVisible(not self._hidden[position])
+        if self._active_position == position:
+            self.active_card = card
+            card.set_active(True)
+
+        height = max(1, card.sizeHint().height())
+        if abs(height - self._heights[position]) > 2:
+            self._heights[position] = height
+            self._offsets_dirty = True
+        return card
+
+    def _swap_row(self, position: int, widget: QWidget) -> None:
+        old = self._rows[position]
+        if self.active_card is old:
+            self.active_card = None
+        self.cards_layout.removeWidget(old)
+        old.setParent(None)
+        old.deleteLater()
+        self.cards_layout.insertWidget(position, widget)
+        self._rows[position] = widget
+
+    def _recompute_offsets(self) -> None:
+        offsets = [0] * (len(self._rows) + 1)
+        cursor = self.cards_layout.contentsMargins().top()
+        spacing = self.cards_layout.spacing()
+        for position, height in enumerate(self._heights):
+            offsets[position] = cursor
+            if not self._hidden[position]:
+                cursor += height + spacing
+        offsets[len(self._rows)] = cursor
+        self._offsets = offsets
+        self._offsets_dirty = False
+
+    def _on_scroll(self, _value: int) -> None:
+        self._materialize_visible()
+
+    def _materialize_visible(self) -> None:
+        """Build the cards inside the viewport window and release the rest."""
+        if self._materializing or not self._rows:
+            return
+        self._materializing = True
+        try:
+            viewport_height = self.scroll_area.viewport().height()
+            if viewport_height <= 0:
+                # Offscreen/not laid out yet: a plausible window beats none.
+                viewport_height = 600
+            scroll_top = self.scroll_area.verticalScrollBar().value()
+            window_top = max(0, scroll_top - _SCROLL_MARGIN_PX)
+            window_bottom = scroll_top + viewport_height + _SCROLL_MARGIN_PX
+            start = max(0, bisect_right(self._offsets, window_top) - 1)
+            end = min(len(self._rows), bisect_left(self._offsets, window_bottom))
+
+            self._release_outside(start, end)
+            for position in range(start, end):
+                if self._hidden[position] or position in self._live:
+                    continue
+                self.card_at(position)
+        finally:
+            self._materializing = False
+        if self._offsets_dirty:
+            self._recompute_offsets()
+
+    def _release_outside(self, start: int, end: int) -> None:
+        for position, card in list(self._live.items()):
+            if start - 1 <= position <= end:
+                continue
+            if card.hasFocus():
+                # Never destroy the widget the user is typing in.
+                continue
+            self._live.pop(position, None)
+            if self.active_card is card:
+                self.active_card = None
+            self._heights[position] = max(1, card.height() or self._heights[position])
+            placeholder = QWidget()
+            placeholder.setFixedHeight(self._heights[position])
+            placeholder.setVisible(not self._hidden[position])
+            self._swap_row(position, placeholder)
+            self._offsets_dirty = True
+
+    def _row_position(self, card: SubtitleCard) -> Optional[int]:
+        for position, live in self._live.items():
+            if live is card:
+                return position
+        return None
 
     def _on_card_edited(self):
+        card = self.sender()
+        if isinstance(card, SubtitleCard):
+            position = self._row_position(card)
+            if position is not None:
+                # Height changes with the line count; keep the scroll length
+                # and the virtual window in sync with the edited card.
+                self._heights[position] = max(40, card.sizeHint().height())
+                self._recompute_offsets()
         self.subtitles_edited.emit(self.processed_items)
 
     def get_processed_subtitles(self) -> List[SubtitleItem]:
         return self.processed_items
 
     def retranslate(self):
-        for card in self.cards:
+        for card in list(self._live.values()):
             card.retranslate()
 
-    def highlight_cue_at_ms(self, pos_ms: int, auto_scroll: bool = True):
-        matching_card = None
-        for card in self.cards:
-            if card.edited_item.start_ms <= pos_ms <= card.edited_item.end_ms:
-                matching_card = card
-                break
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._materialize_visible()
 
-        if matching_card != self.active_card:
-            if self.active_card:
-                self.active_card.set_active(False)
-            self.active_card = matching_card
-            if self.active_card:
-                self.active_card.set_active(True)
-                if auto_scroll and self.active_card.isVisible():
-                    self.scroll_area.ensureWidgetVisible(self.active_card, 0, 70)
+    def highlight_cue_at_ms(self, pos_ms: int, auto_scroll: bool = True):
+        """Highlight the cue under ``pos_ms``; first match in cue order wins.
+
+        Playback calls this on every position tick, so it starts from the cue
+        that is already active (A4): the common case is one comparison instead
+        of a scan over every cue. When the position leaves that cue the full
+        scan still decides, preserving the original first-match semantics.
+        Only the active cue's card is materialized, so this stays O(1) in
+        widget work even for files with thousands of cues (B5).
+        """
+        items = self.processed_items
+        matching_position: Optional[int] = None
+        cached_position = self._active_position
+        if cached_position is not None and 0 <= cached_position < len(items):
+            # The cached cue is only the first match when no earlier cue can
+            # still be on screen at ``pos_ms``; overlapping cues fall through
+            # to the full scan so "first in cue order" stays exact.
+            earlier_end = self._prefix_max_end[cached_position]
+            cached = items[cached_position]
+            if earlier_end < pos_ms and cached.start_ms <= pos_ms <= cached.end_ms:
+                matching_position = cached_position
+        if matching_position is None:
+            for position, item in enumerate(items):
+                if item.start_ms <= pos_ms <= item.end_ms:
+                    matching_position = position
+                    break
+
+        if matching_position == self._active_position:
+            if matching_position is not None:
+                self._refresh_active_card(matching_position)
+                if auto_scroll:
+                    self._ensure_visible(matching_position)
+            return
+
+        if self.active_card is not None:
+            self.active_card.set_active(False)
+        self._active_position = matching_position
+        self.active_card = None
+        if matching_position is None:
+            return
+        card = self.card_at(matching_position)
+        self.active_card = card
+        card.set_active(True)
+        if auto_scroll:
+            self._ensure_visible(matching_position)
+
+    def _refresh_active_card(self, position: int) -> None:
+        card = self.card_at(position)
+        self.active_card = card
+        card.set_active(True)
+
+    def _ensure_visible(self, position: int) -> None:
+        card = self.card_at(position)
+        self.cards_layout.activate()
+        self.scroll_area.ensureWidgetVisible(card, 0, 70)
+        self._materialize_visible()
+
+    def count_matches(self, query: str) -> tuple[int, int]:
+        """Count cues matching ``query`` without touching their visibility.
+
+        Searching must feel immediate even with thousands of cues, while the
+        visibility pass is the expensive part (one layout invalidation per
+        row). This lets the caller update the counter at keystroke time and
+        defer the relayout.
+        """
+        query = (query or "").strip()
+        total = len(self._rows)
+        if not query:
+            return total, total
+        return sum(
+            1 for position in range(total) if self._matches(position, query)
+        ), total
 
     def filter_subtitles(self, query: str) -> tuple[int, int]:
-        self._current_filter = query.strip()
-        visible_count = 0
-        total_count = len(self.cards)
+        self._current_filter = (query or "").strip()
+        applying = bool(self._current_filter)
+        total_count = len(self._rows)
 
         self.cards_container.setUpdatesEnabled(False)
         try:
-            for card in self.cards:
-                matches = card.matches_query(self._current_filter)
-                card.setVisible(matches)
-                if matches:
-                    visible_count += 1
+            for position in range(total_count):
+                hidden = applying and not self._matches(position, self._current_filter)
+                self._hidden[position] = hidden
+                self._rows[position].setVisible(not hidden)
+            self._recompute_offsets()
         finally:
             self.cards_container.setUpdatesEnabled(True)
 
+        self._materialize_visible()
+        visible_count = total_count - sum(self._hidden)
         self.count_changed.emit(visible_count, total_count)
         return visible_count, total_count
 

@@ -5,7 +5,7 @@ import threading
 import time
 from typing import Optional, List
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QSize
+from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal, QUrl, QSize
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QApplication,
@@ -51,6 +51,7 @@ from ..services.subtitle_service import (
     SubtitleCancelledError,
     SubtitleService,
     ProcessingResult,
+    read_subtitle_file,
 )
 from ..services.translation_service import TranslationService
 from ..services.transcription_providers import (
@@ -125,10 +126,12 @@ class ProcessWorker(QThread):
         service: SubtitleService,
         file_path: str,
         do_clean: bool,
-        do_translate: bool,
-        target_lang: str,
-        source_lang: str,
-        engine: str,
+        do_translate: bool = False,
+        # Cleaning-only jobs leave translation untouched; these defaults keep
+        # that call site from passing arguments the service would never use.
+        target_lang: str = "es",
+        source_lang: str = "auto",
+        engine: str = "google",
         target_format: Optional[str] = None,
         parallel: bool = True,
     ):
@@ -229,6 +232,88 @@ class TranscribeWorker(QThread):
             self.failed.emit(t("worker.error_transcribe"))
 
 
+class BatchWorker(QThread):
+    """Process a batch of subtitle files off the UI thread.
+
+    Deep-audit-style finding (A-4): the batch used to run in the GUI thread with
+    ``QApplication.processEvents()`` inside the loop. That froze the window for
+    the whole batch and let the user re-enter the same stateful
+    ``SubtitleService`` through the event pump. The worker reuses the exact same
+    service call and the same cooperative ``cancel_event`` contract as
+    ``ProcessWorker``.
+    """
+
+    row_started = pyqtSignal(int)
+    #: (row, ProcessingResult | None, error label | None)
+    row_finished = pyqtSignal(int, object, object)
+    completed = pyqtSignal(bool)  # cancelled
+
+    def __init__(
+        self,
+        service: SubtitleService,
+        files: List[str],
+        *,
+        do_clean: bool,
+        do_translate: bool,
+        target_lang: str,
+        source_lang: str,
+        engine: str,
+        parallel: bool,
+        cancel_event: Optional[threading.Event] = None,
+    ):
+        super().__init__()
+        self.service = service
+        self.files = list(files)
+        self.do_clean = do_clean
+        self.do_translate = do_translate
+        self.target_lang = target_lang
+        self.source_lang = source_lang
+        self.engine = engine
+        self.parallel = parallel
+        self.cancel_event = cancel_event or threading.Event()
+
+    def cancel(self):
+        self.cancel_event.set()
+
+    def run(self):
+        for row, file_path in enumerate(self.files):
+            if self.cancel_event.is_set():
+                self.completed.emit(True)
+                return
+            self.row_started.emit(row)
+            if not file_path or not os.path.isfile(file_path):
+                self.row_finished.emit(row, None, "file not found")
+                continue
+            try:
+                result = self.service.process_subtitles(
+                    file_path=file_path,
+                    do_clean=self.do_clean,
+                    do_translate=self.do_translate,
+                    target_language=self.target_lang,
+                    source_language=self.source_lang,
+                    engine=self.engine,
+                    parallel=self.parallel,
+                    cancel_event=self.cancel_event,
+                )
+                base, ext = os.path.splitext(file_path)
+                self.service.write_output_file(
+                    f"{base}_processed{ext}", result.output_content
+                )
+                self.row_finished.emit(row, result, None)
+            except SubtitleCancelledError:
+                self.row_finished.emit(row, None, "cancelled")
+                self.completed.emit(True)
+                return
+            except Exception as exc:
+                logger.exception(
+                    "Failed to process batch file %s (%s)",
+                    file_path,
+                    type(exc).__name__,
+                )
+                self.row_finished.emit(row, None, type(exc).__name__)
+        self.completed.emit(False)
+
+
 class PipelineWorker(QThread):
     """Full media pipeline off the UI thread; cooperative cancellation."""
 
@@ -293,6 +378,8 @@ class MainWindow(QMainWindow):
         self._batch_running = False
         self._batch_cancelled = False
         self._batch_cancel_event = threading.Event()
+        self._batch_files: List[str] = []
+        self.batch_worker: Optional[QThread] = None
         self.burn_worker: Optional[QThread] = None
         self.burn_modal = None
 
@@ -303,8 +390,8 @@ class MainWindow(QMainWindow):
         self.retranslate_ui()
 
         logger.info(
-            "Interfaz inicializada (tema=%s, idioma=%s)",
-            "oscuro" if self.dark_mode else "claro",
+            "Interface initialized (theme=%s, language=%s)",
+            "dark" if self.dark_mode else "light",
             self.i18n.current_language,
         )
         if self.config_service.load_error:
@@ -455,7 +542,13 @@ class MainWindow(QMainWindow):
     def _active_workers(self) -> List[QThread]:
         """Every background thread this window currently owns."""
         found: List[QThread] = []
-        for name in ("worker", "transcribe_worker", "pipeline_worker", "burn_worker"):
+        for name in (
+            "worker",
+            "transcribe_worker",
+            "pipeline_worker",
+            "batch_worker",
+            "burn_worker",
+        ):
             candidate = getattr(self, name, None)
             if _is_running_thread(candidate) and candidate not in found:
                 found.append(candidate)
@@ -883,6 +976,14 @@ class MainWindow(QMainWindow):
             }}
         """)
         self.preview_search_input.textChanged.connect(self._on_preview_search_changed)
+        # Typing must not run one visibility pass over every cue per keystroke:
+        # the counter updates immediately (cheap) and the relayout is debounced
+        # (A3).
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(150)
+        self._search_timer.timeout.connect(self._apply_preview_filter)
+        self._pending_search = ""
         tb_layout.addWidget(self.preview_search_input, stretch=2)
 
         # Counter badge
@@ -2228,14 +2329,13 @@ class MainWindow(QMainWindow):
             )
             return
 
+        # Cleaning never translates, so the translation defaults of
+        # ``ProcessWorker`` apply and no inert language/engine arguments are
+        # passed here.
         self.worker = ProcessWorker(
             service=self.subtitle_service,
             file_path=self.current_subtitle_path,
             do_clean=True,
-            do_translate=False,
-            target_lang="es",
-            source_lang="auto",
-            engine="google",
         )
         self.worker.completed.connect(self._on_processing_completed)
         self.worker.failed.connect(self._on_processing_failed)
@@ -2262,10 +2362,7 @@ class MainWindow(QMainWindow):
         out_path = f"{base}_processed.{tgt_fmt}"
 
         try:
-            with open(
-                self.current_subtitle_path, "r", encoding="utf-8", errors="replace"
-            ) as f:
-                content = f.read()
+            content = read_subtitle_file(self.current_subtitle_path)
             src_fmt = self.subtitle_service.detect_format(
                 content, self.current_subtitle_path
             )
@@ -2294,7 +2391,14 @@ class MainWindow(QMainWindow):
         self.video_player.set_subtitles(edited_items)
 
     def _on_preview_search_changed(self, text: str):
-        self.diff_viewer.filter_subtitles(text)
+        """Publish the match counter now and defer the visibility pass."""
+        self._pending_search = text
+        self._on_preview_count_changed(*self.diff_viewer.count_matches(text))
+        self._search_timer.start()
+
+    def _apply_preview_filter(self):
+        """Apply the pending search once the user stops typing."""
+        self.diff_viewer.filter_subtitles(self._pending_search)
 
     def _on_preview_count_changed(self, visible: int, total: int):
         if total == 0:
@@ -2400,8 +2504,7 @@ class MainWindow(QMainWindow):
             self.current_subtitle_path = path
             fmt = self.subtitle_service.detect_format("", path)
             try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
+                content = read_subtitle_file(path)
                 items = self.subtitle_service.parse_subtitles(content, fmt)
                 edited_items = copy.deepcopy(items)
                 self.diff_viewer.load_subtitles(items, edited_items)
@@ -2450,6 +2553,12 @@ class MainWindow(QMainWindow):
             self._batch_cancel_event.set()
 
     def _run_batch_processing(self):
+        """Start batch processing on a worker thread (A-4).
+
+        The worker owns the loop; the UI thread only reacts to its signals, so
+        the window stays responsive and the shared service cannot be re-entered
+        through an event pump while a file is being processed.
+        """
         if getattr(self, "_batch_running", False):
             return
 
@@ -2466,99 +2575,66 @@ class MainWindow(QMainWindow):
             )
             return
 
-        target_lang = self.cb_target_lang.currentData()
-        source_lang = self.cb_source_lang.currentData()
-        engine = self.cb_engine.currentData()
-        do_translate = self.toggle_translate.isChecked()
-        do_clean = self.toggle_clean.isChecked()
-        parallel = self.toggle_parallel.isChecked()
+        files = []
+        for row in range(rows):
+            item = self.batch_table.item(row, 0)
+            files.append(item.text().strip() if item else "")
 
         self._batch_running = True
-        if hasattr(self, "_batch_cancel_event"):
-            self._batch_cancel_event.clear()
-        was_cancelled = False
-        try:
-            for row in range(rows):
-                if self._batch_cancelled or (
-                    hasattr(self, "_batch_cancel_event")
-                    and self._batch_cancel_event.is_set()
-                ):
-                    was_cancelled = True
-                    break
-                item = self.batch_table.item(row, 0)
-                if not item:
-                    continue
-                file_path = item.text().strip()
-                if not file_path or not os.path.isfile(file_path):
-                    self.batch_table.setItem(
-                        row,
-                        3,
-                        QTableWidgetItem(t("batch.status_error", err="file not found")),
-                    )
-                    continue
+        self._batch_files = files
+        self._batch_cancel_event.clear()
+        worker = BatchWorker(
+            self.subtitle_service,
+            files,
+            do_clean=self.toggle_clean.isChecked(),
+            do_translate=self.toggle_translate.isChecked(),
+            target_lang=self.cb_target_lang.currentData(),
+            source_lang=self.cb_source_lang.currentData(),
+            engine=self.cb_engine.currentData(),
+            parallel=self.toggle_parallel.isChecked(),
+            cancel_event=self._batch_cancel_event,
+        )
+        worker.row_started.connect(self._on_batch_row_started)
+        worker.row_finished.connect(self._on_batch_row_finished)
+        worker.completed.connect(self._on_batch_completed)
+        self.batch_worker = worker
+        worker.start()
 
-                self.batch_table.setItem(
-                    row, 3, QTableWidgetItem(t("batch.status_processing"))
-                )
-                QApplication.processEvents()
-                try:
-                    result = self.subtitle_service.process_subtitles(
-                        file_path=file_path,
-                        do_clean=do_clean,
-                        do_translate=do_translate,
-                        target_language=target_lang,
-                        source_language=source_lang,
-                        engine=engine,
-                        parallel=parallel,
-                        cancel_event=getattr(self, "_batch_cancel_event", None),
-                    )
-                    base, ext = os.path.splitext(file_path)
-                    out_path = f"{base}_processed{ext}"
-                    self.subtitle_service.write_output_file(
-                        out_path, result.output_content
-                    )
-                    self.batch_table.setItem(
-                        row, 3, QTableWidgetItem(t("batch.status_completed"))
-                    )
-                    from application.services.history_store import record_result_safely
+    def _on_batch_row_started(self, row: int) -> None:
+        if 0 <= row < self.batch_table.rowCount():
+            self.batch_table.setItem(
+                row, 3, QTableWidgetItem(t("batch.status_processing"))
+            )
 
-                    record_result_safely(
-                        result,
-                        operation="process",
-                        file_path=file_path,
-                        source_language=source_lang,
-                        target_language=target_lang,
-                        engine=engine,
-                    )
-                except SubtitleCancelledError:
-                    was_cancelled = True
-                    self.batch_table.setItem(
-                        row,
-                        3,
-                        QTableWidgetItem(t("batch.status_error", err="cancelled")),
-                    )
-                    break
-                except Exception as exc:
-                    logger.exception(
-                        "Failed to process batch file %s (%s)",
-                        file_path,
-                        type(exc).__name__,
-                    )
-                    self.batch_table.setItem(
-                        row,
-                        3,
-                        QTableWidgetItem(
-                            t("batch.status_error", err=type(exc).__name__)
-                        ),
-                    )
-                QApplication.processEvents()
-        finally:
-            self._batch_running = False
-            self._batch_cancelled = False
-            if hasattr(self, "_batch_cancel_event"):
-                self._batch_cancel_event.clear()
+    def _on_batch_row_finished(self, row: int, result, error) -> None:
+        if not 0 <= row < self.batch_table.rowCount():
+            return
+        if result is None:
+            self.batch_table.setItem(
+                row,
+                3,
+                QTableWidgetItem(t("batch.status_error", err=error or "error")),
+            )
+            return
+        self.batch_table.setItem(row, 3, QTableWidgetItem(t("batch.status_completed")))
+        if row < len(self._batch_files):
+            from application.services.history_store import record_result_safely
 
-        if not was_cancelled:
+            record_result_safely(
+                result,
+                operation="process",
+                file_path=self._batch_files[row],
+                source_language=self.cb_source_lang.currentData(),
+                target_language=self.cb_target_lang.currentData(),
+                engine=self.cb_engine.currentData(),
+            )
+
+    def _on_batch_completed(self, cancelled: bool) -> None:
+        self._batch_running = False
+        self._batch_cancelled = False
+        self._batch_cancel_event.clear()
+        self.batch_worker = None
+        if not cancelled:
             ThemedMessageBox.information(
                 self, t("alert.batch_done_title"), t("alert.batch_done_desc")
             )

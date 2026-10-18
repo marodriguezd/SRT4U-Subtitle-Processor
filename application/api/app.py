@@ -5,6 +5,8 @@ GUI, CLI and API share the same ``SubtitleService`` / ``TranslationService`` /
 imports FastAPI.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -33,7 +35,17 @@ API_PREFIX = "/api/v1"
 
 def create_app(job_manager: JobManager | None = None) -> FastAPI:
     """Application factory (a fresh JobManager per app unless given)."""
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        """Always release the job pool: it owns real worker threads."""
+        try:
+            yield
+        finally:
+            application.state.jobs.shutdown()
+
     app = FastAPI(
+        lifespan=lifespan,
         title="SRT4U Subtitle Processor",
         description=(
             "Local REST API over the existing SRT4U core: analysis, QA, "

@@ -427,7 +427,7 @@ def _load_pipeline(config_path: Optional[str]) -> Dict[str, Any]:
     normalized = dict(pipeline)
     if "convert_to" in normalized:
         if "target_format" in normalized:
-            raise ValueError("usa 'convert_to' o 'target_format', no ambos")
+            raise ValueError("use either 'convert_to' or 'target_format', not both")
         normalized["target_format"] = normalized.pop("convert_to")
     for key in ("clean", "translate", "parallel"):
         if key in normalized and not isinstance(normalized[key], bool):
@@ -464,13 +464,12 @@ def _resolve_options(
         parser.error("--target is required when --translate is enabled")
     if options.get("target_format") not in (None, "srt", "vtt", "ass", "ssa", "txt"):
         parser.error("the preset contains an unsupported output format")
-    if not isinstance(options["engine"], str) or options["engine"] not in {
-        "google",
-        "deepl",
-        "openai",
-        "ollama",
-        "llm",
-    }:
+    # The registry is the single source of truth (same list the ``--engine``
+    # choice uses), so a preset can never accept a provider the CLI rejects.
+    if (
+        not isinstance(options["engine"], str)
+        or options["engine"].strip().casefold() not in TRANSLATION_PROVIDERS
+    ):
         parser.error("the preset contains an unsupported translation engine")
     if not isinstance(options["parallel"], bool):
         parser.error("'parallel' must be true or false")
@@ -737,9 +736,9 @@ def _human_report(command: str, payload: Dict[str, Any], strict: bool = False) -
     if command == "qa":
         passed = payload["strict_passed"] if strict else payload["passed"]
         lines = [
-            f"QA: {'correcto' if passed else 'problemas encontrados'}; "
-            f"{payload['error_count']} errores, {payload['warning_count']} avisos, "
-            f"{payload['info_count']} informativos."
+            f"QA: {'passed' if passed else 'problems found'}; "
+            f"{payload['error_count']} errors, {payload['warning_count']} warnings, "
+            f"{payload['info_count']} informational."
         ]
         lines.extend(
             f"{finding['severity'].upper()} [{finding['rule']}] "
@@ -756,14 +755,14 @@ def _human_report(command: str, payload: Dict[str, Any], strict: bool = False) -
     return (
         f"Subtitles: {content['subtitle_count']} | duration: "
         f"{timing['total_duration_ms'] / 1000:.3f}s\n"
-        f"Palabras: {content['total_words']} | caracteres: "
+        f"Words: {content['total_words']} | characters: "
         f"{content['total_characters']} | lines: {content['line_count']}\n"
         f"CPS avg/max/min: {timing['average_cps']:.3f}/"
-        f"{timing['max_cps']:.3f}/{timing['min_cps']:.3f} | solapamientos: "
+        f"{timing['max_cps']:.3f}/{timing['min_cps']:.3f} | overlaps: "
         f"{timing['overlapping_subtitles']}\n"
-        f"QA: {quality['errors']} errores, {quality['warnings']} avisos | "
+        f"QA: {quality['errors']} errors, {quality['warnings']} warnings | "
         f"cleaning: {processing['lines_removed']} lines removed | "
-        f"tiempo: {processing['processing_time_seconds']:.3f}s\n"
+        f"time: {processing['processing_time_seconds']:.3f}s\n"
     )
 
 
@@ -781,13 +780,9 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
     except FileNotFoundError:
         print("ERROR: subtitle file not found", file=sys.stderr)
         return 2
-    except (OSError, UnicodeError, ValueError) as exc:
-        print(
-            f"ERROR: could not parse the file ({type(exc).__name__})",
-            file=sys.stderr,
-        )
-        return 2
     except Exception as exc:
+        # One handler for every failure: the message never carries paths,
+        # tracebacks or file contents, only the exception class.
         print(
             f"ERROR: could not parse the file ({type(exc).__name__})",
             file=sys.stderr,
@@ -837,7 +832,7 @@ def _run_analysis(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
             )
             return 2
         if not args.json:
-            print(f"Informe guardado: {output_path}")
+            print(f"Report saved: {output_path}")
     else:
         sys.stdout.write(rendered)
     qa_section = payload if args.command == "qa" else payload.get("qa", {})
@@ -907,7 +902,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
                 file=sys.stderr,
             )
             return 2
-        print(f"Informe guardado: {output_path}")
+        print(f"Report saved: {output_path}")
     else:
         sys.stdout.write(rendered)
     if args.output_csv:
@@ -921,12 +916,12 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
                 file=sys.stderr,
             )
             return 2
-        print(f"CSV guardado: {csv_path}")
+        print(f"CSV saved: {csv_path}")
     failed = sum(1 for run in report.runs if not run.success)
     print(
-        f"Benchmark: {len(report.runs)} ejecuciones "
+        f"Benchmark: {len(report.runs)} runs "
         f"({len(providers)} providers × {args.runs} runs, "
-        f"{report.dataset_size} cues); {failed} fallidas.",
+        f"{report.dataset_size} cues); {failed} failed.",
         file=sys.stderr,
     )
     if args.store:
@@ -936,7 +931,7 @@ def _run_benchmark(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
             with HistoryStore(getattr(args, "db", None)) as store:
                 store.record_benchmark_report(report)
             print(
-                f"Benchmark {report.benchmark_id} guardado en historial.",
+                f"Benchmark {report.benchmark_id} saved to history.",
                 file=sys.stderr,
             )
         except HistoryError as exc:
@@ -1198,7 +1193,7 @@ def _run_pipeline(args: argparse.Namespace, parser: argparse.ArgumentParser) -> 
             if result.output_video:
                 print(f"Video: {result.output_video}")
         elif result.cancelled:
-            print("Cancelada.", file=sys.stderr)
+            print("Cancelled.", file=sys.stderr)
         else:
             for error in result.errors:
                 print(
@@ -1260,7 +1255,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _run_pipeline(args, parser)
     if args.command == "serve":
         return _run_serve(args, parser)
-    parser.error("comando no reconocido")
+    parser.error("unrecognized command")
     return 2
 
 

@@ -841,10 +841,16 @@ def test_p1_api_process_result_exposes_parse_issues(client, mock_provider):
 
 
 def test_p1_process_stats_model_includes_parse_issues():
-    from application.api.schemas import ProcessingMetricsModel
+    """The parser's real count lives in the /process stats model.
 
-    model = ProcessingMetricsModel(processing_time_seconds=0.1)
-    assert model.parse_issues == 0
+    Analytics cannot count parse issues, so its block reports ``None`` instead
+    of a fabricated zero (B3); ``/process`` has its own model that carries the
+    value the parser actually produced.
+    """
+    from application.api.schemas import ProcessStatsModel, ProcessingMetricsModel
+
+    assert ProcessingMetricsModel(processing_time_seconds=0.1).parse_issues is None
+    assert ProcessStatsModel(parse_issues=2).parse_issues == 2
 
 
 def test_p1_gui_completion_handler_warns_about_parse_issues(
@@ -875,7 +881,7 @@ def test_p1_gui_completion_handler_warns_about_parse_issues(
         monkeypatch.setattr("application.ui.main_window.ThemedMessageBox", FakeBox)
         issue = ParseIssue(
             kind="invalid_timestamp",
-            reason="minutos/segundos fuera de rango (00-59): 00:75:00",
+            reason="minutes/seconds out of range (00-59): 00:75:00",
             line=6,
             snippet="00:75:00,000 --> 00:75:01,000",
         )

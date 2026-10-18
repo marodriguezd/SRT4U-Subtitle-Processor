@@ -197,7 +197,7 @@ if __name__ == "__main__":
     # Before creating QApplication, to capture early startup messages as well
     install_qt_message_handler()
     install_excepthook(log_path)
-    logger.info("Iniciando SRT4U (log en %s)", log_path)
+    logger.info("Starting SRT4U (log at %s)", log_path)
 
     # To show icon in taskbar on Windows
     if sys.platform == "win32":

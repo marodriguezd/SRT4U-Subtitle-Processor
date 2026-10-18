@@ -180,16 +180,6 @@ class SubtitleAnalyticsService:
         return SubtitleAnalytics(content, timing, quality, processing)
 
     @staticmethod
-    def _count_unique_indices(report: QAReport, rule: str) -> int:
-        return len(
-            {
-                finding.subtitle_index
-                for finding in report.findings
-                if finding.rule == rule
-            }
-        )
-
-    @staticmethod
     def _duplicate_count(normalized_texts: list[str]) -> int:
         seen = set()
         duplicate_count = 0

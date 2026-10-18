@@ -16,31 +16,10 @@ router = APIRouter(tags=["benchmarks"])
 
 
 def _summaries() -> List[BenchmarkSummaryModel]:
+    """Aggregated benchmark list; grouping happens in SQLite, not in Python."""
     with open_history() as store:
-        rows = store.recent_runs(limit=100000, operation="benchmark")
-    grouped = {}
-    for row in rows:
-        benchmark_id = row.get("benchmark_id") or "unknown"
-        entry = grouped.setdefault(
-            benchmark_id, {"runs": 0, "providers": set(), "first_seen": None}
-        )
-        entry["runs"] += 1
-        if row.get("requested_provider"):
-            entry["providers"].add(str(row["requested_provider"]))
-        timestamp = row.get("timestamp")
-        if timestamp and (
-            entry["first_seen"] is None or timestamp < entry["first_seen"]
-        ):
-            entry["first_seen"] = timestamp
-    return [
-        BenchmarkSummaryModel(
-            benchmark_id=benchmark_id,
-            runs=entry["runs"],
-            providers=sorted(entry["providers"]),
-            first_seen=entry["first_seen"],
-        )
-        for benchmark_id, entry in sorted(grouped.items())
-    ]
+        rows = store.benchmark_summaries()
+    return [BenchmarkSummaryModel(**row) for row in rows]
 
 
 @router.get(
@@ -69,11 +48,11 @@ def list_benchmarks() -> BenchmarkListResponse:
 def get_benchmark(benchmark_id: str) -> BenchmarkDetailResponse:
     try:
         with open_history() as store:
-            rows = [
-                row
-                for row in store.recent_runs(limit=100000, operation="benchmark")
-                if (row.get("benchmark_id") or "unknown") == benchmark_id
-            ]
+            rows = store.recent_runs(
+                limit=100000,
+                operation="benchmark",
+                benchmark_id=benchmark_id,
+            )
     except HistoryError as exc:
         raise HTTPException(
             status_code=500, detail="history store unavailable"

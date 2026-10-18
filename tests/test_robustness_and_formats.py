@@ -11,6 +11,8 @@ Tests cover:
 
 import os
 import threading
+import time
+
 import pytest
 
 from application.services.subtitle_service import (
@@ -229,6 +231,7 @@ def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
     win.toggle_clean.setChecked(True)
 
     win._run_batch_processing()
+    _wait_for_batch(win, qapp)
 
     from application.services.i18n_service import t
 
@@ -245,6 +248,21 @@ def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
 
     # Row 2 (empty file) must complete safely (0 cues processed)
     assert win.batch_table.item(2, 3).text() == t("batch.status_completed")
+
+
+def _wait_for_batch(window, qapp, timeout=15.0):
+    """Batch work runs on a QThread (A-4): await it deterministically."""
+    worker = getattr(window, "batch_worker", None)
+    assert worker is not None, "batch worker was not started"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        qapp.processEvents()
+        if not window._batch_running:
+            break
+        time.sleep(0.01)
+    assert not window._batch_running, "batch timed out"
+    assert worker.wait(int(timeout * 1000))
+    qapp.processEvents()
 
 
 def test_batch_processing_cooperative_cancellation(qapp, tmp_path):
@@ -378,6 +396,7 @@ def test_batch_processing_resets_cancellation_for_subsequent_runs(qapp, tmp_path
     win.toggle_translate.setChecked(False)
     win.toggle_clean.setChecked(True)
     win._run_batch_processing()
+    _wait_for_batch(win, qapp)
 
     from application.services.i18n_service import t
 
@@ -749,6 +768,7 @@ def test_batch_processing_immediate_cancellation_mid_process(
     monkeypatch.setattr(win.subtitle_service, "process_subtitles", mock_process)
 
     win._run_batch_processing()
+    _wait_for_batch(win, qapp)
 
     from application.services.i18n_service import t
 

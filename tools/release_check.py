@@ -32,7 +32,7 @@ def project_version(pyproject_path: Path) -> str:
         match = re.search(r'^version\s*=\s*"([^"]+)"\s*$', source, re.M)
         if not match:
             raise SystemExit(
-                "pyproject.toml: no [project].version encontrado"
+                "pyproject.toml: no [project].version entry found"
             ) from None
         return match.group(1)
     with pyproject_path.open("rb") as fh:
@@ -50,21 +50,21 @@ def check_tag(tag: str, pyproject_path: Path) -> str | None:
     if tag != expected:
         return (
             f"the tag {tag!r} does not match the project version "
-            f"({expected} en pyproject.toml)"
+            f"({expected} in pyproject.toml)"
         )
     return None
 
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
-        print("uso: release_check.py vX.Y.Z", file=sys.stderr)
+        print("usage: release_check.py vX.Y.Z", file=sys.stderr)
         return 1
     root = Path(__file__).resolve().parent.parent
     reason = check_tag(argv[1], root / "pyproject.toml")
     if reason is not None:
-        print(f"release cancelada: {reason}", file=sys.stderr)
+        print(f"release refused: {reason}", file=sys.stderr)
         return 1
-    print(f"tag {argv[1]} verificado contra pyproject.toml")
+    print(f"tag {argv[1]} verified against pyproject.toml")
     return 0
 
 

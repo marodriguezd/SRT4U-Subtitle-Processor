@@ -490,6 +490,45 @@ def test_pipeline_rejects_output_paths_that_overwrite_inputs(
         assert source.read() == CLEAN_SRT
 
 
+def test_validation_creates_no_output_directories(tmp_path, srt_file):
+    """B11/S-6: validating a configuration must not leave directories behind."""
+    missing = tmp_path / "not-created" / "nested"
+    config = PipelineConfig(
+        input_media=srt_file, output_subtitle=str(missing / "out.srt")
+    )
+    config.validate()
+    assert not missing.exists()
+
+    # The directory is only created when the run actually exports.
+    result = MediaPipeline().run(config)
+    assert result.success
+    assert (missing / "out.srt").is_file()
+
+
+def test_pipeline_preserves_legacy_encoded_subtitle(tmp_path):
+    """B1: the parse stage decodes like the GUI/CLI instead of replacing bytes.
+
+    A CP1252 file used to enter the pipeline as U+FFFD and be exported that
+    way, silently corrupting every accented character.
+    """
+    source = tmp_path / "legacy.srt"
+    source.write_bytes(
+        "1\n00:00:01,000 --> 00:00:02,000\nSeñor, ¿qué pasa? Acción.\n".encode("cp1252")
+    )
+    output = tmp_path / "legacy_pipeline.srt"
+    result = MediaPipeline().run(
+        PipelineConfig(
+            input_media=str(source),
+            output_subtitle=str(output),
+            clean_enabled=False,
+            qa_enabled=False,
+        )
+    )
+    assert result.success, result.errors
+    assert "Señor, ¿qué pasa? Acción." in result.output_content
+    assert "\ufffd" not in output.read_text(encoding="utf-8")
+
+
 def test_burn_in_config_errors(tmp_path, srt_file):
     with pytest.raises(PipelineConfigError):
         PipelineConfig(

@@ -2,7 +2,7 @@
 
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..jobs import JobManager
 from ..schemas import JobStatusResponse
@@ -35,7 +35,12 @@ def _public(job: dict) -> dict:
     summary="List jobs",
     description="In-memory local jobs (not persistent across restarts).",
 )
-def list_jobs(request: Request, limit: int = 50) -> List[JobStatusResponse]:
+def list_jobs(
+    request: Request,
+    limit: int = Query(
+        50, ge=1, le=500, description="Maximum number of most recent jobs"
+    ),
+) -> List[JobStatusResponse]:
     return [
         JobStatusResponse(**_public(job)) for job in _jobs_from(request).list(limit)
     ]
