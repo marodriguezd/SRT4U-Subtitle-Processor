@@ -1,20 +1,19 @@
 # Release Notes — SRT4U 1.0.0
 
-SRT4U Subtitle Processor **1.0.0** is published on GitHub as
-[tag/v1.0.0](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.0.0).
+SRT4U Subtitle Processor 1.0.0 is the initial production release of the local-first desktop, CLI, and REST API platform for subtitle translation, cleaning, format conversion, deterministic quality assurance, and video burn-in.
 
-## What's in 1.0.0
+## Key Capabilities
 
-Initial major release of SRT4U Subtitle Processor: a fast, local-first, robust tool to translate, clean, convert, analyze, and burn-in subtitle files (`.srt`, `.vtt`, `.ass`, `.ssa`, `.txt`) with optional local Whisper transcription and end-to-end media pipeline.
+- **Unified Core Architecture**: A shared domain core powers the PyQt6 desktop interface, headless CLI (`srt4u`), and OpenAPI REST service (`/api/v1`).
+- **Local-First Processing**: Cleaning, format conversion (`.srt`, `.vtt`, `.ass`, `.ssa`, `.txt`), deterministic QA analysis, and SQLite audit logging operate entirely offline.
+- **Translation Provider Registry**: Pluggable integration for Google Translate, DeepL, and OpenAI-compatible endpoints (Ollama, OpenRouter, OpenAI) with cycle-safe fallback chains.
+- **Local Transcription & Pipeline**: Optional local Whisper integration via `faster-whisper` and an end-to-end media processing pipeline.
+- **High-Performance UI Virtualization**: The subtitle preview viewer uses row virtualization and debounced search, providing instant loading and low-latency navigation across documents with thousands of cues.
+- **Encoding & Contract Integrity**: Unified encoding auto-detection across CP1252, UTF-8, and UTF-16, with synchronized API schemas and cooperative worker cancellation.
 
-### Highlights
+## Platform Binaries
 
-- **Three Front-ends, One Core**: PyQt6 desktop GUI, headless CLI (`srt4u`, 8 subcommands), and local REST API (`/api/v1`, OpenAPI).
-- **Local-first & Offline-capable**: Free translation tier, cleaning, conversion, analytics, deterministic QA, and SQLite history work 100% locally.
-- **Interchangeable Providers**: Google Translate, DeepL, OpenAI-compatible LLMs (Ollama, OpenRouter, OpenAI) with cycle-safe fallback chains and opt-in retries.
-- **Whisper Transcription & Media Pipeline**: Optional local speech-to-text via `faster-whisper` and full end-to-end media processing pipeline.
-- **Deterministic Quality Assurance & Analytics**: Strict QA gates, reading speed (CPS/CPL), timing overlap detection, and zero-data-loss subtitle format conversion.
-- **Optimized & Hardened**: Consolidated $O(N)$ analytics passes, precompiled regular expressions, vector icon caching, concurrency-safe burn-in, and 100% passing test suite (752 tests passed, ~82% coverage).
-
-The macOS DMG remains **Apple Silicon (arm64)** only and will not launch on Intel Macs;
-no x86_64 build is available.
+Automated GitHub Actions builds produce signed standalone binaries:
+- Windows: x64 standalone executable.
+- Linux: x86_64 AppImage and portable tarball.
+- macOS: Apple Silicon (arm64) DMG. Intel x86_64 Macs are not supported.
