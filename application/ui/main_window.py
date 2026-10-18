@@ -290,6 +290,11 @@ class MainWindow(QMainWindow):
         self.pipeline_cancelled = False
         self.last_result: Optional[ProcessingResult] = None
         self.saved_output_path: Optional[str] = None
+        self._batch_running = False
+        self._batch_cancelled = False
+        self._batch_cancel_event = threading.Event()
+        self.burn_worker: Optional[QThread] = None
+        self.burn_modal = None
 
         self._setup_ui()
         self._load_config_values()
@@ -450,15 +455,16 @@ class MainWindow(QMainWindow):
     def _active_workers(self) -> List[QThread]:
         """Every background thread this window currently owns."""
         found: List[QThread] = []
-        for name in ("worker", "transcribe_worker", "pipeline_worker"):
+        for name in ("worker", "transcribe_worker", "pipeline_worker", "burn_worker"):
             candidate = getattr(self, name, None)
-            if _is_running_thread(candidate):
+            if _is_running_thread(candidate) and candidate not in found:
                 found.append(candidate)
-        dialog = getattr(self, "burn_dialog", None)
-        if dialog is not None:
-            candidate = getattr(dialog, "worker", None)
-            if _is_running_thread(candidate):
-                found.append(candidate)
+        for dialog_attr in ("burn_modal", "burn_dialog"):
+            dialog = getattr(self, dialog_attr, None)
+            if dialog is not None:
+                candidate = getattr(dialog, "worker", None)
+                if _is_running_thread(candidate) and candidate not in found:
+                    found.append(candidate)
         return found
 
     def closeEvent(self, event):  # noqa: N802 - Qt naming
@@ -475,13 +481,18 @@ class MainWindow(QMainWindow):
         terminate it. Losing a queued window close is much cheaper than
         destroying a live thread.
         """
+        if getattr(self, "_batch_running", False):
+            self._batch_cancelled = True
+            if hasattr(self, "_batch_cancel_event"):
+                self._batch_cancel_event.set()
+
         workers = self._active_workers()
         if not workers:
             event.accept()
             return
 
         logger.warning(
-            "Cierre solicitado con %s worker(s) activo(s): cancelando",
+            "Close requested with %s active worker(s): cancelling",
             len(workers),
         )
         for worker in workers:
@@ -502,7 +513,7 @@ class MainWindow(QMainWindow):
         still_running = [worker for worker in workers if worker.isRunning()]
         if still_running:
             logger.error(
-                "Cierre pospuesto: %s worker(s) no terminaron a tiempo",
+                "Close postponed: %s worker(s) did not finish in time",
                 len(still_running),
             )
             event.ignore()
@@ -1348,7 +1359,7 @@ class MainWindow(QMainWindow):
         modal = getattr(self, "transcribe_modal", None)
         if modal is not None and modal.isVisible():
             modal.reject()
-        if self.transcribe_cancelled:
+        if self.transcribe_cancelled or error_msg == t("transcribe.cancelled"):
             return
         ThemedMessageBox.critical(
             self,
@@ -1664,11 +1675,11 @@ class MainWindow(QMainWindow):
             logger.warning("Could not record the pipeline (%s)", type(exc).__name__)
 
     def _on_pipeline_failed(self, error_msg: str):
-        logger.error("Pipeline fallida")
+        logger.error("Pipeline failed")
         modal = getattr(self, "pipeline_modal", None)
         if modal is not None and modal.isVisible():
             modal.reject()
-        if self.pipeline_cancelled:
+        if self.pipeline_cancelled or error_msg == t("pipeline.cancelled"):
             return
         ThemedMessageBox.critical(
             self,
@@ -2122,7 +2133,7 @@ class MainWindow(QMainWindow):
             ThemedMessageBox.critical(
                 self,
                 t("alert.save_error_title"),
-                t("alert.save_error_desc", err="error de escritura"),
+                t("alert.save_error_desc", err="write error"),
             )
             return
 
@@ -2374,8 +2385,12 @@ class MainWindow(QMainWindow):
     def _start_burn_in_process(
         self, v_path: str, o_path: str, items: list, opts: BurnInOptions
     ):
-        modal = BurnInProgressModal(v_path, o_path, items, opts, parent=self)
-        modal.exec()
+        self.burn_modal = BurnInProgressModal(v_path, o_path, items, opts, parent=self)
+        self.burn_worker = getattr(self.burn_modal, "worker", None)
+        try:
+            self.burn_modal.exec()
+        finally:
+            self.burn_modal = None
 
     def _browse_preview_file(self):
         path = ask_open_file(
@@ -2428,7 +2443,22 @@ class MainWindow(QMainWindow):
     def _clear_batch_table(self):
         self.batch_table.setRowCount(0)
 
+    def cancel_batch(self):
+        """Cooperatively stop any in-flight batch processing."""
+        self._batch_cancelled = True
+        if hasattr(self, "_batch_cancel_event"):
+            self._batch_cancel_event.set()
+
     def _run_batch_processing(self):
+        if getattr(self, "_batch_running", False):
+            return
+
+        if getattr(self, "_batch_cancelled", False):
+            self._batch_cancelled = False
+            if hasattr(self, "_batch_cancel_event"):
+                self._batch_cancel_event.clear()
+            return
+
         rows = self.batch_table.rowCount()
         if rows == 0:
             ThemedMessageBox.information(
@@ -2443,48 +2473,95 @@ class MainWindow(QMainWindow):
         do_clean = self.toggle_clean.isChecked()
         parallel = self.toggle_parallel.isChecked()
 
-        for row in range(rows):
-            file_path = self.batch_table.item(row, 0).text()
-            self.batch_table.setItem(
-                row, 3, QTableWidgetItem(t("batch.status_processing"))
+        self._batch_running = True
+        if hasattr(self, "_batch_cancel_event"):
+            self._batch_cancel_event.clear()
+        was_cancelled = False
+        try:
+            for row in range(rows):
+                if self._batch_cancelled or (
+                    hasattr(self, "_batch_cancel_event")
+                    and self._batch_cancel_event.is_set()
+                ):
+                    was_cancelled = True
+                    break
+                item = self.batch_table.item(row, 0)
+                if not item:
+                    continue
+                file_path = item.text().strip()
+                if not file_path or not os.path.isfile(file_path):
+                    self.batch_table.setItem(
+                        row,
+                        3,
+                        QTableWidgetItem(t("batch.status_error", err="file not found")),
+                    )
+                    continue
+
+                self.batch_table.setItem(
+                    row, 3, QTableWidgetItem(t("batch.status_processing"))
+                )
+                QApplication.processEvents()
+                try:
+                    result = self.subtitle_service.process_subtitles(
+                        file_path=file_path,
+                        do_clean=do_clean,
+                        do_translate=do_translate,
+                        target_language=target_lang,
+                        source_language=source_lang,
+                        engine=engine,
+                        parallel=parallel,
+                        cancel_event=getattr(self, "_batch_cancel_event", None),
+                    )
+                    base, ext = os.path.splitext(file_path)
+                    out_path = f"{base}_processed{ext}"
+                    self.subtitle_service.write_output_file(
+                        out_path, result.output_content
+                    )
+                    self.batch_table.setItem(
+                        row, 3, QTableWidgetItem(t("batch.status_completed"))
+                    )
+                    from application.services.history_store import record_result_safely
+
+                    record_result_safely(
+                        result,
+                        operation="process",
+                        file_path=file_path,
+                        source_language=source_lang,
+                        target_language=target_lang,
+                        engine=engine,
+                    )
+                except SubtitleCancelledError:
+                    was_cancelled = True
+                    self.batch_table.setItem(
+                        row,
+                        3,
+                        QTableWidgetItem(t("batch.status_error", err="cancelled")),
+                    )
+                    break
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to process batch file %s (%s)",
+                        file_path,
+                        type(exc).__name__,
+                    )
+                    self.batch_table.setItem(
+                        row,
+                        3,
+                        QTableWidgetItem(
+                            t("batch.status_error", err=type(exc).__name__)
+                        ),
+                    )
+                QApplication.processEvents()
+        finally:
+            self._batch_running = False
+            self._batch_cancelled = False
+            if hasattr(self, "_batch_cancel_event"):
+                self._batch_cancel_event.clear()
+
+        if not was_cancelled:
+            ThemedMessageBox.information(
+                self, t("alert.batch_done_title"), t("alert.batch_done_desc")
             )
-            try:
-                result = self.subtitle_service.process_subtitles(
-                    file_path=file_path,
-                    do_clean=do_clean,
-                    do_translate=do_translate,
-                    target_language=target_lang,
-                    source_language=source_lang,
-                    engine=engine,
-                    parallel=parallel,
-                )
-                base, ext = os.path.splitext(file_path)
-                out_path = f"{base}_processed{ext}"
-                self.subtitle_service.write_output_file(out_path, result.output_content)
-                self.batch_table.setItem(
-                    row, 3, QTableWidgetItem(t("batch.status_completed"))
-                )
-                from application.services.history_store import record_result_safely
-
-                record_result_safely(
-                    result,
-                    operation="process",
-                    file_path=file_path,
-                    source_language=source_lang,
-                    target_language=target_lang,
-                    engine=engine,
-                )
-            except Exception:
-                logger.exception("Failed to process the batch file")
-                self.batch_table.setItem(
-                    row,
-                    3,
-                    QTableWidgetItem(t("batch.status_error", err="error interno")),
-                )
-
-        ThemedMessageBox.information(
-            self, t("alert.batch_done_title"), t("alert.batch_done_desc")
-        )
 
     # Settings Management
     def _load_config_values(self):

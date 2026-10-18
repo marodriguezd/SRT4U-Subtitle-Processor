@@ -486,11 +486,16 @@ class SubtitleQA:
         unique_findings = []
         seen_findings = set()
         for finding in findings:
+            metadata_key = (
+                json.dumps(finding.metadata, sort_keys=True, ensure_ascii=False)
+                if finding.metadata
+                else ""
+            )
             identity = (
                 finding.severity,
                 finding.rule,
                 finding.subtitle_index,
-                json.dumps(finding.metadata, sort_keys=True, ensure_ascii=False),
+                metadata_key,
             )
             if identity not in seen_findings:
                 seen_findings.add(identity)

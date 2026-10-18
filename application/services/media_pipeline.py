@@ -564,11 +564,11 @@ class MediaPipeline:
                 raise PipelineStageError(
                     stage,
                     "qa_failed",
-                    f"QA estricto: {report.error_count} errores, "
-                    f"{report.warning_count} avisos",
+                    f"Strict QA: {report.error_count} error(s), "
+                    f"{report.warning_count} warning(s)",
                 )
             result.warnings.append(
-                f"QA: {report.error_count} errores, {report.warning_count} avisos"
+                f"QA: {report.error_count} error(s), {report.warning_count} warning(s)"
             )
         return items
 
@@ -754,16 +754,17 @@ def run_burn_in_sync(
     duration_sec = duration_ms / 1000.0 if duration_ms else 0.0
     width, height = VideoBurnerService.get_video_dimensions(video_path, ffmpeg_bin)
     temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
-    # D1: FFmpeg must never open the final destination. It used to receive
-    # ``output_path`` directly with ``-y``, so encoding truncated any file
-    # already sitting there and the failure/cancel branches then *deleted*
-    # it — destroying the user's previous good video. Encode into a sibling
-    # temporary file instead and promote it with ``os.replace`` only after
-    # FFmpeg exits 0; every failure path removes the temp and never touches
-    # the final path (same contract as ``atomic_write_text``).
-    final_path = os.path.abspath(output_path)
-    temp_output = f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
+    temp_output = None
     try:
+        # D1: FFmpeg must never open the final destination. It used to receive
+        # ``output_path`` directly with ``-y``, so encoding truncated any file
+        # already sitting there and the failure/cancel branches then *deleted*
+        # it — destroying the user's previous good video. Encode into a sibling
+        # temporary file instead and promote it with ``os.replace`` only after
+        # FFmpeg exits 0; every failure path removes the temp and never touches
+        # the final path (same contract as ``atomic_write_text``).
+        final_path = os.path.abspath(output_path)
+        temp_output = f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
         ass_content = VideoBurnerService.generate_ass_script(
             items, BurnInOptions(), video_width=width, video_height=height
         )
@@ -790,19 +791,20 @@ def run_burn_in_sync(
             "pipe:1",
             temp_output,
         ]
-        with open(stderr_log_path, "w", encoding="utf-8") as stderr_file:
-            process = subprocess.Popen(
-                cmd,
-                cwd=temp_dir,
-                stdout=subprocess.PIPE,
-                stderr=stderr_file,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-        current_sec = 0.0
-        assert process.stdout is not None
+        process = None
         try:
+            with open(stderr_log_path, "w", encoding="utf-8") as stderr_file:
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=temp_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=stderr_file,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+            current_sec = 0.0
+            assert process.stdout is not None
             while True:
                 if cancel_event is not None and cancel_event.is_set():
                     try:
@@ -861,9 +863,19 @@ def run_burn_in_sync(
             # destroyed destination.
             os.replace(temp_output, final_path)
         finally:
+            if process is not None and process.poll() is None:
+                try:
+                    process.terminate()
+                    process.wait(timeout=1.5)
+                except Exception:
+                    try:
+                        process.kill()
+                        process.wait(timeout=1.0)
+                    except Exception:
+                        pass
             # Every failure/cancel path lands here: remove only the temp.
             try:
-                if os.path.exists(temp_output):
+                if temp_output and os.path.exists(temp_output):
                     os.remove(temp_output)
             except OSError:
                 logger.warning("Could not delete the temporary pipeline video")

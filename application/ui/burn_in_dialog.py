@@ -662,7 +662,7 @@ class BurnInProgressModal(QDialog):
         options: BurnInOptions,
     ):
         self.worker = BurnInWorker(
-            video_path, output_path, subtitle_items, options, parent=self
+            video_path, output_path, subtitle_items, options, parent=None
         )
         self.worker.progress_updated.connect(self._on_progress)
         self.worker.finished_success.connect(self._on_success)
@@ -725,3 +725,20 @@ class BurnInProgressModal(QDialog):
     def _open_folder(self):
         if os.path.exists(self.output_path):
             reveal_path(self.output_path)
+
+    def accept(self):
+        if hasattr(self, "worker") and self.worker.isRunning():
+            self.worker.wait(2000)
+        super().accept()
+
+    def reject(self):
+        if hasattr(self, "worker") and self.worker.isRunning():
+            self._cancel_task()
+            self.worker.wait(2000)
+        super().reject()
+
+    def closeEvent(self, event):
+        if hasattr(self, "worker") and self.worker.isRunning():
+            self._cancel_task()
+            self.worker.wait(2000)
+        event.accept()

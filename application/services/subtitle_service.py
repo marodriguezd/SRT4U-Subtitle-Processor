@@ -16,6 +16,22 @@ from . import timestamps
 
 logger = get_logger("subtitles")
 
+_SRT_TIMING_RE = re.compile(
+    rf"({timestamps.SRT_TIMESTAMP_PATTERN})\s*-->\s*"
+    rf"({timestamps.SRT_TIMESTAMP_PATTERN})"
+)
+_VTT_TIMING_RE = re.compile(
+    rf"({timestamps.VTT_TIMESTAMP_PATTERN})\s*-->\s*"
+    rf"({timestamps.VTT_TIMESTAMP_PATTERN})"
+)
+_ASS_DIALOGUE_RE = re.compile(
+    r"^Dialogue:[ \t]*[^,]*,"  # layer
+    r"([^,]*),([^,]*),([^,]*),"  # start, end, style
+    r"([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),"  # name, margins, effect
+    r"(.*)$",
+    re.IGNORECASE,
+)
+
 
 def read_subtitle_file(file_path: str) -> str:
     """Read a subtitle file with encoding detection (BOM and common fallbacks)."""
@@ -372,14 +388,11 @@ class SubtitleService:
         timestamp line, so multi-paragraph cues survive intact.
         """
         items: List[SubtitleItem] = []
-        lines = (content or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        lines = (content or "").splitlines()
         # Hours are unbounded so that >99h media round trips through SRT (L5).
         # The pattern comes from the shared grammar module (D4): the exact
         # component grammar QA validates with.
-        ts_regex = re.compile(
-            rf"({timestamps.SRT_TIMESTAMP_PATTERN})\s*-->\s*"
-            rf"({timestamps.SRT_TIMESTAMP_PATTERN})"
-        )
+        ts_regex = _SRT_TIMING_RE
 
         def find_timing(value: str):
             match = ts_regex.search(value)
@@ -449,12 +462,9 @@ class SubtitleService:
         return items
 
     def _parse_vtt(self, content: str) -> List[SubtitleItem]:
-        lines = (content or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        lines = (content or "").splitlines()
         items: List[SubtitleItem] = []
-        ts_regex = re.compile(
-            rf"({timestamps.VTT_TIMESTAMP_PATTERN})\s*-->\s*"
-            rf"({timestamps.VTT_TIMESTAMP_PATTERN})"
-        )
+        ts_regex = _VTT_TIMING_RE
 
         curr_idx = 1
         i = 0
@@ -550,13 +560,7 @@ class SubtitleService:
         # fields". The previous code guarded on a case-sensitive
         # startswith("Dialogue:") and then matched case-insensitively, so the
         # IGNORECASE flag was dead and lowercase "dialogue:" was dropped.
-        dialogue_regex = re.compile(
-            r"^Dialogue:[ \t]*[^,]*,"  # layer
-            r"([^,]*),([^,]*),([^,]*),"  # start, end, style
-            r"([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),"  # name, margins, effect
-            r"(.*)$",
-            re.IGNORECASE,
-        )
+        dialogue_regex = _ASS_DIALOGUE_RE
         self._last_ass_styles = ass_utils.parse_style_definitions(content)
         curr_idx = 1
         for number, line in enumerate((content or "").splitlines(), start=1):
@@ -926,11 +930,20 @@ class SubtitleService:
                         break
                     future_to_idx[executor.submit(translate_single_item, i, item)] = i
                 for future in concurrent.futures.as_completed(future_to_idx):
-                    record = future.result()
+                    try:
+                        record = future.result()
+                    except concurrent.futures.CancelledError:
+                        cancelled_early = True
+                        break
                     records[record.position] = record
                     completed += 1
                     if progress_callback:
                         progress_callback("step_translating", (completed, total_items))
+                    if cancelled():
+                        cancelled_early = True
+                        for f in future_to_idx:
+                            f.cancel()
+                        break
         else:
             for i, item in enumerate(items):
                 if cancelled():
@@ -1094,6 +1107,11 @@ class SubtitleService:
         progress_callback: Optional[Callable[[str, object], None]] = None,
         cancel_event: Optional[threading.Event] = None,
     ) -> ProcessingResult:
+        def check_cancelled():
+            if cancel_event is not None and cancel_event.is_set():
+                raise SubtitleCancelledError("processing cancelled")
+
+        check_cancelled()
         start_time = time.time()
 
         # Step 1: Reading
@@ -1101,6 +1119,7 @@ class SubtitleService:
             progress_callback("step_reading", True)
 
         content = read_subtitle_file(file_path)
+        check_cancelled()
 
         source_format = self.detect_format(content, file_path)
         out_format = target_format or source_format
@@ -1120,6 +1139,7 @@ class SubtitleService:
         current_items = list(original_items)
         total_original_lines = sum(len(it.text.split("\n")) for it in original_items)
         deleted_lines_count = 0
+        check_cancelled()
 
         # Step 3: Cleaning
         if do_clean:
@@ -1128,6 +1148,7 @@ class SubtitleService:
             current_items, total_original_lines, deleted_lines_count = (
                 self.clean_subtitles(current_items)
             )
+            check_cancelled()
 
         # Step 4: Translation
         translation_failures = 0
@@ -1144,12 +1165,14 @@ class SubtitleService:
                 cancel_event=cancel_event,
             )
             translation_failures = self.last_translation_failures
+            check_cancelled()
 
         # Step 5: Apply original formatting
         if progress_callback:
             progress_callback("step_formatting", True)
 
         output_content = self.format_output(current_items, out_format)
+        check_cancelled()
 
         # Step 6: Saving
         if progress_callback:

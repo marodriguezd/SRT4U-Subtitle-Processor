@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from typing import Any, Dict, Optional
 
 from ..logging_setup import get_logger
@@ -36,7 +37,7 @@ class ConfigService:
     def _get_config_dir(self) -> str:
         if os.name == "nt":
             base = os.environ.get("APPDATA", os.path.expanduser("~"))
-        elif os.uname().sysname == "Darwin":
+        elif sys.platform == "darwin":
             base = os.path.expanduser("~/Library/Application Support")
         else:
             base = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))

@@ -13,7 +13,7 @@
 
 Desktop-App zum Übersetzen, Bearbeiten, Bereinigen und Konvertieren von Untertiteldateien (`.srt`, `.vtt`, `.ass`/`.ssa`, `.txt`) mit einem echtzeit-synchronisierten Videoplayer und direktem Video-Burn-in-Export.
 
-Aktuelles stabiles Release: **[v1.4.12](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.12)**. Details siehe [RELEASE_NOTES.md](RELEASE_NOTES.md).
+Aktuelles stabiles Release: **[v1.0.0](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.0.0)**. Details siehe [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ![SRT4U-Vorschau](assets/preview_en.png)
 
@@ -119,15 +119,15 @@ anleitungen: [docs/cli.md](docs/cli.md), [docs/api.md](docs/api.md),
 
 ### Vorgefertigte Binärdateien
 
-Das aktuelle stabile Release ist **[v1.4.12](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.4.12)** (kein Prerelease). GitHub Actions baut und hängt diese Assets für jeden stabilen `v*`-Tag an:
+Das aktuelle stabile Release ist **[v1.0.0](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/tag/v1.0.0)** (kein Prerelease). GitHub Actions baut und hängt diese Assets für jeden stabilen `v*`-Tag an:
 
 | Asset | Plattform | Architektur |
 |---|---|---|
-| [`SRT4U-Windows-x64.exe`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-Windows-x64.exe) | Windows 10/11 | x86_64 |
-| [`SRT4U-Linux-x86_64.AppImage`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-Linux-x86_64.AppImage) | Linux | x86_64 |
-| [`SRT4U-Linux-x86_64.tar.gz`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-Linux-x86_64.tar.gz) | Linux | x86_64 |
-| [`SRT4U-macOS.dmg`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/SRT4U-macOS.dmg) | macOS (Apple Silicon) | **nur arm64** — startet nicht auf Intel-Macs |
-| [`checksums.txt`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.4.12/checksums.txt) | SHA-256-Prüfsummen der obigen Assets | — |
+| [`SRT4U-Windows-x64.exe`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.0.0/SRT4U-Windows-x64.exe) | Windows 10/11 | x86_64 |
+| [`SRT4U-Linux-x86_64.AppImage`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.0.0/SRT4U-Linux-x86_64.AppImage) | Linux | x86_64 |
+| [`SRT4U-Linux-x86_64.tar.gz`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.0.0/SRT4U-Linux-x86_64.tar.gz) | Linux | x86_64 |
+| [`SRT4U-macOS.dmg`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.0.0/SRT4U-macOS.dmg) | macOS (Apple Silicon) | **nur arm64** — startet nicht auf Intel-Macs |
+| [`checksums.txt`](https://github.com/marodriguezd/SRT4U-Subtitle-Processor/releases/download/v1.0.0/checksums.txt) | SHA-256-Prüfsummen der obigen Assets | — |
 
 Die CI-Builds bündeln ein versionsgepinntes statisches FFmpeg-Executable, sodass Burn-in
 out of the box funktioniert; Plattform-Laufzeitbibliotheksanforderungen gelten weiterhin.

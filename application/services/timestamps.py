@@ -25,6 +25,11 @@ _MINUTES = r"\d{1,2}"
 _SECONDS = r"\d{1,2}"
 _FRACTION = r"\d{1,3}"
 
+_HOURS_RE = re.compile(_HOURS)
+_MINUTES_RE = re.compile(_MINUTES)
+_SECONDS_RE = re.compile(_SECONDS)
+_FRACTION_RE = re.compile(_FRACTION)
+
 #: Full SRT clock ``H:MM:SS`` with unbounded hours (``HH:MM:SS`` ⊂ grammar),
 #: optional 1-3 digit fraction separated by ``,`` or ``.``.
 _SRT_CLOCK_RE = re.compile(
@@ -41,6 +46,7 @@ _VTT_CLOCK_RE = re.compile(
 #: ASS/SSA clock ``H:MM:SS`` with centiseconds (ASS stores 1/100 s). One
 #: capturing group per component (the pre-existing QA layout).
 ASS_TIMESTAMP_PATTERN = r"(\d{1,}):(\d{1,2}):(\d{1,2})\.(\d{1,2})"
+_ASS_TIMESTAMP_RE = re.compile(ASS_TIMESTAMP_PATTERN)
 
 #: ASS/SSA Dialogue timing pair: two full ASS clocks separated by a comma.
 #: Anchoring the end timestamp to the field boundary (``...cc,``) removes the
@@ -74,7 +80,7 @@ def _clock_to_ms(hours: str, minutes: str, seconds: str) -> int:
 
 
 def _validate_fraction(raw_fraction: str, original: str) -> int:
-    if raw_fraction and not re.fullmatch(_FRACTION, raw_fraction):
+    if raw_fraction and not _FRACTION_RE.fullmatch(raw_fraction):
         raise ValueError(f"invalid fractional second: {original!r}")
     return int(raw_fraction.ljust(3, "0")) if raw_fraction else 0
 
@@ -100,15 +106,15 @@ def parse_timestamp_to_ms(time_str: str) -> int:
     else:
         raise ValueError(f"unsupported timestamp format: {time_str!r}")
 
-    if not re.fullmatch(_HOURS, raw_hours):
+    if not _HOURS_RE.fullmatch(raw_hours):
         raise ValueError(f"invalid hours: {raw_hours!r}")
-    if not re.fullmatch(_MINUTES, raw_minutes):
+    if not _MINUTES_RE.fullmatch(raw_minutes):
         raise ValueError(f"invalid minutes: {raw_minutes!r}")
     if "." in raw_seconds:
         raw_whole, _, raw_fraction = raw_seconds.partition(".")
     else:
         raw_whole, raw_fraction = raw_seconds, ""
-    if not re.fullmatch(_SECONDS, raw_whole):
+    if not _SECONDS_RE.fullmatch(raw_whole):
         raise ValueError(f"invalid seconds: {raw_whole!r}")
 
     milliseconds = _clock_to_ms(raw_hours, raw_minutes, raw_whole)
@@ -168,7 +174,7 @@ def ass_timestamp_to_ms(timestamp: str) -> Optional[int]:
     """
     if not isinstance(timestamp, str):
         return None
-    match = re.fullmatch(ASS_TIMESTAMP_PATTERN, timestamp.strip())
+    match = _ASS_TIMESTAMP_RE.fullmatch(timestamp.strip())
     if not match:
         return None
     try:

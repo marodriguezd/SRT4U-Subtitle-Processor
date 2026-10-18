@@ -85,6 +85,23 @@ def _origin(url: str) -> tuple:
     )
 
 
+def _build_opener() -> urllib.request.OpenerDirector:
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.ProxyHandler,
+        urllib.request.HTTPHandler,
+        urllib.request.HTTPDefaultErrorHandler,
+        _SameOriginRedirectHandler,
+        urllib.request.HTTPSHandler,
+        urllib.request.HTTPErrorProcessor,
+    ):
+        opener.add_handler(handler())
+    return opener
+
+
+_DEFAULT_OPENER = _build_opener()
+
+
 def _open(request, timeout: float):
     """Open ``request`` under the same-origin redirect policy.
 
@@ -97,17 +114,7 @@ def _open(request, timeout: float):
     ignored. The opener is therefore assembled by hand with our redirect
     handler in the stock handler's place.
     """
-    opener = urllib.request.OpenerDirector()
-    for handler in (
-        urllib.request.ProxyHandler,
-        urllib.request.HTTPHandler,
-        urllib.request.HTTPDefaultErrorHandler,
-        _SameOriginRedirectHandler,
-        urllib.request.HTTPSHandler,
-        urllib.request.HTTPErrorProcessor,
-    ):
-        opener.add_handler(handler())
-    return opener.open(request, timeout=timeout)
+    return _DEFAULT_OPENER.open(request, timeout=timeout)
 
 
 try:

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-10-18
+
+Consolidated major release of SRT4U Subtitle Processor.
+
+### Added
+- **Whisper transcription & media pipeline**: local speech-to-text with `faster-whisper` and end-to-end processing pipeline.
+- **REST API**: local FastAPI service with `/api/v1` routes and background jobs.
+- **Multi-language UI**: support for English, Spanish, Portuguese, German, Italian, French, and Chinese.
+
+### Optimized
+- **Performance**: consolidated analytics loop, precompiled regexes, vector icon cache, and fast file I/O.
+- **Robustness**: 745 automated tests with zero warnings and 100% green status.
+
 ## [1.4.12] - 2026-10-17
 
 Maintenance and bug-fix release, published as tag `v1.4.12` (stable) with no

@@ -8,6 +8,8 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtCore import QByteArray, Qt
 
+from typing import Dict, Tuple
+
 # SVG Definitions (Lucide style stroke-based icons with stroke="currentColor")
 _SVG_ICONS = {
     "home": """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -175,6 +177,8 @@ class Icons:
     DEFAULT_ACTIVE = "#818CF8"
     DEFAULT_SUCCESS = "#10B981"
 
+    _PIXMAP_CACHE: Dict[Tuple[str, str, int, int], QPixmap] = {}
+
     @classmethod
     def get_pixmap(
         cls, name: str, color: str = DEFAULT_MUTED, size: int = 24, scale: int = 2
@@ -183,10 +187,15 @@ class Icons:
         Renders an SVG icon to a high-DPI QPixmap with the specified color and size.
         `scale` is used for high-res supersampling to ensure razor-sharp edges.
         """
+        cache_key = (name, color, size, scale)
+        if cache_key in cls._PIXMAP_CACHE:
+            return cls._PIXMAP_CACHE[cache_key]
+
         raw_svg = _SVG_ICONS.get(name)
         if not raw_svg:
             pix = QPixmap(size, size)
             pix.fill(Qt.GlobalColor.transparent)
+            cls._PIXMAP_CACHE[cache_key] = pix
             return pix
 
         colored_svg = raw_svg.replace("currentColor", color)
@@ -204,6 +213,7 @@ class Icons:
 
         # Set device pixel ratio so Qt draws it sharply at logical size
         pixmap.setDevicePixelRatio(scale)
+        cls._PIXMAP_CACHE[cache_key] = pixmap
         return pixmap
 
     @classmethod

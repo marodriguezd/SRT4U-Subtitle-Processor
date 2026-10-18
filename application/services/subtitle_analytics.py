@@ -81,14 +81,38 @@ class SubtitleAnalyticsService:
     ) -> SubtitleAnalytics:
         report = qa_report or self.qa.validate(items, file_format, source_content)
         cue_count = len(items)
-        texts = [item.text for item in items]
-        visible_texts = [self.qa.visible_text(text) for text in texts]
-        character_counts = [
-            sum(len(line) for line in text.splitlines()) for text in visible_texts
-        ]
-        word_counts = [len(text.split()) for text in visible_texts]
-        line_counts = [len(text.splitlines()) if text else 0 for text in texts]
-        normalized_texts = [" ".join(text.split()).casefold() for text in visible_texts]
+
+        character_counts: list[int] = []
+        word_counts: list[int] = []
+        line_counts: list[int] = []
+        normalized_texts: list[str] = []
+        empty_subtitles = 0
+        min_start: Optional[int] = None
+        max_end: Optional[int] = None
+        cps_values: list[float] = []
+
+        for item in items:
+            raw_text = item.text or ""
+            if not raw_text.strip():
+                empty_subtitles += 1
+            line_counts.append(len(raw_text.splitlines()) if raw_text else 0)
+
+            visible = self.qa.visible_text(raw_text)
+            chars = sum(len(line) for line in visible.splitlines())
+            character_counts.append(chars)
+
+            words = visible.split()
+            word_counts.append(len(words))
+            normalized_texts.append(" ".join(words).casefold())
+
+            if item.start_ms >= 0 and item.end_ms > item.start_ms:
+                if min_start is None or item.start_ms < min_start:
+                    min_start = item.start_ms
+                if max_end is None or item.end_ms > max_end:
+                    max_end = item.end_ms
+                duration = item.end_ms - item.start_ms
+                if chars > 0:
+                    cps_values.append(chars / (duration / 1000.0))
 
         content = ContentMetrics(
             subtitle_count=cue_count,
@@ -105,30 +129,29 @@ class SubtitleAnalyticsService:
             average_lines_per_subtitle=(
                 round(sum(line_counts) / cue_count, 3) if cue_count else 0.0
             ),
-            empty_subtitles=sum(not text.strip() for text in texts),
+            empty_subtitles=empty_subtitles,
             duplicate_subtitles=self._duplicate_count(normalized_texts),
         )
 
-        valid_intervals = [
-            item for item in items if item.start_ms >= 0 and item.end_ms > item.start_ms
-        ]
         duration_span = (
-            max(item.end_ms for item in valid_intervals)
-            - min(item.start_ms for item in valid_intervals)
-            if valid_intervals
+            (max_end - min_start)
+            if min_start is not None and max_end is not None
             else 0
         )
-        durations = [item.end_ms - item.start_ms for item in items]
-        cps_values = [
-            characters / (duration / 1000)
-            for item, characters, duration in zip(
-                items, character_counts, durations, strict=True
-            )
-            if duration > 0 and item.start_ms >= 0 and characters > 0
-        ]
+
         rule_counts: Dict[str, int] = {}
+        rule_indices: Dict[str, set] = {
+            "overlap": set(),
+            "duration_too_short": set(),
+            "duration_too_long": set(),
+            "cps_exceeded": set(),
+            "line_too_long": set(),
+        }
         for finding in report.findings:
-            rule_counts[finding.rule] = rule_counts.get(finding.rule, 0) + 1
+            rule = finding.rule
+            rule_counts[rule] = rule_counts.get(rule, 0) + 1
+            if rule in rule_indices and finding.subtitle_index is not None:
+                rule_indices[rule].add(finding.subtitle_index)
 
         timing = TimingMetrics(
             total_duration_ms=max(0, duration_span),
@@ -137,15 +160,13 @@ class SubtitleAnalyticsService:
             else 0.0,
             max_cps=round(max(cps_values), 3) if cps_values else 0.0,
             min_cps=round(min(cps_values), 3) if cps_values else 0.0,
-            overlapping_subtitles=self._count_unique_indices(report, "overlap"),
-            too_short_subtitles=self._count_unique_indices(
-                report, "duration_too_short"
-            ),
-            too_long_subtitles=self._count_unique_indices(report, "duration_too_long"),
-            cps_violations=self._count_unique_indices(report, "cps_exceeded"),
+            overlapping_subtitles=len(rule_indices["overlap"]),
+            too_short_subtitles=len(rule_indices["duration_too_short"]),
+            too_long_subtitles=len(rule_indices["duration_too_long"]),
+            cps_violations=len(rule_indices["cps_exceeded"]),
         )
         quality = QualityMetrics(
-            line_length_violations=self._count_unique_indices(report, "line_too_long"),
+            line_length_violations=len(rule_indices["line_too_long"]),
             errors=report.error_count,
             warnings=report.warning_count,
             infos=report.info_count,

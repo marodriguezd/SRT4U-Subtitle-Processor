@@ -22,6 +22,9 @@ from .subtitle_service import SubtitleItem
 
 logger = get_logger("burner")
 
+_FFMPEG_DURATION_RE = re.compile(r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)")
+_FFMPEG_DIMENSIONS_RE = re.compile(r"Stream.*Video:.*,\s*(\d{2,5})x(\d{2,5})")
+
 
 def paths_refer_to_same_file(first: str, second: str) -> bool:
     """Compare canonical paths and existing filesystem identities (hard links)."""
@@ -134,9 +137,7 @@ class VideoBurnerService:
                 timeout=10,
             )
             # Match "Duration: 00:02:15.34"
-            match = re.search(
-                r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)", res.stderr
-            )
+            match = _FFMPEG_DURATION_RE.search(res.stderr)
             if match:
                 hours = int(match.group(1))
                 minutes = int(match.group(2))
@@ -175,7 +176,7 @@ class VideoBurnerService:
                 errors="replace",
                 timeout=10,
             )
-            match = re.search(r"Stream.*Video:.*,\s*(\d{2,5})x(\d{2,5})", res.stderr)
+            match = _FFMPEG_DIMENSIONS_RE.search(res.stderr)
             if match:
                 return int(match.group(1)), int(match.group(2))
             logger.warning(
@@ -366,6 +367,8 @@ class BurnInWorker(QThread):
             self.failed.emit(t("burn.error_no_ffmpeg"))
             return
 
+        temp_dir: Optional[str] = None
+        temp_output: Optional[str] = None
         try:
             out_dir = os.path.dirname(os.path.abspath(self.output_path))
             if out_dir:
@@ -380,26 +383,23 @@ class BurnInWorker(QThread):
                 self.video_path, ffmpeg_bin
             )
             temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
-        except Exception as exc:
-            logger.error("Could not prepare the burn-in (%s)", type(exc).__name__)
-            self.failed.emit(t("burn.error_prepare"))
-            return
 
-        # 2. Generate ASS file in temporary directory
-        ass_filename = "subtitles.ass"
-        ass_path = os.path.join(temp_dir, ass_filename)
-        stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
+            # 2. Generate ASS file in temporary directory
+            ass_filename = "subtitles.ass"
+            ass_path = os.path.join(temp_dir, ass_filename)
+            stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
 
-        # D1: FFmpeg never opens the final destination. It used to receive
-        # ``output_path`` with ``-y``, so any file already at that path was
-        # truncated the moment encoding started and the cancel/failure
-        # branches then deleted it. Encode into a sibling temp file and
-        # promote it with ``os.replace`` only after a clean exit; every other
-        # path removes just the temp.
-        final_path = os.path.abspath(self.output_path)
-        temp_output = f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
+            # D1: FFmpeg never opens the final destination. It used to receive
+            # ``output_path`` with ``-y``, so any file already at that path was
+            # truncated the moment encoding started and the cancel/failure
+            # branches then deleted it. Encode into a sibling temp file and
+            # promote it with ``os.replace`` only after a clean exit; every other
+            # path removes just the temp.
+            final_path = os.path.abspath(self.output_path)
+            temp_output = (
+                f"{final_path}.srt4u-burn-tmp{os.path.splitext(final_path)[1]}"
+            )
 
-        try:
             ass_content = VideoBurnerService.generate_ass_script(
                 self.subtitle_items, self.options, video_width=vw, video_height=vh
             )
@@ -434,6 +434,10 @@ class BurnInWorker(QThread):
                 temp_output,
             ]
 
+            if self._is_cancelled:
+                self.cancelled.emit()
+                return
+
             with open(stderr_log_path, "w", encoding="utf-8") as stderr_file:
                 self._process = subprocess.Popen(
                     cmd,
@@ -451,6 +455,16 @@ class BurnInWorker(QThread):
                 while True:
                     if self._is_cancelled:
                         logger.info("Burn-in cancelled by the user")
+                        if self._process and self._process.poll() is None:
+                            try:
+                                self._process.terminate()
+                                self._process.wait(timeout=1.5)
+                            except Exception:
+                                try:
+                                    self._process.kill()
+                                    self._process.wait(timeout=1.0)
+                                except Exception:
+                                    pass
                         self.cancelled.emit()
                         return
 
@@ -542,14 +556,25 @@ class BurnInWorker(QThread):
             if not self._is_cancelled:
                 self.failed.emit(t("burn.error_exception"))
         finally:
+            if self._process is not None and self._process.poll() is None:
+                try:
+                    self._process.terminate()
+                    self._process.wait(timeout=1.5)
+                except Exception:
+                    try:
+                        self._process.kill()
+                        self._process.wait(timeout=1.0)
+                    except Exception:
+                        pass
             # D1: only the temporary encode is ever cleaned up. The final
             # output path is never removed here, so a cancel, a non-zero
             # FFmpeg exit or an exception leaves any pre-existing file intact.
             try:
-                if os.path.exists(temp_output):
+                if temp_output and os.path.exists(temp_output):
                     os.remove(temp_output)
             except OSError as exc:
                 logger.warning(
                     "Could not delete the temporary video (%s)", type(exc).__name__
                 )
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            if temp_dir:
+                shutil.rmtree(temp_dir, ignore_errors=True)
