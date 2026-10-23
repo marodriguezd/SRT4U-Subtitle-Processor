@@ -49,8 +49,9 @@ release_backup/
 # Agent-only workspace (private, never committed)
 .agents/
 
-# Agent tooling session state
+# Agent tooling session state (handoff notes stay local)
 .opencode/
+HANDOFF.md
 
 # Caches
 .ruff_cache/
