@@ -79,7 +79,7 @@ class BurnInOptions:
     font_color: str = "white"  # "white", "yellow", "cyan"
     box_style: str = "semi"  # "none", "semi", "solid"
     quality_preset: str = "high"  # "high", "fast"
-    fix_overlaps: bool = True  # Automatically adjusts timing to prevent visual overlaps
+    fix_overlaps: bool = True
 
 
 class VideoBurnerService:
@@ -320,11 +320,8 @@ class VideoBurnerService:
         )
         events = []
         for item in processed_items:
-            # The rendering contract lives in ``ass_utils`` so the ``.ass``
-            # exporter and this burn-in script can never disagree about the
-            # same cue (deep-audit M1). In ASS a brace opens an override block,
-            # so user text containing ``{b1}`` or ``{\p1}m 0 0 l 9 9{\p0}`` would
-            # otherwise change the render without SRT4U generating it.
+            # Rendering contract lives in ``ass_utils`` (M1) so exporter and
+            # burn-in agree; user braces must never become override blocks.
             ass_text = ass_utils.to_ass_text(item.text)
             events.append((item.start_ms, item.end_ms, ass_text))
 
@@ -333,10 +330,7 @@ class VideoBurnerService:
             {ass_utils.DEFAULT_STYLE_NAME: style_body},
             title="SRT4U Burn-In Subtitles",
             play_res=(vw, vh),
-            # D2: burn-in renders one calibrated visual style by design (the
-            # dialog exposes font size/colour/box, not per-cue styles), so the
-            # assignment stays uniformly Default here even though the exporter
-            # now preserves source styles.
+            # D2: burn-in renders one calibrated style; every event is Default.
             event_styles=[ass_utils.DEFAULT_STYLE_NAME] * len(events),
         )
 
@@ -423,14 +417,12 @@ class BurnInWorker(QThread):
             )
             temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
 
-            # Generate ASS file in temporary directory
             ass_filename = "subtitles.ass"
             ass_path = os.path.join(temp_dir, ass_filename)
             stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
 
-            # D1: FFmpeg never opens the final destination. Encode into a
-            # sibling temp and promote it with ``os.replace`` only after a clean
-            # exit; every other path removes just the temp.
+            # D1: FFmpeg never opens the final destination; a clean exit promotes
+            # a sibling temp with ``os.replace``, every other path removes it.
             final_path = os.path.abspath(self.output_path)
             temp_output = make_unique_burn_temp(self.output_path)
 
@@ -440,7 +432,6 @@ class BurnInWorker(QThread):
             with open(ass_path, "w", encoding="utf-8") as f:
                 f.write(ass_content)
 
-            # Configure encoding parameters
             if self.options.quality_preset == "fast":
                 v_preset = "ultrafast"
                 v_crf = "23"
@@ -601,9 +592,8 @@ class BurnInWorker(QThread):
                         self._process.wait(timeout=1.0)
                     except Exception:
                         pass
-            # D1: only the temporary encode is ever cleaned up. The final
-            # output path is never removed here, so a cancel, a non-zero
-            # FFmpeg exit or an exception leaves any pre-existing file intact.
+            # D1: only the temporary encode is removed here, so a cancel or a
+            # failed FFmpeg exit leaves any pre-existing output intact.
             try:
                 if temp_output and os.path.exists(temp_output):
                     os.remove(temp_output)

@@ -65,7 +65,6 @@ def test_main_window_flow(qapp, tmp_path):
     win = MainWindow()
     assert win.stack.count() == 11
 
-    # Page switching check
     win._switch_page(0)
     assert win.stack.currentIndex() == 0
     win._switch_page(3)  # Convert

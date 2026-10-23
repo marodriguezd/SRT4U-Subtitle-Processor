@@ -1,20 +1,8 @@
-"""Shared timestamp grammar for parsing and QA (single source of truth).
+"""Shared timestamp grammar for parsing and QA.
 
-Historically ``SubtitleService`` and ``SubtitleQA`` each carried their own
-timestamp grammar and they silently diverged: the parser grew support for
->99-hour media and single-digit VTT hours while QA kept rejecting both, so a
-file the product itself accepted was reported as structurally broken — and a
-strict QA pipeline aborted on it. This module is now the only grammar: the
-parsers validate with the same functions QA validates with, so the two layers
-cannot disagree again.
-
-Contract (mirrors the original ``parse_timestamp_to_ms``):
-
-* a well-formed timestamp returns an integer number of milliseconds;
-* anything else raises :class:`ValueError`;
-* minutes and seconds must be ``00-59``;
-* hours are unbounded (media longer than 99 hours round trips);
-* the fractional part carries at most three digits (SRT/VTT milliseconds).
+Parsing and QA validate with the same functions, so a file the parser accepts
+cannot be reported as structurally broken. Hours are unbounded; minutes and
+seconds are 00-59; fractions carry at most three digits.
 """
 
 import re
@@ -36,9 +24,8 @@ _SRT_CLOCK_RE = re.compile(
     rf"({_HOURS}):({_MINUTES}):({_SECONDS})(?:[.,]({_FRACTION}))?"
 )
 
-#: WebVTT clock ``[H:]MM:SS`` with a mandatory ``.`` fraction; the whole
-#: hours component is optional (``00:01.000`` is hourless WebVTT) and one- or
-#: two-digit hours are both accepted (matching the parser's grammar).
+#: WebVTT clock ``[H:]MM:SS`` with a mandatory ``.`` fraction; hours are
+#: optional and may have one or two digits.
 _VTT_CLOCK_RE = re.compile(
     rf"(?:(?:({_HOURS})):)?(?:({_MINUTES})):({_SECONDS})[.]({_FRACTION})"
 )
@@ -48,20 +35,14 @@ _VTT_CLOCK_RE = re.compile(
 ASS_TIMESTAMP_PATTERN = r"(\d{1,}):(\d{1,2}):(\d{1,2})\.(\d{1,2})"
 _ASS_TIMESTAMP_RE = re.compile(ASS_TIMESTAMP_PATTERN)
 
-#: ASS/SSA Dialogue timing pair: two full ASS clocks separated by a comma.
-#: Anchoring the end timestamp to the field boundary (``...cc,``) removes the
-#: ambiguity where a start timestamp's tail (``0:00:01.00`` -> trailing
-#: ``00``) could be misread as a second clock.
+#: ASS Dialogue timing pair: two clocks separated by a comma. The trailing
+#: comma anchors the end field so a start's centiseconds cannot be re-read.
 ASS_DIALOGUE_TIMING_RE = re.compile(
     rf"({ASS_TIMESTAMP_PATTERN}),(?:{ASS_TIMESTAMP_PATTERN}),",
     re.IGNORECASE,
 )
-#: Full-line timestamp patterns for the ``SubtitleService`` parsers: one
-#: capturing group per timestamp, built from the very same component grammar
-#: above (non-capturing) so the line-level regex used to find cues cannot
-#: drift from the validation QA performs on each component. Exactly one
-#: capturing group per pattern keeps the parsers' ``match.group(1)/(2)``
-#: layout stable.
+#: Full-line timestamp patterns for the parsers: one capture group per
+#: timestamp, built from the component grammar above so they cannot drift.
 SRT_TIMESTAMP_PATTERN = (
     rf"(?:{_HOURS}):(?:{_MINUTES}):(?:{_SECONDS})[,.](?:{_FRACTION})"
 )
@@ -196,9 +177,8 @@ def ass_dialogue_timing_to_ms(line: str) -> Optional[Tuple[int, int]]:
     match = ASS_DIALOGUE_TIMING_RE.search(line)
     if not match:
         return None
-    # group(1) is the whole start clock; the start components are groups
-    # 2-5. The end clock is non-capturing at its outer level, so its
-    # components are groups 6-9 (hour, minute, second, centiseconds).
+    # group(1) is the start clock; its components are 2-5. The end clock's
+    # outer group is non-capturing, so its components are 6-9.
     try:
         start = _clock_to_ms(match.group(2), match.group(3), match.group(4))
         end = _clock_to_ms(match.group(6), match.group(7), match.group(8))

@@ -11,9 +11,8 @@ here instead of repeating the literal. Update it together with
 
 APP_VERSION = "1.0.0"
 
-#: Public project identity shown on the About page. Centralized here so the
-#: GUI, docs and coherence tests share one source instead of hardcoding the
-#: handle / repository name in widgets.
+#: Public project identity shown on the About page, centralized so the GUI,
+#: docs and coherence tests share one source.
 APP_AUTHOR_NAME = "Miguel Ángel Rodríguez Dalí"
 APP_GITHUB_OWNER = "marodriguezd"
 APP_GITHUB_REPO = "SRT4U-Subtitle-Processor"

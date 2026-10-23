@@ -357,9 +357,8 @@ def test_fallback_error_type_preserves_original_provider_error(monkeypatch):
     # The requested provider's failure survives in ``fallback_error_type``.
     assert result.metrics.fallback_error_type == "rate_limit"
     assert result.metrics.requested_provider == "primary"
-    # On total failure ``provider`` keeps the requested name (selected is
-    # only updated on success); the attempted fallback shows in
-    # providers_used/fallback_used.
+    # On total failure ``provider`` keeps the requested name; the attempted
+    # fallback shows in providers_used/fallback_used.
     assert result.metrics.provider == "primary"
     assert result.metrics.providers_used == ["primary", "backup"]
     assert result.metrics.fallback_used is True
@@ -389,9 +388,8 @@ def test_translation_service_normalizes_failure_and_keeps_original(monkeypatch):
     assert result.text == "sensitive input"
     assert result.metrics.success is False
     assert result.metrics.error_type == "authentication"
-    # Security policy: provider failure details are sanitized to the error
-    # category; raw messages (which could contain secrets or content) are
-    # never retained in metrics.
+    # Security policy: raw provider messages (secrets, content) are never
+    # retained in metrics, only the error category.
     assert result.metrics.error_message is None
     assert result.metrics.fallback_error_type == "authentication"
     assert service.last_error == "authentication"

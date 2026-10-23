@@ -677,9 +677,8 @@ class _CardSequence(Sequence):
 _SCROLL_MARGIN_PX = 700
 
 
-#: Placeholder height used before a card exists, derived from the cue text.
-#: The real card replaces it as soon as it is materialized, so this only has
-#: to keep the scrollbar and the scroll anchors approximately right.
+#: Placeholder height before a card exists, derived from the cue text; the real
+#: card replaces it as soon as it is materialized.
 def _placeholder_height(text: str) -> int:
     lines = max(1, text.count("\n") + 1)
     body = max(40, min(140, lines * 22 + 18))
@@ -709,8 +708,7 @@ class SubtitleDiffViewer(QWidget):
         self._current_filter: str = ""
         self._active_position: Optional[int] = None
         #: ``_prefix_max_end[i]`` is the largest ``end_ms`` of cues ``0..i-1``
-        #: (``-1`` for the first cue). It bounds the fast path in
-        #: ``highlight_cue_at_ms`` without assuming cues are sorted.
+        #: (-1 for the first), bounding the fast path without assuming order.
         self._prefix_max_end: List[int] = []
         self._materializing = False
 
@@ -796,9 +794,8 @@ class SubtitleDiffViewer(QWidget):
             child = self.cards_layout.takeAt(0)
             widget = child.widget()
             if widget is not None:
-                # Reparent before deleting: the layout keeps no ownership and
-                # deleteLater() alone would leave the widget visible on some
-                # platforms until the event loop runs.
+                # Reparent before deleteLater: the layout owns nothing and the
+                # widget would stay visible until the event loop runs.
                 widget.setParent(None)
                 widget.deleteLater()
         self._rows = []
@@ -956,9 +953,8 @@ class SubtitleDiffViewer(QWidget):
         matching_position: Optional[int] = None
         cached_position = self._active_position
         if cached_position is not None and 0 <= cached_position < len(items):
-            # The cached cue is only the first match when no earlier cue can
-            # still be on screen at ``pos_ms``; overlapping cues fall through
-            # to the full scan so "first in cue order" stays exact.
+            # The cached cue is the first match only when no earlier cue can
+            # still be on screen; overlaps fall through to the full scan.
             earlier_end = self._prefix_max_end[cached_position]
             cached = items[cached_position]
             if earlier_end < pos_ms and cached.start_ms <= pos_ms <= cached.end_ms:
@@ -1278,7 +1274,7 @@ class VideoPreviewPlayer(QFrame):
         vol = val / 100.0
         if self.audio_output is not None:
             self.audio_output.setVolume(vol)
-            # Adjusting volume implies intent to listen: unmute unless volume is set to zero
+            # Adjusting volume implies intent to listen: unmute unless it is zero.
             if val > 0 and self.audio_output.isMuted():
                 self.audio_output.setMuted(False)
             elif val == 0:
@@ -1388,7 +1384,6 @@ class VideoPreviewPlayer(QFrame):
         self._reposition_overlay()
         self.sub_overlay.show()
         self.sub_overlay.raise_()
-        # New media loaded: reset visual controls to idle state
         self.time_slider.setRange(0, 0)
         self.time_slider.setValue(0)
         self._update_time_label(0, 0)
@@ -1397,7 +1392,6 @@ class VideoPreviewPlayer(QFrame):
 
     def set_subtitles(self, subtitles: List[SubtitleItem]):
         self.current_subtitles = subtitles
-        # Update overlay text based on current playback position
         if self.player is not None and self.player.position() > 0:
             self._on_position_changed(self.player.position())
 

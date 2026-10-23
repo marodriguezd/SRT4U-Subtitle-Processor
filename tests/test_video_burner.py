@@ -52,7 +52,6 @@ def test_generate_ass_script_styles():
         ),
     ]
 
-    # Test Default (medium, white, semi)
     opts_default = BurnInOptions()
     script = VideoBurnerService.generate_ass_script(items, opts_default)
     assert "[Script Info]" in script
@@ -62,7 +61,6 @@ def test_generate_ass_script_styles():
     assert "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,First line" in script
     assert "Second line with\\Nbreak" in script
 
-    # Test large, yellow, solid
     opts_yellow = BurnInOptions(
         font_size="large",
         font_color="yellow",
@@ -71,7 +69,6 @@ def test_generate_ass_script_styles():
     script_yellow = VideoBurnerService.generate_ass_script(items, opts_yellow)
     assert "Style: Default,sans-serif,63,&H0000FFFF" in script_yellow
 
-    # Test small, cyan, none
     opts_cyan = BurnInOptions(
         font_size="small",
         font_color="cyan",

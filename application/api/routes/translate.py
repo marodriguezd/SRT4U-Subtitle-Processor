@@ -247,10 +247,8 @@ async def process(
                 qa=result.qa_report.to_dict() if result.qa_report is not None else None,  # type: ignore[arg-type]
             )
             data = payload.model_dump(mode="json")
-            # P1: parser findings ride along as a top-level advisory list
-            # (kind/reason/line/snippet) so API clients can warn their users.
-            # ProcessResultModel declares the field, so the served OpenAPI
-            # contract matches this runtime payload.
+            # P1: advisory parser findings ride along so clients can warn users;
+            # ProcessResultModel declares the field, keeping OpenAPI in sync.
             data["parse_issues"] = [
                 issue.to_dict() for issue in getattr(result, "parse_issues", [])
             ]

@@ -186,9 +186,8 @@ class ProcessingResult:
     analytics: Optional[SubtitleAnalytics] = None
     qa_report: Optional[QAReport] = None
     translation_metrics: Optional[TranslationMetrics] = None
-    #: ``True`` only when a complete, usable output was produced. The same
-    #: meaning is used by ``record_pipeline_result`` (L2), so history never
-    #: records a failed run as successful just because it had no metrics.
+    #: ``True`` only when a complete, usable output was produced (L2), so
+    #: history never records a failed run as successful.
     success: bool = True
     #: Structural problems found while parsing (skipped/repaired blocks).
     parse_issues: List[ParseIssue] = field(default_factory=list)
@@ -215,25 +214,8 @@ class _CueTranslation:
 class SubtitleService:
     """Core subtitle processing engine for SRT, VTT, ASS, SSA, and TXT formats."""
 
-    # Spam is detected in two tiers, because "contains a token" and "is spam"
-    # are not the same statement (deep-audit H1).
-    #
-    # TIER 1 - the WHOLE line is spam. These patterns are matched with
-    # ``fullmatch`` against the stripped line, so any additional words make the
-    # line survive. This is what keeps real dialogue intact:
-    #     "I went to www.city.com yesterday."      -> kept
-    #     "The rarbg group released it."           -> kept
-    #     "I downloaded it from opensubtitles."    -> kept
-    #     "www.city.com"                           -> removed
-    #     "Subtitled by AnimeFansubPro"            -> removed
-    #: Lines that are spam on their own: bare URLs, bare site tags, credits
-    #: and music placeholders.
-    #:
-    #: Attribution phrases ("Subtitled by ...", "Subtitulos sincronizados
-    #: por ...") are unambiguous credit markers, so they may appear after a
-    #: short lead-in. The release-site tokens deliberately do NOT allow a
-    #: lead-in: that is exactly what separates a bare "YTS.MX" credit line from
-    #: the dialogue "The rarbg group released it.".
+    #: Two tiers (H1): whole-line ``fullmatch`` removes a bare "www.city.com"
+    #: but not "I went to..."; credit phrases allow a short lead-in.
     WHOLE_LINE_SPAM_PATTERNS = [
         # Attribution / credit lines.
         r"(?i)^[\[\(]?\s*subtitled?\s+by\b.*",
@@ -267,11 +249,8 @@ class SubtitleService:
         r"(?i)^we\s*compress\s*knowledge\s*for\s*you!?$",
     ]
 
-    #: Lines that are spam only when they *advertise* something. The call to
-    #: action must open the line, which is what separates an ad from a
-    #: first-person statement that happens to mention the same place:
-    #     "Visit us at www.site.org for more."  -> removed
-    #:     "I visited https://example.org."     -> kept
+    #: Promotional spam needs the call to action at line start: "Visit us at
+    #: www.site.org" is removed, "I visited https://..." is kept.
     PROMOTIONAL_VERBS = (
         r"visit|download|watch|stream|get|grab|click|support|rate|join|"
         r"order|follow|subscribe|suscrib"
@@ -321,9 +300,8 @@ class SubtitleService:
         self.advertisement_patterns = [
             re.compile(p) for p in self.ADVERTISEMENT_PATTERNS
         ]
-        #: (pattern count, compiled alternation) cache. ``spam_patterns`` stays
-        #: part of the public surface, so the entry remembers how many patterns
-        #: it was built from and is rebuilt when that count changes.
+        #: Cache keyed by pattern count: ``spam_patterns`` is public and may be
+        #: replaced, so the compiled matcher tracks how many patterns built it.
         self._spam_matcher: Optional[tuple] = None
         #: Structural problems found by the last parse. Never silently empty.
         self.last_parse_issues: List[ParseIssue] = []
@@ -412,12 +390,8 @@ class SubtitleService:
         """
         items: List[SubtitleItem] = []
         lines = (content or "").splitlines()
-        # Hours are unbounded so that >99h media round trips through SRT (L5).
-        # The pattern comes from the shared grammar module (D4): the exact
-        # component grammar QA validates with.
-        # ``re.Pattern.search`` already returns ``None`` on no match, so the
-        # loop calls it directly: the previous ``find_timing`` wrapper added one
-        # Python frame per scanned line (A6).
+        # Hours are unbounded for >99h media (L5); this is the shared grammar
+        # regex QA uses (D4), called directly to save one frame per line (A6).
         search_timing = _SRT_TIMING_RE.search
 
         index = 0
@@ -450,8 +424,7 @@ class SubtitleService:
                 text_lines.append(candidate)
                 position += 1
             if timings is None:
-                # ``_safe_timestamps`` already recorded the specific reason;
-                # adding a generic one here would double-count every block.
+                # Already recorded by ``_safe_timestamps``; do not double-count.
                 continue
             start_ms, end_ms = timings
             text = "\n".join(text_lines).strip("\n")
@@ -468,9 +441,8 @@ class SubtitleService:
                 SubtitleItem(index=index, start_ms=start_ms, end_ms=end_ms, text=text)
             )
 
-        # Text that precedes the very first timecode belongs to no cue; report
-        # it instead of dropping it without a trace. A bare cue number is the
-        # index of the first cue, not lost content.
+        # Text before the first timecode belongs to no cue: report it instead of
+        # dropping it silently (a bare cue number is not lost content).
         if first_timing_line is not None and first_timing_line > 0:
             for offset in range(first_timing_line):
                 candidate = lines[offset].strip()
@@ -495,9 +467,8 @@ class SubtitleService:
             if not line:
                 i += 1
                 continue
-            # D3: NOTE/STYLE/REGION blocks run until the next blank line.
-            # Skipping only the header re-scanned the body and turned a
-            # timecode inside a NOTE into a phantom cue.
+            # D3: NOTE/STYLE/REGION run until the next blank line; skipping only
+            # the header turned a NOTE timecode into a phantom cue.
             if (
                 line == "NOTE"
                 or line.startswith(("NOTE ", "NOTE\t"))
@@ -547,8 +518,7 @@ class SubtitleService:
                 )
                 text = "\n".join(text_lines)
                 if timings is None:
-                    # ``_safe_timestamps`` already recorded the specific reason;
-                    # adding a generic one here would double-count every block.
+                    # Already recorded by ``_safe_timestamps``; do not double-count.
                     continue
                 start_ms, end_ms = timings
                 if not text.strip():
@@ -575,10 +545,8 @@ class SubtitleService:
 
     def _parse_ass(self, content: str) -> List[SubtitleItem]:
         items: List[SubtitleItem] = []
-        # One regex decides both "is this a dialogue line" and "what are its
-        # fields". The previous code guarded on a case-sensitive
-        # startswith("Dialogue:") and then matched case-insensitively, so the
-        # IGNORECASE flag was dead and lowercase "dialogue:" was dropped.
+        # One case-insensitive regex decides both "is this dialogue" and "what
+        # are its fields"; the old case-sensitive guard dropped "dialogue:".
         dialogue_regex = _ASS_DIALOGUE_RE
         self._last_ass_styles = ass_utils.parse_style_definitions(content)
         curr_idx = 1
@@ -725,17 +693,10 @@ class SubtitleService:
     def is_spam_line(self, line: str) -> bool:
         """Classify one subtitle line as spam.
 
-        A line is only removed when the *whole line* is spam, or when it opens
-        with a call to action and names a source. Merely mentioning a site, a
-        URL or a release tag inside a sentence is dialogue, not spam.
-
-        The whole-line group is evaluated as one compiled alternation (M-4):
-        ``any(pattern.fullmatch(...))`` is a logical OR, so the verdict is
-        identical with a single regex call instead of 25. The promotional and
-        advertising groups deliberately keep their per-pattern ``search``
-        loops: merging them was measured to be *slower* (their ``^`` anchors
-        and ``.*`` tails let each pattern fail fast, while one alternation
-        loses the start-of-string optimisation).
+        A line is removed only when the whole line is spam, or when it opens with
+        a call to action and names a source. The whole-line group runs as one
+        compiled alternation (M-4); promotional groups keep per-pattern
+        ``search`` loops, measured faster than one alternation.
         """
         stripped = (line or "").strip()
         if not stripped:
@@ -761,8 +722,6 @@ class SubtitleService:
             for line in lines:
                 total_lines += 1
                 if not line.strip():
-                    # Blank padding is not a line of dialogue; drop it without
-                    # counting it as deleted content.
                     continue
                 if self.is_spam_line(line):
                     deleted_lines += 1
@@ -800,18 +759,11 @@ class SubtitleService:
     ) -> List[SubtitleItem]:
         """Translate cues, preserving order and per-cue metric attribution.
 
-        Concurrency contract (deep-audit H2): a worker never touches a shared
-        collection. It receives its own cue, does its work against the
-        thread-local translation state, and *returns* a complete
-        :class:`_CueTranslation` record. The coordinator then rebuilds the
-        output in the original order, so neither the metrics nor the reported
-        error type can depend on which thread happened to finish first.
-
-        ``cancel_event`` implements cooperative cancellation (H3): no new cue
-        is started once it is set, the in-flight provider call is allowed to
-        finish, the thread pool is always shut down cleanly, and
-        :class:`SubtitleCancelledError` is raised instead of returning a
-        partial result.
+        Concurrency contract (H2): each worker returns a complete
+        :class:`_CueTranslation` record and the coordinator rebuilds the order,
+        so metrics cannot depend on thread completion order. Cancellation (H3)
+        is cooperative: no new cue starts, the pool shuts down cleanly and
+        :class:`SubtitleCancelledError` replaces any partial result.
         """
         total_items = len(items)
         self._last_translation_started_at = time.perf_counter()
@@ -994,8 +946,7 @@ class SubtitleService:
         if cancelled_early or any(
             record is not None and record.cancelled for record in records
         ):
-            # Leave no partial state behind: the next job must not read a
-            # half-finished translation.
+            # Leave no partial state: the next job must not read a half-finished result.
             self.last_translation_failures = 0
             self.last_translation_metrics = None
             raise SubtitleCancelledError("translation cancelled")
@@ -1011,9 +962,7 @@ class SubtitleService:
                 provider for record in ordered for provider in record.providers_used
             )
         )
-        # One strip per cue (A5): the comprehension used to strip twice to test
-        # and to keep the value, and the metrics recomputed ``split()`` per
-        # pass. Counters are accumulated in a single loop instead.
+        # One strip per cue (A5); counters accumulate in a single loop.
         input_texts = [text for text in (item.text.strip() for item in items) if text]
         output_texts = [
             text for text in (record.item.text.strip() for record in ordered) if text
@@ -1044,8 +993,7 @@ class SubtitleService:
             success=not failed,
             requested_provider=engine,
             providers_used=providers_used,
-            # Deterministic: the first failure in *cue* order, not in the order
-            # the worker threads happened to finish.
+            # Deterministic: the first failure in *cue* order, not completion order.
             error_type=failed_records[0].error_type if failed_records else None,
             error_message=None,
             fallback_error_type=next(
@@ -1130,9 +1078,8 @@ class SubtitleService:
             events.append(
                 (item.start_ms, item.end_ms, ass_utils.to_ass_text(item.text))
             )
-        # D2: the per-cue style assignment travels with each event instead of
-        # collapsing to ``Default``; ``build_ass_document`` keeps the
-        # never-emit-an-undefined-style guarantee by falling back to Default.
+        # D2: per-cue styles travel with each event; ``build_ass_document``
+        # falls back to Default for an undefined style.
         return ass_utils.build_ass_document(
             events,
             definitions,

@@ -215,11 +215,9 @@ if __name__ == "__main__":
     if hasattr(app, "setDesktopFileName"):
         app.setDesktopFileName("srt4u")
 
-    # Set application icon (PNG/SVG prioritized on Linux, ICO on Windows)
     app_icon = load_app_icon()
     app.setWindowIcon(app_icon)
 
-    # Optional: Set application-wide font (platform-native family, same size)
     app.setFont(Styles.ui_font(10))
 
     # Tooltips do not inherit widget QSS; styled application-wide

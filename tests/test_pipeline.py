@@ -200,9 +200,6 @@ def _ok_stages(result):
     return {stage.name: stage.status for stage in result.stages}
 
 
-# 1. Minimal pipeline: fake transcription -> SRT
-
-
 def test_minimal_transcription_to_srt(fakes, media_file, tmp_path):
     out = str(tmp_path / "out.srt")
     config = PipelineConfig(
@@ -227,9 +224,6 @@ def test_minimal_transcription_to_srt(fakes, media_file, tmp_path):
     assert result.total_duration_ms >= 0
 
 
-# 2. Transcription -> analytics -> QA
-
-
 def test_transcription_analytics_qa(fakes, media_file, tmp_path):
     config = PipelineConfig(
         input_media=media_file,
@@ -243,9 +237,6 @@ def test_transcription_analytics_qa(fakes, media_file, tmp_path):
     assert result.qa_before["passed"] is True
     assert result.qa_after["passed"] is True
     assert set(result.qa_before) == set(result.qa_after)
-
-
-# 3. Transcription -> cleaning -> export
 
 
 def test_cleaning_stage_removes_spam(fakes, tmp_path):
@@ -263,9 +254,6 @@ def test_cleaning_stage_removes_spam(fakes, tmp_path):
     content = open(out, encoding="utf-8").read()
     assert "Spammer" not in content
     assert "Hello world" in content
-
-
-# 4. Transcription -> translation with fake
 
 
 def test_translation_stage_keeps_metrics(fakes, media_file, tmp_path):
@@ -286,9 +274,6 @@ def test_translation_stage_keeps_metrics(fakes, media_file, tmp_path):
     assert metrics.target_language == "en"
     assert metrics.success
     assert "[en]" in result.output_content
-
-
-# 5. Pipeline with fallback
 
 
 def test_translation_fallback_used(fakes, media_file, tmp_path):
@@ -322,9 +307,6 @@ def test_translation_fallback_used(fakes, media_file, tmp_path):
     assert result.translation_metrics.requested_provider == "openai"
 
 
-# 6. Transcription failure
-
-
 def test_transcription_failure_binds_stage(fakes, media_file, tmp_path):
     FakeTranscription.fail_with = TranscriptionModelError("modelo roto")
     config = PipelineConfig(
@@ -336,9 +318,6 @@ def test_transcription_failure_binds_stage(fakes, media_file, tmp_path):
     assert result.errors[0]["error_type"] == "model_unavailable"
     assert result.output_subtitle is None
     assert _ok_stages(result).get("export") != "ok"
-
-
-# 7. Translation failure
 
 
 def test_translation_failure_binds_stage(fakes, media_file, tmp_path):
@@ -384,9 +363,6 @@ def test_partial_translation_failure_keeps_original_cue_and_exports(
     assert "[en]" in result.output_content
 
 
-# 8. Strict QA
-
-
 def test_strict_qa_stops_pipeline(tmp_path):
     path = tmp_path / "overlap.srt"
     path.write_text(OVERLAP_SRT, encoding="utf-8")
@@ -410,9 +386,6 @@ def test_strict_qa_stops_pipeline(tmp_path):
     assert ok_result.success
     assert ok_result.qa_before["warning_count"] > 0
     assert ok_result.qa_before["passed"] is True
-
-
-# 9. Burn-in with mock
 
 
 def test_burn_in_uses_runner(fakes, media_file, tmp_path):
@@ -538,9 +511,6 @@ def test_burn_in_config_errors(tmp_path, srt_file):
         PipelineConfig(input_media=srt_file, burn_in_enabled=True).validate()
 
 
-# 10. Cancellation
-
-
 def test_cancel_before_stages(media_file, tmp_path):
     import threading
 
@@ -584,9 +554,6 @@ def test_cancel_mid_transcription(fakes, media_file, tmp_path):
     assert result.output_subtitle is None
     exported = [s for s in result.stages if s.name == "export" and s.status == "ok"]
     assert exported == []
-
-
-# 11. History
 
 
 def test_history_main_record(fakes, media_file, tmp_path):
@@ -649,9 +616,6 @@ def test_history_partial_translation_failure_count(fakes, media_file, tmp_path):
     assert rows[0]["translation_failures"] == 1
 
 
-# 12. JSON serialization
-
-
 def test_result_json_roundtrip(fakes, media_file, tmp_path):
     config = PipelineConfig(
         input_media=media_file,
@@ -671,9 +635,6 @@ def test_result_json_roundtrip(fakes, media_file, tmp_path):
     payload = json.loads(json.dumps(failed.to_dict()))
     assert payload["success"] is False
     assert payload["failed_stage"] == "transcription"
-
-
-# 13. CLI
 
 
 def test_cli_pipeline_subtitle(fakes, tmp_path, capsys):
@@ -720,9 +681,6 @@ def test_cli_pipeline_stats_json_and_failure(fakes, tmp_path, capsys):
     with pytest.raises(SystemExit) as exc_info:
         cli.main(["pipeline", str(bad), "--no-history"])
     assert exc_info.value.code == 2
-
-
-# 14. API
 
 
 def _wait_job(client, job_id, timeout=15.0):
@@ -803,9 +761,6 @@ def test_api_pipeline_validation(api_client):
     assert "/api/v1/pipeline" in spec["paths"]
 
 
-# GUI
-
-
 def test_pipeline_page_wired(qapp):
     from application.ui.main_window import MainWindow
 
@@ -820,9 +775,6 @@ def test_pipeline_page_wired(qapp):
     assert "transcription" in win._pipeline_media_filter().lower() or True
     assert "*.mp4" in win._pipeline_media_filter()
     assert "nav.pipeline" in [b.property("i18n_key") for b in win.nav_buttons]
-
-
-# 15. Full fake end-to-end
 
 
 def test_full_end_to_end(fakes, media_file, tmp_path):
@@ -869,9 +821,6 @@ def test_full_end_to_end(fakes, media_file, tmp_path):
     assert row["operation"] == "pipeline"
     assert row["target_language"] == "en"
     json.dumps(result.to_dict())
-
-
-# Hardening: job drop cleanup + no server paths
 
 
 def test_queued_cancel_runs_on_drop():

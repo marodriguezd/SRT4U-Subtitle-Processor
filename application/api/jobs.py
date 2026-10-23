@@ -16,9 +16,8 @@ from ..logging_setup import get_logger
 
 logger = get_logger("api")
 
-#: Retention defaults (deep-audit M9). Without these, ``_jobs`` grew without
-#: bound and every finished job kept its full result payload alive for the
-#: lifetime of the server.
+#: Retention defaults (M9): without them ``_jobs`` grows without bound and
+#: finished payloads stay alive for the server's lifetime.
 DEFAULT_MAX_JOBS = 200
 DEFAULT_MAX_QUEUED_JOBS = 50
 DEFAULT_TTL_SECONDS = 3600.0
@@ -138,9 +137,8 @@ class JobManager:
         job_is_dropped = False
         with self._lock:
             job = self._jobs.get(job_id)
-            # A job already marked cancelled (by ``cancel`` or ``shutdown``) has
-            # had its drop callback consumed. Running it now would execute work
-            # whose temp inputs were already removed, so it must stop here.
+            # Already-cancelled jobs consumed their drop callback: running them
+            # would use temp inputs that no longer exist.
             if job is None or job["cancel_requested"] or job["status"] == "cancelled":
                 job_is_dropped = True
                 if job is not None:

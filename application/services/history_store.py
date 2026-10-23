@@ -236,8 +236,6 @@ class HistoryStore:
     def __exit__(self, *args: Any) -> None:
         self.close()
 
-    # Writes (single transaction each)
-
     def record_run(self, operation: str, **fields: Any) -> int:
         """Insert one execution row; returns its id. All values parameterized."""
         try:
@@ -333,17 +331,9 @@ class HistoryStore:
     ) -> int:
         """Build a run row from a ProcessingResult without importing services.
 
-        Deep-audit L1: the run row and its QA findings are written in **one**
-        transaction, so a failure while storing findings rolls the run back
-        instead of leaving a half-recorded execution.
-
-        Deep-audit L2: ``success`` means the same thing here as it does in
-        ``record_pipeline_result`` — did this execution produce a usable
-        result? It is resolved in this order: the explicit ``success``
-        argument, then ``ProcessingResult.success`` (set by the pipeline-style
-        outcome), then the translation metrics, and only then a successful run.
-        A translation-free ``process`` run is no longer implicitly "successful"
-        just because it had no metrics.
+        L1: the run and its QA findings share one transaction, so a failure
+        rolls both back. L2: ``success`` resolution is explicit argument,
+        ``ProcessingResult.success``, translation metrics, then success.
         """
         stats = getattr(result, "stats", None)
         metrics = getattr(result, "translation_metrics", None)
@@ -481,8 +471,6 @@ class HistoryStore:
         except sqlite3.DatabaseError as exc:
             raise HistoryError(f"cannot record benchmark: {exc}") from exc
         return ids
-
-    # Reads
 
     def recent_runs(
         self,

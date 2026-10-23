@@ -162,10 +162,8 @@ class ProcessResultModel(BaseModel):
     processed_items_count: int = 0
     translation_metrics: Optional[TranslationMetricsModel] = None
     qa: Optional[QAReportModel] = None
-    # P1: parser findings ride along as a top-level advisory list so API
-    # clients can warn their users. Declared explicitly because the /process
-    # route serializes this exact model into the job result (documented via
-    # JobStatusResponse.result in create_app's OpenAPI extension).
+    # P1: advisory parser findings, declared so OpenAPI documents them via
+    # JobStatusResponse.result.
     parse_issues: List[ParseIssueModel] = Field(default_factory=list)
 
 
@@ -183,9 +181,8 @@ class JobStatusResponse(BaseModel):
     created_at: str
     finished_at: Optional[str] = None
     error: Optional[str] = None
-    # The concrete payload depends on `operation`; create_app's OpenAPI
-    # extension documents `result` as the union of the job-result models.
-    # Runtime stays tolerant (jobs carry plain dicts built by the routes).
+    # Payload depends on `operation`; the OpenAPI extension documents `result`
+    # as the union of job-result models, while runtime stays tolerant.
     result: Optional[Any] = None
 
 

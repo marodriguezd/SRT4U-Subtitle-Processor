@@ -55,8 +55,7 @@ def test_single_product_version_everywhere():
     assert pyproject_version == EXPECTED_VERSION
 
     # Single runtime source: application/version.py re-exports the release
-    # version; API schemas, app metadata, the seven GUI version pills and the
-    # CLI --version all derive from it instead of repeating the literal.
+    # version used by the API, the GUI pills and the CLI.
     from application.version import APP_VERSION
 
     assert APP_VERSION == EXPECTED_VERSION
@@ -88,9 +87,8 @@ def test_single_product_version_everywhere():
 def test_runtime_version_literal_lives_only_in_single_source():
     """The version literal lives only in pyproject.toml + application/version.py;
     every other runtime module derives it via APP_VERSION."""
-    # Restrict to application/*.py (the tested scope). pyproject.toml is
-    # the authoritative source and lives at the repo root, so it is not
-    # scanned here; test_single_product_version_everywhere checks it.
+    # Restrict to application/*.py: pyproject.toml is checked by
+    # test_single_product_version_everywhere instead.
     offenders = []
     for path in (ROOT / "application").rglob("*.py"):
         text = path.read_text(encoding="utf-8")
@@ -335,10 +333,8 @@ def test_release_workflow_gates_publication_on_tag_validation():
     # Provenance: the tag must point at the published commit (no API).
     assert "git rev-parse" in release_block and "refs/tags/" in release_block
     assert "github.sha" in release_block
-    # Artifact provenance: each build writes a plain-text version stamp
-    # (RELEASE_VERSION) and the release job compares it against the tag.
-    # PyInstaller binaries compress the Python code, so grepping
-    # for the literal inside the executable can never pass.
+    # Artifact provenance: each build stamps RELEASE_VERSION and the release
+    # job compares it with the tag; the binary's Python is compressed.
     _JOB_ORDER = [
         "test",
         "compat-min-pyqt6",

@@ -33,9 +33,6 @@ def service():
     return SubtitleService()
 
 
-# 1. Format Round-Tripping & SSA Specifics
-
-
 def test_ssa_format_parsing_and_formatting(service):
     """Verify .ssa format parsing with 'Marked=0' and format roundtrip."""
     ssa_content = """[Script Info]
@@ -63,7 +60,6 @@ Dialogue: 0,0:02:00.00,0:02:04.50,Default,,0,0,0,,Second cue in SSA
     assert items[1].end_ms == 124500
     assert items[1].text == "Second cue in SSA"
 
-    # Export to SSA/ASS format
     rendered_ssa = service.format_output(items, "ssa")
     assert "[Events]" in rendered_ssa
     assert "Dialogue:" in rendered_ssa
@@ -89,29 +85,21 @@ def test_txt_format_roundtrip_with_crlf(service):
     assert "Line 2 of subtitles" in out_txt
 
 
-# 2. Multi-Hour (>99h) Timestamps
-
-
 def test_multi_hour_timestamps_across_formats(service):
     """Verify timestamps > 99 hours round-trip cleanly in SRT, VTT, and ASS."""
-    # 125 hours, 30 minutes, 15 seconds, 500 ms
     ms = (125 * 3600 + 30 * 60 + 15) * 1000 + 500
 
-    # SRT unbounded hours
     srt_time = ms_to_srt_time(ms)
     assert srt_time == "125:30:15,500"
     assert parse_timestamp_to_ms(srt_time) == ms
 
-    # VTT unbounded hours
     vtt_time = ms_to_vtt_time(ms)
     assert vtt_time == "125:30:15.500"
     assert parse_timestamp_to_ms(vtt_time) == ms
 
-    # ASS unbounded hours (centisecond precision)
     ass_time = ms_to_ass_time(ms)
     assert ass_time == "125:30:15.50"
 
-    # Full SRT parse/format round-trip with >99h cues
     srt_content = "1\n125:30:15,500 --> 125:30:20,000\nExtreme duration cue\n"
     items = service.parse_subtitles(srt_content, "srt")
     assert len(items) == 1
@@ -119,26 +107,20 @@ def test_multi_hour_timestamps_across_formats(service):
     assert items[0].end_ms == ms + 4500
     assert service.format_output(items, "srt").strip() == srt_content.strip()
 
-    # Full VTT parse/format round-trip with >99h cues
     vtt_content = "WEBVTT\n\n1\n125:30:15.500 --> 125:30:20.000\nExtreme VTT cue\n"
     vtt_items = service.parse_subtitles(vtt_content, "vtt")
     assert len(vtt_items) == 1
     assert vtt_items[0].start_ms == ms
 
 
-# 3. Malformed Timestamps & Empty Cues (ParseIssue tracking)
-
-
 def test_malformed_timestamp_minutes_seconds_out_of_range(service):
     """Timestamps with minutes > 59 or seconds > 59 must be rejected with ParseIssue."""
-    # Minutes out of range in SRT
     srt_bad_minutes = "1\n00:75:00,000 --> 00:75:02,000\nInvalid minutes\n"
     items = service.parse_subtitles(srt_bad_minutes, "srt")
     assert len(items) == 0
     issues = service.last_parse_issues
     assert any(i.kind == "invalid_timestamp" for i in issues)
 
-    # Seconds out of range in VTT
     vtt_bad_seconds = (
         "WEBVTT\n\n00:01:99.000 --> 00:02:00.000\nInvalid seconds in VTT\n"
     )
@@ -158,7 +140,6 @@ def test_reversed_timestamps_recorded_as_issue(service):
 
 def test_empty_cue_handling_across_all_formats(service):
     """Empty cues in SRT, VTT, and ASS must be captured as ParseIssue without crashing."""
-    # SRT empty cue
     srt_empty = (
         "1\n00:00:01,000 --> 00:00:02,000\n\n2\n00:00:03,000 --> 00:00:04,000\nValid\n"
     )
@@ -167,14 +148,12 @@ def test_empty_cue_handling_across_all_formats(service):
     assert srt_items[0].text == "Valid"
     assert any(i.kind == "empty_cue" for i in service.last_parse_issues)
 
-    # VTT empty cue
     vtt_empty = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n\n00:00:03.000 --> 00:00:04.000\nValid VTT\n"
     vtt_items = service.parse_subtitles(vtt_empty, "vtt")
     assert len(vtt_items) == 1
     assert vtt_items[0].text == "Valid VTT"
     assert any(i.kind == "empty_cue" for i in service.last_parse_issues)
 
-    # ASS empty cue
     ass_empty = """[Script Info]
 Title: Empty Cue Test
 [Events]
@@ -188,23 +167,17 @@ Dialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,,Valid ASS
     assert any(i.kind == "empty_cue" for i in service.last_parse_issues)
 
 
-# 4. Batch Queue Resilience & Error Isolation
-
-
 def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
     """Batch queue must process valid files, isolate errors per file, and not crash."""
     win = MainWindow()
 
-    # File 1: Valid SRT
     valid_srt = tmp_path / "valid.srt"
     valid_srt.write_text(
         "1\n00:00:01,000 --> 00:00:03,000\nValid cue\n", encoding="utf-8"
     )
 
-    # File 2: Non-existent file
     missing_file = tmp_path / "missing.srt"
 
-    # File 3: Empty file
     empty_file = tmp_path / "empty.srt"
     empty_file.write_text("", encoding="utf-8")
 
@@ -277,9 +250,6 @@ def test_batch_processing_cooperative_cancellation(qapp, tmp_path):
     assert win.batch_table.item(0, 3).text() == "Queued"
 
 
-# 5. Worker Thread State Isolation & Cancellation
-
-
 def test_process_worker_cancellation_during_clean_or_parse(tmp_path, qapp):
     """ProcessWorker must abort cooperatively when cancelled before or during stages."""
     source = tmp_path / "sample.srt"
@@ -325,15 +295,11 @@ def test_process_subtitles_cancel_event_without_translation(tmp_path):
         )
 
 
-# 6. Atomic File Write Protection
-
-
 def test_atomic_write_preserves_destination_on_failure(tmp_path, monkeypatch):
     """If atomic_write_text encounters a disk write error, destination remains intact."""
     dest = tmp_path / "important.srt"
     dest.write_text("ORIGINAL CONTENT", encoding="utf-8")
 
-    # Simulate write error by breaking os.fsync
     def fail_fsync(fd):
         raise OSError("Simulated disk error during fsync")
 
@@ -348,9 +314,6 @@ def test_atomic_write_preserves_destination_on_failure(tmp_path, monkeypatch):
     # Temporary files must be cleaned up
     remaining_tmps = [f for f in os.listdir(tmp_path) if f.startswith(".srt4u-tmp-")]
     assert len(remaining_tmps) == 0
-
-
-# 7. Reviewer Hardening & Adversarial Edge Cases
 
 
 def test_batch_processing_resets_cancellation_for_subsequent_runs(qapp, tmp_path):
@@ -765,26 +728,22 @@ def test_cross_format_roundtrip_all_formats(service):
     items_srt = service.parse_subtitles(srt_content, "srt")
     assert len(items_srt) == 2
 
-    # SRT -> ASS
     ass_rendered = service.format_output(items_srt, "ass")
     items_ass = service.parse_subtitles(ass_rendered, "ass")
     assert len(items_ass) == 2
     assert items_ass[0].text == "First dialogue line"
     assert items_ass[1].start_ms == items_srt[1].start_ms
 
-    # ASS -> VTT
     vtt_rendered = service.format_output(items_ass, "vtt")
     items_vtt = service.parse_subtitles(vtt_rendered, "vtt")
     assert len(items_vtt) == 2
     assert items_vtt[0].text == "First dialogue line"
 
-    # VTT -> SSA
     ssa_rendered = service.format_output(items_vtt, "ssa")
     items_ssa = service.parse_subtitles(ssa_rendered, "ssa")
     assert len(items_ssa) == 2
     assert items_ssa[1].text == "Second dialogue line"
 
-    # SSA -> TXT
     txt_rendered = service.format_output(items_ssa, "txt")
     items_txt = service.parse_subtitles(txt_rendered, "txt")
     assert len(items_txt) == 2

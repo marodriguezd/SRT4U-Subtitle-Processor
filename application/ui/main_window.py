@@ -76,9 +76,8 @@ from ..logging_setup import get_logger
 
 logger = get_logger("ui")
 
-#: How long ``closeEvent`` waits for a cooperative cancellation to land before
-#: it defers the window close. Long enough for an in-flight provider call to
-#: return, short enough that the user does not think the app has hung.
+#: How long ``closeEvent`` waits for a cooperative cancellation before deferring
+#: the close: long enough for a provider call, short enough not to feel hung.
 CLOSE_GRACE_SECONDS = 5.0
 
 
@@ -441,17 +440,18 @@ class MainWindow(QMainWindow):
         self.page_transcribe = self._build_transcribe_page()
         self.page_pipeline = self._build_pipeline_page()
 
-        self.stack.addWidget(self.page_home)  # 0
-        self.stack.addWidget(self.page_preview)  # 1
-        self.stack.addWidget(self.page_clean)  # 2
-        self.stack.addWidget(self.page_convert)  # 3
-        self.stack.addWidget(self.page_batch)  # 4
-        self.stack.addWidget(self.page_settings)  # 5
-        self.stack.addWidget(self.page_completed)  # 6
-        self.stack.addWidget(self.page_about)  # 7
-        self.stack.addWidget(self.page_history)  # 8
-        self.stack.addWidget(self.page_transcribe)  # 9
-        self.stack.addWidget(self.page_pipeline)  # 10
+        # Stack order is part of the navigation contract (_switch_page).
+        self.stack.addWidget(self.page_home)
+        self.stack.addWidget(self.page_preview)
+        self.stack.addWidget(self.page_clean)
+        self.stack.addWidget(self.page_convert)
+        self.stack.addWidget(self.page_batch)
+        self.stack.addWidget(self.page_settings)
+        self.stack.addWidget(self.page_completed)
+        self.stack.addWidget(self.page_about)
+        self.stack.addWidget(self.page_history)
+        self.stack.addWidget(self.page_transcribe)
+        self.stack.addWidget(self.page_pipeline)
 
         root_layout.addWidget(self.stack)
         self._switch_page(0)
@@ -557,18 +557,10 @@ class MainWindow(QMainWindow):
         return found
 
     def closeEvent(self, event):  # noqa: N802 - Qt naming
-        """Never let Qt destroy a QThread that is still running.
+        """Refuse to let Qt destroy a running QThread.
 
-        Deep-audit M11: there was no ``closeEvent`` at all, so closing the
-        window during a transcription, a pipeline or a burn-in destroyed a
-        running ``QThread``. That aborts with "QThread: Destroyed while thread
-        is still running" and orphans the FFmpeg child plus its ``srt4u_burn_*``
-        temp directory, because the worker's ``finally`` never runs.
-
-        Policy: ask every worker to cancel cooperatively, pump the event loop
-        until they stop, and if any refuses, *refuse the close* rather than
-        terminate it. Losing a queued window close is much cheaper than
-        destroying a live thread.
+        M11: cancel every worker cooperatively and wait; if one refuses to
+        stop, refuse the close instead of terminating it.
         """
         if getattr(self, "_batch_running", False):
             self._batch_cancelled = True
@@ -674,7 +666,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(16)
 
-        # Header with theme toggle and language selector
         header_row = QHBoxLayout()
         header_text = QVBoxLayout()
         header_text.setSpacing(4)
@@ -763,7 +754,6 @@ class MainWindow(QMainWindow):
         self.drop_zone.file_dropped.connect(self._on_file_selected)
         layout.addWidget(self.drop_zone)
 
-        # Selector row (source language, target language, translation engine)
         selector_card = QFrame()
         selector_card.setObjectName("CardContainer")
         sel_layout = QHBoxLayout(selector_card)
@@ -961,9 +951,8 @@ class MainWindow(QMainWindow):
             }}
         """)
         self.preview_search_input.textChanged.connect(self._on_preview_search_changed)
-        # Typing must not run one visibility pass over every cue per keystroke:
-        # the counter updates immediately (cheap) and the relayout is debounced
-        # (A3).
+        # Typing must not run a visibility pass over every cue per keystroke:
+        # the counter updates immediately and the relayout is debounced (A3).
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(150)
@@ -1011,7 +1000,6 @@ class MainWindow(QMainWindow):
 
         page_layout.addWidget(toolbar)
 
-        # 3. Cinema Splitter (Video Player on TOP, Subtitle Diff Viewer on BOTTOM)
         splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setHandleWidth(8)
         splitter.setStyleSheet(f"""
@@ -2101,9 +2089,8 @@ class MainWindow(QMainWindow):
             self.video_player.load_video(video_path)
 
     def _start_processing(self):
-        # D6: one process job at a time. A second start while the previous
-        # worker runs used to replace ``self.worker`` and run concurrently
-        # against the same stateful ``SubtitleService``.
+        # D6: one process job at a time; a second start would overwrite
+        # ``self.worker`` and race the stateful ``SubtitleService``.
         worker = getattr(self, "worker", None)
         if worker is not None and worker.isRunning():
             return
@@ -2194,8 +2181,7 @@ class MainWindow(QMainWindow):
         base, ext = os.path.splitext(self.current_subtitle_path)
         out_path = f"{base}_processed{ext}"
         try:
-            # Deep-audit L9: write atomically so a failure never destroys the
-            # user's previous good file.
+            # L9: atomic write, so a failure never destroys the previous good file.
             self.subtitle_service.write_output_file(out_path, result.output_content)
             self.saved_output_path = out_path
         except Exception:
@@ -2298,9 +2284,8 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Cleaning never translates, so the translation defaults of
-        # ``ProcessWorker`` apply and no inert language/engine arguments are
-        # passed here.
+        # Cleaning never translates: ``ProcessWorker`` defaults apply, so no
+        # inert language/engine arguments are passed.
         self.worker = ProcessWorker(
             service=self.subtitle_service,
             file_path=self.current_subtitle_path,
@@ -2621,7 +2606,6 @@ class MainWindow(QMainWindow):
             self.config_service.get("openai_model", "gpt-4o-mini")
         )
 
-        # Restore home page options
         self._select_combo_data(
             self.cb_source_lang, self.config_service.get("source_lang", "auto")
         )
@@ -3154,7 +3138,6 @@ class MainWindow(QMainWindow):
                 self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
 
     def retranslate_ui(self):
-        # Global chrome
         self.setWindowTitle(t("about.title"))
         if hasattr(self, "lbl_app_sub"):
             self.lbl_app_sub.setText(t("app.subtitle"))
@@ -3173,13 +3156,11 @@ class MainWindow(QMainWindow):
             self.cb_settings_lang.setItemText(0, t("settings.lang_auto"))
         self._refresh_effective_language()
 
-        # Sidebar Nav
         for btn in self.nav_buttons:
             key = btn.property("i18n_key")
             if key:
                 btn.setText(_nav_label(key))
 
-        # Home Page
         if hasattr(self, "lbl_home_title"):
             self.lbl_home_title.setText(t("home.title"))
             self.lbl_home_sub.setText(t("home.subtitle"))
@@ -3195,7 +3176,6 @@ class MainWindow(QMainWindow):
             self.btn_process.setText(t("home.btn_process"))
             self.drop_zone.retranslate()
 
-        # Preview / Studio Page
         if hasattr(self, "lbl_preview_title"):
             self.lbl_preview_title.setText(t("preview.title"))
             self.lbl_preview_sub.setText(t("preview.subtitle"))
@@ -3209,14 +3189,12 @@ class MainWindow(QMainWindow):
             self.diff_viewer.retranslate()
             self.video_player.retranslate()
 
-        # Clean Page
         if hasattr(self, "lbl_clean_title"):
             self.lbl_clean_title.setText(t("clean.title"))
             self.lbl_clean_sub.setText(t("clean.subtitle"))
             self.btn_fast_clean.setText(t("clean.btn_clean"))
             self.clean_drop_zone.retranslate()
 
-        # Convert Page
         if hasattr(self, "lbl_convert_title"):
             self.lbl_convert_title.setText(t("convert.title"))
             self.lbl_convert_sub.setText(t("convert.subtitle"))
@@ -3224,7 +3202,6 @@ class MainWindow(QMainWindow):
             self.btn_run_convert.setText(t("convert.btn_convert"))
             self.convert_drop_zone.retranslate()
 
-        # Transcribe Page
         if hasattr(self, "lbl_transcribe_title"):
             self.lbl_transcribe_title.setText(t("transcribe.title"))
             self.lbl_transcribe_sub.setText(t("transcribe.subtitle"))
@@ -3238,7 +3215,6 @@ class MainWindow(QMainWindow):
             self.btn_start_transcribe.setText(t("transcribe.btn_start"))
             self._refresh_transcribe_availability()
 
-        # Pipeline Page
         if hasattr(self, "lbl_pipeline_title"):
             self.lbl_pipeline_title.setText(t("pipeline.title"))
             self.lbl_pipeline_sub.setText(t("pipeline.subtitle"))
@@ -3258,7 +3234,6 @@ class MainWindow(QMainWindow):
             self.btn_choose_video_out.setText(t("pipeline.btn_video_out"))
             self.btn_start_pipeline.setText(t("pipeline.btn_start"))
 
-        # Batch Page
         if hasattr(self, "lbl_batch_title"):
             self.lbl_batch_title.setText(t("batch.title"))
             self.lbl_batch_sub.setText(t("batch.subtitle"))
@@ -3274,7 +3249,6 @@ class MainWindow(QMainWindow):
             )
             self.btn_start_batch.setText(t("batch.btn_start"))
 
-        # Settings Page
         if hasattr(self, "lbl_settings_title"):
             self.lbl_settings_title.setText(t("settings.title"))
             self.lbl_lang_card_title.setText(t("settings.lang_card_title"))
@@ -3292,7 +3266,6 @@ class MainWindow(QMainWindow):
             )
             self.btn_save_settings.setText(t("settings.btn_save"))
 
-        # Completed Page
         if hasattr(self, "lbl_completed_title"):
             self.lbl_completed_title.setText(t("completed.title"))
             self.lbl_completed_sub.setText(t("completed.subtitle"))
@@ -3307,7 +3280,6 @@ class MainWindow(QMainWindow):
             self.lbl_sum2.setText(t("completed.sum2"))
             self.lbl_sum3.setText(t("completed.sum3"))
 
-        # About Page
         if hasattr(self, "lbl_about_status"):
             self.lbl_about_title.setText(t("about.title"))
             self.lbl_version_badge.setText(t("about.version_pill"))
@@ -3327,7 +3299,6 @@ class MainWindow(QMainWindow):
             self.btn_open_license.setText(t("about.btn_open_license"))
             self.btn_web_deed.setText(t("about.btn_web_deed"))
 
-        # History Page
         if hasattr(self, "lbl_history_title"):
             self.lbl_history_title.setText(t("history.title"))
             self.lbl_history_sub.setText(t("history.subtitle"))

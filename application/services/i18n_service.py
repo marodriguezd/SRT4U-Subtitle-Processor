@@ -1,14 +1,4 @@
-"""Centralized internationalization (i18n) service for SRT4U.
-
-Supports automatic system locale detection and dynamic language switching between:
-- English (en)
-- Spanish (es)
-- Portuguese (pt)
-- German (de)
-- Italian (it)
-- French (fr)
-- Simplified Chinese (zh-CN)
-"""
+"""UI translation catalogue with system locale detection (seven languages)."""
 
 import os
 from typing import Dict, Optional
@@ -41,7 +31,6 @@ class I18nService(QObject):
     TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # EN (English)
         "en": {
-            # Navigation
             "nav.home": "Home",
             "nav.translate": "Translation Studio",
             "nav.clean": "Clean",
@@ -64,12 +53,10 @@ class I18nService(QObject):
             "history.col_status": "Status",
             "history.col_fallback": "Fallback",
             "history.col_parse_issues": "Parse issues",
-            # Top bar
             "topbar.theme_tooltip": "Toggle dark / light theme",
             "topbar.lang_tooltip": "Change interface language",
             "topbar.lang_tooltip_effective": "Change interface language — now: {language}",
             "topbar.lang_auto": "Auto (System)",
-            # Home Page
             "home.title": "Translate Subtitles",
             "home.subtitle": "Select your file, target language and processing options.",
             "home.source_lang": "Source Language",
@@ -82,7 +69,6 @@ class I18nService(QObject):
             "home.translate_title": "Translate text",
             "home.translate_desc": "Translate dialogues to target language",
             "home.btn_process": "Start processing",
-            # Dropzone
             "dropzone.title": "Drag your subtitle file here",
             "dropzone.subtitle": "or click to browse",
             "dropzone.formats": "Supported formats: .srt, .ass, .vtt, .txt",
@@ -91,7 +77,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "Click or drag another file to replace",
             "dropzone.dialog_title": "Select subtitle",
             "dropzone.filter": "Subtitles (*.srt *.ass *.vtt *.txt);;All files (*.*)",
-            # Preview / Translation Studio
             "preview.title": "Translation Studio",
             "preview.subtitle": "Preview video, edit subtitles line by line and synchronize.",
             "preview.btn_open": "Open Subtitle",
@@ -114,9 +99,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volume",
             "preview.video_filter": "Videos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;All files (*.*)",
             "preview.save_dialog_title": "Save edited subtitle",
-            # File dialogs
             "dialog.all_files": "All files (*.*)",
-            # Transcribe Page
             "transcribe.title": "Transcribe media",
             "transcribe.subtitle": "Convert audio or video into subtitles with local Whisper. The result feeds Analytics, QA, cleaning and translation.",
             "transcribe.no_file": "No file selected",
@@ -140,7 +123,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "Could not transcribe: {err}",
             "transcribe.error_generic": "Check that the media is readable and Whisper is available, then try again.",
             "transcribe.cancelled": "Transcription cancelled",
-            # Pipeline Page
             "pipeline.title": "Media pipeline",
             "pipeline.subtitle": "Transcription → cleaning → analytics → QA → optional translation → final QA → export → optional burn-in.",
             "pipeline.no_file": "No file selected",
@@ -172,16 +154,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "The pipeline did not complete: {err}",
             "pipeline.error_unknown": "Unknown error",
             "pipeline.cancelled": "Pipeline cancelled",
-            # Clean Page
             "clean.title": "Clean Subtitles",
             "clean.subtitle": "Remove ads, links, and fansub watermarks without modifying timings.",
             "clean.btn_clean": "Clean File Now",
-            # Convert Page
             "convert.title": "Format Conversion",
             "convert.subtitle": "Convert between SRT, VTT, ASS and TXT while preserving synchronization.",
             "convert.target_label": "Target format:",
             "convert.btn_convert": "Convert and Save",
-            # Batch Page
             "batch.title": "Batch Processing",
             "batch.subtitle": "Translate, clean, or convert multiple files in parallel.",
             "batch.btn_add": "Add Subtitles",
@@ -195,7 +174,6 @@ class I18nService(QObject):
             "batch.status_processing": "Processing...",
             "batch.status_completed": "Completed",
             "batch.status_error": "Error: {err}",
-            # Settings Page
             "settings.title": "Settings",
             "settings.lang_card_title": "Interface Language",
             "settings.lang_card_desc": "Select the language of the application interface or detect automatically.",
@@ -213,7 +191,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "Model (e.g. gpt-4o-mini)",
             "settings.btn_save": "Save Settings",
             "settings.save_success": "Settings saved successfully!",
-            # Completed Page
             "completed.title": "Processing Completed",
             "completed.subtitle": "The file has been processed and saved successfully.",
             "completed.card_lines": "processed lines",
@@ -226,7 +203,6 @@ class I18nService(QObject):
             "completed.sum1": "Spam, URLs, and unwanted markers cleaned",
             "completed.sum2": "Original timing and structure preserved",
             "completed.sum3": "Output file saved successfully",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Cross-platform desktop app • FFmpeg required to embed subtitles in video",
@@ -250,7 +226,6 @@ class I18nService(QObject):
             "about.restr_3": "Same license: Derivative works must carry the GNU GPL v3.0",
             "about.btn_open_license": "Open LICENSE file",
             "about.btn_web_deed": "View GNU GPL v3.0 Terms",
-            # Burn In Dialog
             "burn.dialog_title": "Burn Subtitles into Video (Hardsub)",
             "burn.lbl_video_source": "Source video:",
             "burn.lbl_output_file": "Output video:",
@@ -283,7 +258,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "internal error",
             "burn.btn_folder": "Open folder",
             "burn.btn_close": "Close",
-            # Alerts & Messages
             "alert.file_req_title": "File required",
             "alert.file_req_desc": "Drag or select a subtitle file first.",
             "alert.no_subs_title": "No subtitles",
@@ -295,7 +269,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "Subtitle saved to:\n{path}",
             "alert.burn_success_title": "Burn completed",
             "alert.burn_success_desc": "Video rendered successfully with hardcoded subtitles:\n{path}",
-            # Progress Modal
             "progress.window_title": "Processing...",
             "progress.title": "Processing...",
             "progress.step_reading": "Reading file...",
@@ -307,24 +280,19 @@ class I18nService(QObject):
             "progress.remaining": "Remaining time: {time}",
             "progress.translating_progress": "Translating ({done}/{total})...",
             "progress.cancel": "Cancel",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "Detect automatically",
             "home.engine_deepl": "DeepL (recommended)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "Click here or drag a video (.mp4, .mkv, .webm) to preview",
             "preview.video_loaded": "Video loaded - Ready to play",
             "preview.select_video_title": "Select video to preview",
             "preview.select_subtitle_title": "Select subtitle to preview",
             "preview.sub_filter": "Subtitles (*.srt *.ass *.vtt *.txt);;All files (*.*)",
             "preview.save_filter": "Subtitle SRT (*.srt);;Subtitle VTT (*.vtt);;Subtitle ASS (*.ass);;Plain text (*.txt)",
-            # Completed extras
             "completed.saved_as": "Saved as: {name}",
-            # Settings extras
             "settings.save_success_title": "Settings saved",
-            # Burn-in extras
             "burn.sub_badge": "Subtitles ready: {count} lines",
             "burn.lbl_quality": "Quality / Speed:",
             "burn.size_small": "Small",
@@ -350,7 +318,6 @@ class I18nService(QObject):
             "burn.stopping": "Stopping FFmpeg process...",
             "burn.chk_fix_overlaps": "Avoid overlapping times between consecutive subtitles",
             "burn.preview_hint": "This is how the burned-in subtitle will look in the video",
-            # Alerts extras
             "alert.save_error_title": "Error saving",
             "alert.save_error_desc": "Could not save the file:\n{err}",
             "alert.process_error_title": "Error",
@@ -378,7 +345,6 @@ class I18nService(QObject):
         },
         # ES (Spanish)
         "es": {
-            # Navigation
             "nav.home": "Inicio",
             "nav.translate": "Traducir",
             "nav.clean": "Limpiar",
@@ -401,12 +367,10 @@ class I18nService(QObject):
             "history.col_status": "Estado",
             "history.col_fallback": "Fallback",
             "history.col_parse_issues": "Bloques sin leer",
-            # Top bar
             "topbar.theme_tooltip": "Alternar modo oscuro / claro",
             "topbar.lang_tooltip": "Cambiar idioma de la interfaz",
             "topbar.lang_tooltip_effective": "Cambiar idioma de la interfaz — actual: {language}",
             "topbar.lang_auto": "Automático (Sistema)",
-            # Home Page
             "home.title": "Traducir subtítulos",
             "home.subtitle": "Selecciona tu archivo, el idioma de destino y las opciones de procesamiento.",
             "home.source_lang": "Idioma de origen",
@@ -419,7 +383,6 @@ class I18nService(QObject):
             "home.translate_title": "Traducir texto",
             "home.translate_desc": "Traduce los diálogos al idioma de destino",
             "home.btn_process": "Iniciar procesamiento",
-            # Dropzone
             "dropzone.title": "Arrastra tu archivo de subtítulos aquí",
             "dropzone.subtitle": "o haz clic para seleccionar",
             "dropzone.formats": "Formatos soportados: .srt, .ass, .vtt, .txt",
@@ -428,7 +391,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "Haz clic o arrastra otro archivo para reemplazar",
             "dropzone.dialog_title": "Seleccionar subtítulo",
             "dropzone.filter": "Subtítulos (*.srt *.ass *.vtt *.txt);;Todos los archivos (*.*)",
-            # Preview / Translation Studio
             "preview.title": "Estudio de Traducción",
             "preview.subtitle": "Previsualiza vídeo, edita subtítulos frase a frase y sincroniza.",
             "preview.btn_open": "Abrir subtítulo",
@@ -451,9 +413,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volumen",
             "preview.video_filter": "Vídeos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos los archivos (*.*)",
             "preview.save_dialog_title": "Guardar subtítulo editado",
-            # File dialogs
             "dialog.all_files": "Todos los archivos (*.*)",
-            # Transcribe Page
             "transcribe.title": "Transcribir multimedia",
             "transcribe.subtitle": "Convierte audio o vídeo en subtítulos con Whisper local. El resultado alimenta Analytics, QA, limpieza y traducción.",
             "transcribe.no_file": "Ningún archivo seleccionado",
@@ -477,7 +437,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "No se pudo transcribir: {err}",
             "transcribe.error_generic": "Comprueba que el archivo multimedia sea legible y que Whisper esté disponible; después, inténtalo de nuevo.",
             "transcribe.cancelled": "Transcripción cancelada",
-            # Pipeline Page
             "pipeline.title": "Pipeline audiovisual",
             "pipeline.subtitle": "Transcripción → limpieza → analítica → QA → traducción opcional → QA final → exportación → incrustación opcional en vídeo.",
             "pipeline.no_file": "Ningún archivo seleccionado",
@@ -509,16 +468,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "La pipeline no completó: {err}",
             "pipeline.error_unknown": "Error desconocido",
             "pipeline.cancelled": "Pipeline cancelada",
-            # Clean Page
             "clean.title": "Limpiar subtítulos",
             "clean.subtitle": "Elimina anuncios, enlaces y marcas de fansubs sin modificar los tiempos.",
             "clean.btn_clean": "Limpiar archivo ahora",
-            # Convert Page
             "convert.title": "Conversión de formatos",
             "convert.subtitle": "Convierte entre SRT, VTT, ASS y TXT manteniendo la sincronización.",
             "convert.target_label": "Formato de destino:",
             "convert.btn_convert": "Convertir y guardar",
-            # Batch Page
             "batch.title": "Procesamiento por lote",
             "batch.subtitle": "Traduce, limpia o convierte múltiples archivos en paralelo.",
             "batch.btn_add": "Añadir subtítulos",
@@ -532,7 +488,6 @@ class I18nService(QObject):
             "batch.status_processing": "Procesando...",
             "batch.status_completed": "Completado",
             "batch.status_error": "Error: {err}",
-            # Settings Page
             "settings.title": "Configuración de servicios",
             "settings.lang_card_title": "Idioma de la interfaz",
             "settings.lang_card_desc": "Selecciona el idioma de la aplicación o detecta automáticamente.",
@@ -550,7 +505,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "Modelo (ej. gpt-4o-mini)",
             "settings.btn_save": "Guardar configuración",
             "settings.save_success": "¡Configuración guardada correctamente!",
-            # Completed Page
             "completed.title": "Procesamiento completado",
             "completed.subtitle": "El archivo se ha procesado y guardado correctamente.",
             "completed.card_lines": "líneas procesadas",
@@ -563,7 +517,6 @@ class I18nService(QObject):
             "completed.sum1": "Limpieza de spam, URLs e IDs aplicada",
             "completed.sum2": "Sincronización y estructura original conservadas",
             "completed.sum3": "Archivo guardado correctamente",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Aplicación de escritorio multiplataforma • FFmpeg necesario para incrustar subtítulos en vídeo",
@@ -587,7 +540,6 @@ class I18nService(QObject):
             "about.restr_3": "Misma licencia: Las obras derivadas deben llevar esta misma licencia GNU GPL v3.0",
             "about.btn_open_license": "Abrir archivo LICENSE",
             "about.btn_web_deed": "Ver Términos Oficiales GNU GPL v3.0",
-            # Burn In Dialog
             "burn.dialog_title": "Incrustar subtítulos en vídeo (Burn-In)",
             "burn.lbl_video_source": "Vídeo original:",
             "burn.lbl_output_file": "Vídeo de salida:",
@@ -620,7 +572,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "error interno",
             "burn.btn_folder": "Abrir carpeta",
             "burn.btn_close": "Cerrar",
-            # Alerts & Messages
             "alert.file_req_title": "Archivo requerido",
             "alert.file_req_desc": "Arrastra o selecciona un archivo de subtítulos primero.",
             "alert.no_subs_title": "Sin subtítulos",
@@ -632,7 +583,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "Subtítulo guardado en:\n{path}",
             "alert.burn_success_title": "Incrustación completada",
             "alert.burn_success_desc": "Vídeo renderizado con éxito con subtítulos incrustados:\n{path}",
-            # Progress Modal
             "progress.window_title": "Procesamiento en curso",
             "progress.title": "Procesamiento en curso",
             "progress.step_reading": "Leyendo archivo...",
@@ -644,24 +594,19 @@ class I18nService(QObject):
             "progress.remaining": "Tiempo restante: {time}",
             "progress.translating_progress": "Traduciendo ({done}/{total})...",
             "progress.cancel": "Cancelar",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "Detectar automáticamente",
             "home.engine_deepl": "DeepL (recomendado)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "Haz clic aquí o arrastra un vídeo (.mp4, .mkv, .webm) para previsualizar",
             "preview.video_loaded": "Vídeo cargado - Listo para reproducir",
             "preview.select_video_title": "Seleccionar vídeo para previsualizar",
             "preview.select_subtitle_title": "Seleccionar subtítulo para previsualizar",
             "preview.sub_filter": "Subtítulos (*.srt *.ass *.vtt *.txt);;Todos los archivos (*.*)",
             "preview.save_filter": "Subtítulo SRT (*.srt);;Subtítulo VTT (*.vtt);;Subtítulo ASS (*.ass);;Texto plano (*.txt)",
-            # Completed extras
             "completed.saved_as": "Guardado como: {name}",
-            # Settings extras
             "settings.save_success_title": "Ajustes guardados",
-            # Burn-in extras
             "burn.sub_badge": "Subtítulos listos: {count} líneas",
             "burn.lbl_quality": "Calidad / Velocidad:",
             "burn.size_small": "Pequeño",
@@ -687,7 +632,6 @@ class I18nService(QObject):
             "burn.stopping": "Deteniendo proceso de FFmpeg...",
             "burn.chk_fix_overlaps": "Evitar solapamiento de tiempos entre subtítulos consecutivos",
             "burn.preview_hint": "Así se verá el subtítulo incrustado en el vídeo",
-            # Alerts extras
             "alert.save_error_title": "Error al guardar",
             "alert.save_error_desc": "No se pudo guardar el archivo:\n{err}",
             "alert.process_error_title": "Error",
@@ -715,7 +659,6 @@ class I18nService(QObject):
         },
         # PT (Portuguese)
         "pt": {
-            # Navigation
             "nav.home": "Início",
             "nav.translate": "Traduzir",
             "nav.clean": "Limpar",
@@ -738,12 +681,10 @@ class I18nService(QObject):
             "history.col_status": "Estado",
             "history.col_fallback": "Fallback",
             "history.col_parse_issues": "Blocos sem ler",
-            # Top bar
             "topbar.theme_tooltip": "Alternar modo claro / escuro",
             "topbar.lang_tooltip": "Alterar idioma da interface",
             "topbar.lang_tooltip_effective": "Alterar idioma da interface — atual: {language}",
             "topbar.lang_auto": "Automático (Sistema)",
-            # Home Page
             "home.title": "Traduzir Legendas",
             "home.subtitle": "Selecione seu arquivo, o idioma de destino e as opções de processamento.",
             "home.source_lang": "Idioma de origem",
@@ -756,7 +697,6 @@ class I18nService(QObject):
             "home.translate_title": "Traduzir texto",
             "home.translate_desc": "Traduz diálogos para o idioma de destino",
             "home.btn_process": "Iniciar processamento",
-            # Dropzone
             "dropzone.title": "Arraste o seu arquivo de legendas aqui",
             "dropzone.subtitle": "ou clique para selecionar",
             "dropzone.formats": "Formatos suportados: .srt, .ass, .vtt, .txt",
@@ -765,7 +705,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "Clique ou arraste outro arquivo para substituir",
             "dropzone.dialog_title": "Selecionar legenda",
             "dropzone.filter": "Legendas (*.srt *.ass *.vtt *.txt);;Todos os arquivos (*.*)",
-            # Preview / Translation Studio
             "preview.title": "Estúdio de Tradução",
             "preview.subtitle": "Pré-visualize vídeo, edite legendas linha por linha e sincronize.",
             "preview.btn_open": "Abrir Legenda",
@@ -788,9 +727,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volume",
             "preview.video_filter": "Vídeos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Todos os arquivos (*.*)",
             "preview.save_dialog_title": "Salvar legenda editada",
-            # File dialogs
             "dialog.all_files": "Todos os arquivos (*.*)",
-            # Transcribe Page
             "transcribe.title": "Transcrever multimédia",
             "transcribe.subtitle": "Converta áudio ou vídeo em legendas com o Whisper local. O resultado alimenta Analytics, QA, limpeza e tradução.",
             "transcribe.no_file": "Nenhum arquivo selecionado",
@@ -814,7 +751,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "Não foi possível transcrever: {err}",
             "transcribe.error_generic": "Verifique se a mídia pode ser lida e se o Whisper está disponível; depois, tente novamente.",
             "transcribe.cancelled": "Transcrição cancelada",
-            # Pipeline Page
             "pipeline.title": "Pipeline audiovisual",
             "pipeline.subtitle": "Transcrição → limpeza → análise → QA → tradução opcional → QA final → exportação → incrustação opcional no vídeo.",
             "pipeline.no_file": "Nenhum arquivo selecionado",
@@ -846,16 +782,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "A pipeline não foi concluída: {err}",
             "pipeline.error_unknown": "Erro desconhecido",
             "pipeline.cancelled": "Pipeline cancelada",
-            # Clean Page
             "clean.title": "Limpar Legendas",
             "clean.subtitle": "Remove anúncios, links e marcas de fansubs sem alterar os tempos.",
             "clean.btn_clean": "Limpar arquivo agora",
-            # Convert Page
             "convert.title": "Conversão de Formatos",
             "convert.subtitle": "Converta entre SRT, VTT, ASS e TXT mantendo a sincronização.",
             "convert.target_label": "Formato de destino:",
             "convert.btn_convert": "Converter e salvar",
-            # Batch Page
             "batch.title": "Processamento em Lote",
             "batch.subtitle": "Traduza, limpe ou converta múltiplos arquivos em paralelo.",
             "batch.btn_add": "Adicionar Legendas",
@@ -869,7 +802,6 @@ class I18nService(QObject):
             "batch.status_processing": "Processando...",
             "batch.status_completed": "Concluído",
             "batch.status_error": "Erro: {err}",
-            # Settings Page
             "settings.title": "Configurações de Serviços",
             "settings.lang_card_title": "Idioma da Interface",
             "settings.lang_card_desc": "Selecione o idioma da aplicação ou detecte automaticamente.",
@@ -887,7 +819,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "Modelo (ex: gpt-4o-mini)",
             "settings.btn_save": "Salvar Configurações",
             "settings.save_success": "Configurações salvas com sucesso!",
-            # Completed Page
             "completed.title": "Processamento Concluído",
             "completed.subtitle": "O arquivo foi processado e salvo com sucesso.",
             "completed.card_lines": "linhas processadas",
@@ -900,7 +831,6 @@ class I18nService(QObject):
             "completed.sum1": "Limpeza de spam, URLs e marcadores aplicada",
             "completed.sum2": "Sincronização e estrutura original preservadas",
             "completed.sum3": "Arquivo salvo com sucesso",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Aplicação de ambiente de trabalho multiplataforma • FFmpeg necessário para incrustar legendas no vídeo",
@@ -924,7 +854,6 @@ class I18nService(QObject):
             "about.restr_3": "Mesma licença: Obras derivadas devem levar esta mesma licença GNU GPL v3.0",
             "about.btn_open_license": "Abrir arquivo LICENSE",
             "about.btn_web_deed": "Ver Termos Oficiais GNU GPL v3.0",
-            # Burn In Dialog
             "burn.dialog_title": "Embutir Legendas no Vídeo (Burn-In)",
             "burn.lbl_video_source": "Vídeo original:",
             "burn.lbl_output_file": "Vídeo de saída:",
@@ -957,7 +886,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "erro interno",
             "burn.btn_folder": "Abrir pasta",
             "burn.btn_close": "Fechar",
-            # Alerts & Messages
             "alert.file_req_title": "Arquivo obrigatório",
             "alert.file_req_desc": "Arraste ou selecione um arquivo de legendas primeiro.",
             "alert.no_subs_title": "Sem legendas",
@@ -969,7 +897,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "Legenda salva em:\n{path}",
             "alert.burn_success_title": "Gravação concluída",
             "alert.burn_success_desc": "Vídeo renderizado com sucesso com legendas embutidas:\n{path}",
-            # Progress Modal
             "progress.window_title": "Processamento em andamento",
             "progress.title": "Processamento em andamento",
             "progress.step_reading": "Lendo arquivo...",
@@ -981,24 +908,19 @@ class I18nService(QObject):
             "progress.remaining": "Tempo restante: {time}",
             "progress.translating_progress": "Traduzindo ({done}/{total})...",
             "progress.cancel": "Cancelar",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "Detectar automaticamente",
             "home.engine_deepl": "DeepL (recomendado)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "Clique aqui ou arraste um vídeo (.mp4, .mkv, .webm) para pré-visualizar",
             "preview.video_loaded": "Vídeo carregado - Pronto para reproduzir",
             "preview.select_video_title": "Selecionar vídeo para pré-visualizar",
             "preview.select_subtitle_title": "Selecionar legenda para pré-visualizar",
             "preview.sub_filter": "Legendas (*.srt *.ass *.vtt *.txt);;Todos os arquivos (*.*)",
             "preview.save_filter": "Legenda SRT (*.srt);;Legenda VTT (*.vtt);;Legenda ASS (*.ass);;Texto simples (*.txt)",
-            # Completed extras
             "completed.saved_as": "Salvo como: {name}",
-            # Settings extras
             "settings.save_success_title": "Configurações salvas",
-            # Burn-in extras
             "burn.sub_badge": "Legendas prontas: {count} linhas",
             "burn.lbl_quality": "Qualidade / Velocidade:",
             "burn.size_small": "Pequeno",
@@ -1024,7 +946,6 @@ class I18nService(QObject):
             "burn.stopping": "Parando o processo do FFmpeg...",
             "burn.chk_fix_overlaps": "Evitar sobreposição de tempos entre legendas consecutivas",
             "burn.preview_hint": "É assim que a legenda embutida ficará no vídeo",
-            # Alerts extras
             "alert.save_error_title": "Erro ao salvar",
             "alert.save_error_desc": "Não foi possível salvar o arquivo:\n{err}",
             "alert.process_error_title": "Erro",
@@ -1052,7 +973,6 @@ class I18nService(QObject):
         },
         # DE (German)
         "de": {
-            # Navigation
             "nav.home": "Startseite",
             "nav.translate": "Übersetzungsstudio",
             "nav.clean": "Bereinigen",
@@ -1075,12 +995,10 @@ class I18nService(QObject):
             "history.col_status": "Status",
             "history.col_fallback": "Fallback",
             "history.col_parse_issues": "Leseprobleme",
-            # Top bar
             "topbar.theme_tooltip": "Dunkel- / Hellmodus umschalten",
             "topbar.lang_tooltip": "Sprache der Benutzeroberfläche ändern",
             "topbar.lang_tooltip_effective": "Sprache der Benutzeroberfläche ändern — aktuell: {language}",
             "topbar.lang_auto": "Automatisch (System)",
-            # Home Page
             "home.title": "Untertitel Übersetzen",
             "home.subtitle": "Wählen Sie Datei, Zielsprache und Verarbeitungsoptionen.",
             "home.source_lang": "Ausgangssprache",
@@ -1093,7 +1011,6 @@ class I18nService(QObject):
             "home.translate_title": "Text übersetzen",
             "home.translate_desc": "Übersetzt Dialoge in die gewählte Zielsprache",
             "home.btn_process": "Verarbeitung starten",
-            # Dropzone
             "dropzone.title": "Untertiteldatei hierher ziehen",
             "dropzone.subtitle": "oder klicken zum Auswählen",
             "dropzone.formats": "Unterstützte Formate: .srt, .ass, .vtt, .txt",
@@ -1102,7 +1019,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "Klicken oder andere Datei ziehen zum Ersetzen",
             "dropzone.dialog_title": "Untertitel auswählen",
             "dropzone.filter": "Untertitel (*.srt *.ass *.vtt *.txt);;Alle Dateien (*.*)",
-            # Preview / Translation Studio
             "preview.title": "Übersetzungsstudio",
             "preview.subtitle": "Video vorschauen, Untertitel zeilenweise bearbeiten und synchronisieren.",
             "preview.btn_open": "Untertitel öffnen",
@@ -1125,9 +1041,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Lautstärke",
             "preview.video_filter": "Videos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Alle Dateien (*.*)",
             "preview.save_dialog_title": "Bearbeiteten Untertitel speichern",
-            # File dialogs
             "dialog.all_files": "Alle Dateien (*.*)",
-            # Transcribe Page
             "transcribe.title": "Medien transkribieren",
             "transcribe.subtitle": "Audio oder Video mit lokalem Whisper in Untertitel umwandeln. Das Ergebnis fließt in Analytics, QA, Bereinigung und Übersetzung ein.",
             "transcribe.no_file": "Keine Datei ausgewählt",
@@ -1151,7 +1065,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "Konnte nicht transkribieren: {err}",
             "transcribe.error_generic": "Prüfen Sie, ob die Mediendatei lesbar und Whisper verfügbar ist, und versuchen Sie es erneut.",
             "transcribe.cancelled": "Transkription abgebrochen",
-            # Pipeline Page
             "pipeline.title": "Medien-Pipeline",
             "pipeline.subtitle": "Transkription → Bereinigung → Analytics → QA → optionale Übersetzung → finales QA → Export → optionales Burn-in.",
             "pipeline.no_file": "Keine Datei ausgewählt",
@@ -1183,16 +1096,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "Die Pipeline wurde nicht abgeschlossen: {err}",
             "pipeline.error_unknown": "Unbekannter Fehler",
             "pipeline.cancelled": "Pipeline abgebrochen",
-            # Clean Page
             "clean.title": "Untertitel Bereinigen",
             "clean.subtitle": "Entfernt Werbung, Links und Fansub-Spuren ohne Zeitänderung.",
             "clean.btn_clean": "Datei jetzt bereinigen",
-            # Convert Page
             "convert.title": "Formatkonvertierung",
             "convert.subtitle": "Konvertieren zwischen SRT, VTT, ASS und TXT mit Synchronisation.",
             "convert.target_label": "Zielformat:",
             "convert.btn_convert": "Konvertieren und speichern",
-            # Batch Page
             "batch.title": "Stapelverarbeitung",
             "batch.subtitle": "Mehrere Dateien parallel übersetzen, bereinigen oder konvertieren.",
             "batch.btn_add": "Untertitel hinzufügen",
@@ -1206,7 +1116,6 @@ class I18nService(QObject):
             "batch.status_processing": "Wird verarbeitet...",
             "batch.status_completed": "Abgeschlossen",
             "batch.status_error": "Fehler: {err}",
-            # Settings Page
             "settings.title": "Diensteinstellungen",
             "settings.lang_card_title": "Sprache der Benutzeroberfläche",
             "settings.lang_card_desc": "Wählen Sie die Anzeigesprache oder automatische Erkennung.",
@@ -1224,7 +1133,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "Modell (z. B. gpt-4o-mini)",
             "settings.btn_save": "Einstellungen speichern",
             "settings.save_success": "Einstellungen erfolgreich gespeichert!",
-            # Completed Page
             "completed.title": "Verarbeitung Abgeschlossen",
             "completed.subtitle": "Die Datei wurde erfolgreich verarbeitet und gespeichert.",
             "completed.card_lines": "verarbeitete Zeilen",
@@ -1237,7 +1145,6 @@ class I18nService(QObject):
             "completed.sum1": "Spam, URLs und Markierungen bereinigt",
             "completed.sum2": "Original-Timing und Struktur beibehalten",
             "completed.sum3": "Datei erfolgreich gespeichert",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Plattformübergreifende Desktop-App • FFmpeg zum Einbetten von Untertiteln ins Video erforderlich",
@@ -1261,7 +1168,6 @@ class I18nService(QObject):
             "about.restr_3": "Gleiche Lizenz: Abgeleitete Werke müssen unter GNU GPL v3.0 stehen",
             "about.btn_open_license": "LICENSE-Datei öffnen",
             "about.btn_web_deed": "Offizielle GNU GPL v3.0-Bedingungen",
-            # Burn In Dialog
             "burn.dialog_title": "Untertitel in Video einbetten (Hardsub)",
             "burn.lbl_video_source": "Quellvideo:",
             "burn.lbl_output_file": "Ausgabevideo:",
@@ -1294,7 +1200,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "interner Fehler",
             "burn.btn_folder": "Ordner öffnen",
             "burn.btn_close": "Schließen",
-            # Alerts & Messages
             "alert.file_req_title": "Datei erforderlich",
             "alert.file_req_desc": "Bitte ziehen oder wählen Sie zuerst eine Untertiteldatei aus.",
             "alert.no_subs_title": "Keine Untertitel",
@@ -1306,7 +1211,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "Untertitel gespeichert unter:\n{path}",
             "alert.burn_success_title": "Einbettung abgeschlossen",
             "alert.burn_success_desc": "Video erfolgreich mit festen Untertiteln gerendert:\n{path}",
-            # Progress Modal
             "progress.window_title": "Verarbeitung läuft",
             "progress.title": "Verarbeitung läuft",
             "progress.step_reading": "Datei wird gelesen...",
@@ -1318,24 +1222,19 @@ class I18nService(QObject):
             "progress.remaining": "Verbleibende Zeit: {time}",
             "progress.translating_progress": "Übersetzung ({done}/{total})...",
             "progress.cancel": "Abbrechen",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "Automatisch erkennen",
             "home.engine_deepl": "DeepL (empfohlen)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "Hier klicken oder ein Video (.mp4, .mkv, .webm) ziehen zur Vorschau",
             "preview.video_loaded": "Video geladen – bereit zur Wiedergabe",
             "preview.select_video_title": "Video zur Vorschau auswählen",
             "preview.select_subtitle_title": "Untertitel zur Vorschau auswählen",
             "preview.sub_filter": "Untertitel (*.srt *.ass *.vtt *.txt);;Alle Dateien (*.*)",
             "preview.save_filter": "SRT-Untertitel (*.srt);;VTT-Untertitel (*.vtt);;ASS-Untertitel (*.ass);;Nur Text (*.txt)",
-            # Completed extras
             "completed.saved_as": "Gespeichert als: {name}",
-            # Settings extras
             "settings.save_success_title": "Einstellungen gespeichert",
-            # Burn-in extras
             "burn.sub_badge": "Untertitel bereit: {count} Zeilen",
             "burn.lbl_quality": "Qualität / Geschwindigkeit:",
             "burn.size_small": "Klein",
@@ -1361,7 +1260,6 @@ class I18nService(QObject):
             "burn.stopping": "FFmpeg-Prozess wird gestoppt...",
             "burn.chk_fix_overlaps": "Überlappende Zeiten zwischen aufeinanderfolgenden Untertiteln vermeiden",
             "burn.preview_hint": "So sieht der eingebettete Untertitel im Video aus",
-            # Alerts extras
             "alert.save_error_title": "Fehler beim Speichern",
             "alert.save_error_desc": "Datei konnte nicht gespeichert werden:\n{err}",
             "alert.process_error_title": "Fehler",
@@ -1389,7 +1287,6 @@ class I18nService(QObject):
         },
         # IT (Italian)
         "it": {
-            # Navigation
             "nav.home": "Home",
             "nav.translate": "Traduci",
             "nav.clean": "Pulisci",
@@ -1412,12 +1309,10 @@ class I18nService(QObject):
             "history.col_status": "Stato",
             "history.col_fallback": "Fallback",
             "history.col_parse_issues": "Blocchi non letti",
-            # Top bar
             "topbar.theme_tooltip": "Alterna tema scuro / chiaro",
             "topbar.lang_tooltip": "Cambia lingua dell'interfaccia",
             "topbar.lang_tooltip_effective": "Cambia lingua dell'interfaccia — attuale: {language}",
             "topbar.lang_auto": "Automatico (Sistema)",
-            # Home Page
             "home.title": "Traduci Sottotitoli",
             "home.subtitle": "Seleziona il file, la lingua di destinazione e le opzioni di elaborazione.",
             "home.source_lang": "Lingua di origine",
@@ -1430,7 +1325,6 @@ class I18nService(QObject):
             "home.translate_title": "Traduci testo",
             "home.translate_desc": "Traduci i dialoghi nella lingua di destinazione",
             "home.btn_process": "Avvia elaborazione",
-            # Dropzone
             "dropzone.title": "Trascina qui il file dei sottotitoli",
             "dropzone.subtitle": "o fai clic per selezionare",
             "dropzone.formats": "Formati supportati: .srt, .ass, .vtt, .txt",
@@ -1439,7 +1333,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "Fai clic o trascina un altro file per sostituire",
             "dropzone.dialog_title": "Seleziona sottotitolo",
             "dropzone.filter": "Sottotitoli (*.srt *.ass *.vtt *.txt);;Tutti i file (*.*)",
-            # Preview / Translation Studio
             "preview.title": "Studio di Traduzione",
             "preview.subtitle": "Anteprima video, modifica riga per riga e sincronizzazione.",
             "preview.btn_open": "Apri Sottotitolo",
@@ -1462,9 +1355,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volume",
             "preview.video_filter": "Video (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Tutti i file (*.*)",
             "preview.save_dialog_title": "Salva sottotitolo modificato",
-            # File dialogs
             "dialog.all_files": "Tutti i file (*.*)",
-            # Transcribe Page
             "transcribe.title": "Trascrivi contenuti multimediali",
             "transcribe.subtitle": "Converti audio o video in sottotitoli con Whisper locale. Il risultato alimenta Analytics, QA, pulizia e traduzione.",
             "transcribe.no_file": "Nessun file selezionato",
@@ -1488,7 +1379,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "Impossibile trascrivere: {err}",
             "transcribe.error_generic": "Verifica che il file multimediale sia leggibile e che Whisper sia disponibile, quindi riprova.",
             "transcribe.cancelled": "Trascrizione annullata",
-            # Pipeline Page
             "pipeline.title": "Pipeline audiovisiva",
             "pipeline.subtitle": "Trascrizione → pulizia → analisi → QA → traduzione opzionale → QA finale → esportazione → sottotitoli opzionali incorporati nel video.",
             "pipeline.no_file": "Nessun file selezionato",
@@ -1520,16 +1410,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "La pipeline non è stata completata: {err}",
             "pipeline.error_unknown": "Errore sconosciuto",
             "pipeline.cancelled": "Pipeline annullata",
-            # Clean Page
             "clean.title": "Pulisci Sottotitoli",
             "clean.subtitle": "Rimuove annunci, link e crediti fansub senza modificare i tempi.",
             "clean.btn_clean": "Pulisci file adesso",
-            # Convert Page
             "convert.title": "Conversione Formati",
             "convert.subtitle": "Converti tra SRT, VTT, ASS e TXT mantenendo la sincronizzazione.",
             "convert.target_label": "Formato di destinazione:",
             "convert.btn_convert": "Converti e salva",
-            # Batch Page
             "batch.title": "Elaborazione in Batch",
             "batch.subtitle": "Traduci, pulisci o converti più file in parallelo.",
             "batch.btn_add": "Aggiungi Sottotitoli",
@@ -1543,7 +1430,6 @@ class I18nService(QObject):
             "batch.status_processing": "In elaborazione...",
             "batch.status_completed": "Completato",
             "batch.status_error": "Errore: {err}",
-            # Settings Page
             "settings.title": "Impostazioni Servizi",
             "settings.lang_card_title": "Lingua dell'Interfaccia",
             "settings.lang_card_desc": "Seleziona la lingua dell'applicazione o rileva automaticamente.",
@@ -1561,7 +1447,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "Modello (es. gpt-4o-mini)",
             "settings.btn_save": "Salva Impostazioni",
             "settings.save_success": "Impostazioni salvate con successo!",
-            # Completed Page
             "completed.title": "Elaborazione Completata",
             "completed.subtitle": "Il file è stato elaborato e salvato correttamente.",
             "completed.card_lines": "righe elaborate",
@@ -1574,7 +1459,6 @@ class I18nService(QObject):
             "completed.sum1": "Pulizia di spam, URL e marcatori applicata",
             "completed.sum2": "Sincronizzazione e struttura originale preservate",
             "completed.sum3": "File salvato con successo",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "App desktop multipiattaforma • FFmpeg necessario per incorporare i sottotitoli nel video",
@@ -1598,7 +1482,6 @@ class I18nService(QObject):
             "about.restr_3": "Stessa licenza: Le opere derivate devono avere questa stessa licenza GNU GPL v3.0",
             "about.btn_open_license": "Apri file LICENSE",
             "about.btn_web_deed": "Visualizza Termini Ufficiali GNU GPL v3.0",
-            # Burn In Dialog
             "burn.dialog_title": "Incidi Sottotitoli nel Video (Hardsub)",
             "burn.lbl_video_source": "Video originale:",
             "burn.lbl_output_file": "Video finale:",
@@ -1631,7 +1514,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "errore interno",
             "burn.btn_folder": "Apri cartella",
             "burn.btn_close": "Chiudi",
-            # Alerts & Messages
             "alert.file_req_title": "File richiesto",
             "alert.file_req_desc": "Trascina o seleziona prima un file di sottotitoli.",
             "alert.no_subs_title": "Nessun sottotitolo",
@@ -1643,7 +1525,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "Sottotitolo salvato in:\n{path}",
             "alert.burn_success_title": "Incisione completata",
             "alert.burn_success_desc": "Video renderizzato con successo con sottotitoli incisi:\n{path}",
-            # Progress Modal
             "progress.window_title": "Elaborazione in corso",
             "progress.title": "Elaborazione in corso",
             "progress.step_reading": "Lettura del file...",
@@ -1655,24 +1536,19 @@ class I18nService(QObject):
             "progress.remaining": "Tempo rimanente: {time}",
             "progress.translating_progress": "Traduzione ({done}/{total})...",
             "progress.cancel": "Annulla",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "Rileva automaticamente",
             "home.engine_deepl": "DeepL (consigliato)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "Fai clic qui o trascina un video (.mp4, .mkv, .webm) per l'anteprima",
             "preview.video_loaded": "Video caricato - Pronto per la riproduzione",
             "preview.select_video_title": "Seleziona video per l'anteprima",
             "preview.select_subtitle_title": "Seleziona sottotitolo per l'anteprima",
             "preview.sub_filter": "Sottotitoli (*.srt *.ass *.vtt *.txt);;Tutti i file (*.*)",
             "preview.save_filter": "Sottotitolo SRT (*.srt);;Sottotitolo VTT (*.vtt);;Sottotitolo ASS (*.ass);;Testo semplice (*.txt)",
-            # Completed extras
             "completed.saved_as": "Salvato come: {name}",
-            # Settings extras
             "settings.save_success_title": "Impostazioni salvate",
-            # Burn-in extras
             "burn.sub_badge": "Sottotitoli pronti: {count} righe",
             "burn.lbl_quality": "Qualità / Velocità:",
             "burn.size_small": "Piccolo",
@@ -1698,7 +1574,6 @@ class I18nService(QObject):
             "burn.stopping": "Arresto del processo FFmpeg...",
             "burn.chk_fix_overlaps": "Evita la sovrapposizione dei tempi tra sottotitoli consecutivi",
             "burn.preview_hint": "Ecco come apparirà il sottotitolo inciso nel video",
-            # Alerts extras
             "alert.save_error_title": "Errore di salvataggio",
             "alert.save_error_desc": "Impossibile salvare il file:\n{err}",
             "alert.process_error_title": "Errore",
@@ -1726,7 +1601,6 @@ class I18nService(QObject):
         },
         # FR (French)
         "fr": {
-            # Navigation
             "nav.home": "Accueil",
             "nav.translate": "Studio de traduction",
             "nav.clean": "Nettoyer",
@@ -1749,12 +1623,10 @@ class I18nService(QObject):
             "history.col_status": "Statut",
             "history.col_fallback": "Fallback",
             "history.col_parse_issues": "Blocs illisibles",
-            # Top bar
             "topbar.theme_tooltip": "Basculer entre mode sombre / clair",
             "topbar.lang_tooltip": "Changer la langue de l'interface",
             "topbar.lang_tooltip_effective": "Changer la langue de l'interface — actuelle : {language}",
             "topbar.lang_auto": "Automatique (Système)",
-            # Home Page
             "home.title": "Traduire les sous-titres",
             "home.subtitle": "Sélectionnez votre fichier, la langue cible et les options de traitement.",
             "home.source_lang": "Langue source",
@@ -1767,7 +1639,6 @@ class I18nService(QObject):
             "home.translate_title": "Traduire le texte",
             "home.translate_desc": "Traduit les dialogues vers la langue cible",
             "home.btn_process": "Démarrer le traitement",
-            # Dropzone
             "dropzone.title": "Glissez votre fichier de sous-titres ici",
             "dropzone.subtitle": "ou cliquez pour parcourir",
             "dropzone.formats": "Formats pris en charge : .srt, .ass, .vtt, .txt",
@@ -1776,7 +1647,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "Cliquez ou glissez un autre fichier pour remplacer",
             "dropzone.dialog_title": "Sélectionner un sous-titre",
             "dropzone.filter": "Sous-titres (*.srt *.ass *.vtt *.txt);;Tous les fichiers (*.*)",
-            # Preview / Translation Studio
             "preview.title": "Studio de traduction",
             "preview.subtitle": "Prévisualisez la vidéo, modifiez les sous-titres ligne par ligne et synchronisez.",
             "preview.btn_open": "Ouvrir le sous-titre",
@@ -1799,9 +1669,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "Volume",
             "preview.video_filter": "Vidéos (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;Tous les fichiers (*.*)",
             "preview.save_dialog_title": "Enregistrer le sous-titre modifié",
-            # File dialogs
             "dialog.all_files": "Tous les fichiers (*.*)",
-            # Transcribe Page
             "transcribe.title": "Transcrire un média",
             "transcribe.subtitle": "Convertissez l'audio ou la vidéo en sous-titres avec Whisper local. Le résultat alimente l'analytique, le QA, le nettoyage et la traduction.",
             "transcribe.no_file": "Aucun fichier sélectionné",
@@ -1825,7 +1693,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "Impossible de transcrire : {err}",
             "transcribe.error_generic": "Vérifiez que le média est lisible et que Whisper est disponible, puis réessayez.",
             "transcribe.cancelled": "Transcription annulée",
-            # Pipeline Page
             "pipeline.title": "Pipeline média",
             "pipeline.subtitle": "Transcription → nettoyage → analytique → QA → traduction optionnelle → QA final → export → incrustation optionnelle.",
             "pipeline.no_file": "Aucun fichier sélectionné",
@@ -1857,16 +1724,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "Le pipeline n'a pas abouti : {err}",
             "pipeline.error_unknown": "Erreur inconnue",
             "pipeline.cancelled": "Pipeline annulé",
-            # Clean Page
             "clean.title": "Nettoyer les sous-titres",
             "clean.subtitle": "Supprime les publicités, les liens et les filigranes des fansubs sans modifier les timings.",
             "clean.btn_clean": "Nettoyer le fichier maintenant",
-            # Convert Page
             "convert.title": "Conversion de formats",
             "convert.subtitle": "Convertissez entre SRT, VTT, ASS et TXT en préservant la synchronisation.",
             "convert.target_label": "Format cible :",
             "convert.btn_convert": "Convertir et enregistrer",
-            # Batch Page
             "batch.title": "Traitement par lots",
             "batch.subtitle": "Traduisez, nettoyez ou convertissez plusieurs fichiers en parallèle.",
             "batch.btn_add": "Ajouter des sous-titres",
@@ -1880,7 +1744,6 @@ class I18nService(QObject):
             "batch.status_processing": "Traitement en cours...",
             "batch.status_completed": "Terminé",
             "batch.status_error": "Erreur : {err}",
-            # Settings Page
             "settings.title": "Paramètres",
             "settings.lang_card_title": "Langue de l'interface",
             "settings.lang_card_desc": "Sélectionnez la langue de l'application ou la détection automatique.",
@@ -1898,7 +1761,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "Modèle (p. ex. gpt-4o-mini)",
             "settings.btn_save": "Enregistrer les paramètres",
             "settings.save_success": "Paramètres enregistrés avec succès !",
-            # Completed Page
             "completed.title": "Traitement terminé",
             "completed.subtitle": "Le fichier a été traité et enregistré avec succès.",
             "completed.card_lines": "lignes traitées",
@@ -1911,7 +1773,6 @@ class I18nService(QObject):
             "completed.sum1": "Spam, URL et marqueurs indésirables nettoyés",
             "completed.sum2": "Timings et structure d'origine préservés",
             "completed.sum3": "Fichier enregistré avec succès",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "Application de bureau multiplateforme • FFmpeg requis pour incrustrer les sous-titres dans la vidéo",
@@ -1935,7 +1796,6 @@ class I18nService(QObject):
             "about.restr_3": "Même licence : les œuvres dérivées doivent porter cette même licence GNU GPL v3.0",
             "about.btn_open_license": "Ouvrir le fichier LICENSE",
             "about.btn_web_deed": "Voir les conditions officielles GNU GPL v3.0",
-            # Burn In Dialog
             "burn.dialog_title": "Incruster les sous-titres dans la vidéo (Hardsub)",
             "burn.lbl_video_source": "Vidéo source :",
             "burn.lbl_output_file": "Vidéo de sortie :",
@@ -1968,7 +1828,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "erreur interne",
             "burn.btn_folder": "Ouvrir le dossier",
             "burn.btn_close": "Fermer",
-            # Alerts & Messages
             "alert.file_req_title": "Fichier requis",
             "alert.file_req_desc": "Glissez ou sélectionnez d'abord un fichier de sous-titres.",
             "alert.no_subs_title": "Aucun sous-titre",
@@ -1980,7 +1839,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "Sous-titre enregistré dans :\n{path}",
             "alert.burn_success_title": "Incrustation terminée",
             "alert.burn_success_desc": "Vidéo rendue avec succès avec les sous-titres incrustés :\n{path}",
-            # Progress Modal
             "progress.window_title": "Traitement en cours",
             "progress.title": "Traitement en cours",
             "progress.step_reading": "Lecture du fichier...",
@@ -1992,24 +1850,19 @@ class I18nService(QObject):
             "progress.remaining": "Temps restant : {time}",
             "progress.translating_progress": "Traduction ({done}/{total})...",
             "progress.cancel": "Annuler",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "Détecter automatiquement",
             "home.engine_deepl": "DeepL (recommandé)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "Cliquez ici ou glissez une vidéo (.mp4, .mkv, .webm) pour prévisualiser",
             "preview.video_loaded": "Vidéo chargée - Prête à lire",
             "preview.select_video_title": "Sélectionner une vidéo à prévisualiser",
             "preview.select_subtitle_title": "Sélectionner un sous-titre à prévisualiser",
             "preview.sub_filter": "Sous-titres (*.srt *.ass *.vtt *.txt);;Tous les fichiers (*.*)",
             "preview.save_filter": "Sous-titre SRT (*.srt);;Sous-titre VTT (*.vtt);;Sous-titre ASS (*.ass);;Texte brut (*.txt)",
-            # Completed extras
             "completed.saved_as": "Enregistré sous : {name}",
-            # Settings extras
             "settings.save_success_title": "Paramètres enregistrés",
-            # Burn-in extras
             "burn.sub_badge": "Sous-titres prêts : {count} lignes",
             "burn.lbl_quality": "Qualité / Vitesse :",
             "burn.size_small": "Petit",
@@ -2035,7 +1888,6 @@ class I18nService(QObject):
             "burn.stopping": "Arrêt du processus FFmpeg...",
             "burn.chk_fix_overlaps": "Éviter le chevauchement des timings entre sous-titres consécutifs",
             "burn.preview_hint": "Voici à quoi ressemblera le sous-titre incrusté dans la vidéo",
-            # Alerts extras
             "alert.save_error_title": "Erreur d'enregistrement",
             "alert.save_error_desc": "Impossible d'enregistrer le fichier :\n{err}",
             "alert.process_error_title": "Erreur",
@@ -2063,7 +1915,6 @@ class I18nService(QObject):
         },
         # ZH-CN (Simplified Chinese)
         "zh-CN": {
-            # Navigation
             "nav.home": "首页",
             "nav.translate": "翻译工作室",
             "nav.clean": "清理",
@@ -2086,12 +1937,10 @@ class I18nService(QObject):
             "history.col_status": "状态",
             "history.col_fallback": "回退",
             "history.col_parse_issues": "解析问题",
-            # Top bar
             "topbar.theme_tooltip": "切换深色 / 浅色主题",
             "topbar.lang_tooltip": "切换界面语言",
             "topbar.lang_tooltip_effective": "切换界面语言 — 当前：{language}",
             "topbar.lang_auto": "自动检测 (系统)",
-            # Home Page
             "home.title": "翻译字幕",
             "home.subtitle": "选择您的字幕文件、目标语言及处理选项。",
             "home.source_lang": "源语言",
@@ -2104,7 +1953,6 @@ class I18nService(QObject):
             "home.translate_title": "翻译文本",
             "home.translate_desc": "将对话内容翻译至目标语言",
             "home.btn_process": "开始处理",
-            # Dropzone
             "dropzone.title": "将字幕文件拖放至此处",
             "dropzone.subtitle": "或点击浏览文件",
             "dropzone.formats": "支持格式：.srt, .ass, .vtt, .txt",
@@ -2113,7 +1961,6 @@ class I18nService(QObject):
             "dropzone.replace_hint": "点击或拖放其他文件以替换",
             "dropzone.dialog_title": "选择字幕文件",
             "dropzone.filter": "字幕文件 (*.srt *.ass *.vtt *.txt);;所有文件 (*.*)",
-            # Preview / Translation Studio
             "preview.title": "翻译工作室",
             "preview.subtitle": "视频实时预览、逐行精准编辑与轴音画同步。",
             "preview.btn_open": "打开字幕",
@@ -2136,9 +1983,7 @@ class I18nService(QObject):
             "preview.volume_tooltip": "音量",
             "preview.video_filter": "视频文件 (*.mp4 *.mkv *.webm *.avi *.mov *.flv *.m4v);;所有文件 (*.*)",
             "preview.save_dialog_title": "保存已编辑的字幕",
-            # File dialogs
             "dialog.all_files": "所有文件 (*.*)",
-            # Transcribe Page
             "transcribe.title": "转录音视频",
             "transcribe.subtitle": "使用本地 Whisper 将音频或视频转换为字幕，结果可用于分析、质检、清理与翻译。",
             "transcribe.no_file": "未选择文件",
@@ -2162,7 +2007,6 @@ class I18nService(QObject):
             "transcribe.error_desc": "转录失败：{err}",
             "transcribe.error_generic": "请确认媒体文件可读取且 Whisper 可用，然后重试。",
             "transcribe.cancelled": "转录已取消",
-            # Pipeline Page
             "pipeline.title": "音视频流水线",
             "pipeline.subtitle": "转录 → 清理 → 分析 → 质检 → 可选翻译 → 终检 → 导出 → 可选压制。",
             "pipeline.no_file": "未选择文件",
@@ -2194,16 +2038,13 @@ class I18nService(QObject):
             "pipeline.error_desc": "流水线未能完成：{err}",
             "pipeline.error_unknown": "未知错误",
             "pipeline.cancelled": "流水线已取消",
-            # Clean Page
             "clean.title": "清理字幕",
             "clean.subtitle": "在不改变时间轴的前提下，智能去除广告、链接与字幕组标记。",
             "clean.btn_clean": "立即清理文件",
-            # Convert Page
             "convert.title": "格式转换",
             "convert.subtitle": "在 SRT、VTT、ASS 和 TXT 之间互转并保持时间轴同步。",
             "convert.target_label": "目标格式：",
             "convert.btn_convert": "转换并保存",
-            # Batch Page
             "batch.title": "批量处理",
             "batch.subtitle": "并行批量翻译、清理或转换多个字幕文件。",
             "batch.btn_add": "添加字幕文件",
@@ -2217,7 +2058,6 @@ class I18nService(QObject):
             "batch.status_processing": "处理中...",
             "batch.status_completed": "已完成",
             "batch.status_error": "错误：{err}",
-            # Settings Page
             "settings.title": "服务与设置",
             "settings.lang_card_title": "界面显示语言",
             "settings.lang_card_desc": "选择应用程序的语言，或设为自动根据系统语言切换。",
@@ -2235,7 +2075,6 @@ class I18nService(QObject):
             "settings.openai_model_placeholder": "模型名称 (例如：gpt-4o-mini)",
             "settings.btn_save": "保存设置",
             "settings.save_success": "设置已成功保存！",
-            # Completed Page
             "completed.title": "处理完成",
             "completed.subtitle": "字幕文件已处理完毕并成功保存至本地。",
             "completed.card_lines": "已处理行数",
@@ -2248,7 +2087,6 @@ class I18nService(QObject):
             "completed.sum1": "广告、URL 与多余标记已清除",
             "completed.sum2": "原始时间轴与对话结构完好保留",
             "completed.sum3": "文件已成功写入磁盘",
-            # About Page
             "about.title": "SRT4U - Subtitle Processor",
             "about.version_pill": f"v{APP_VERSION}",
             "about.status": "跨平台桌面应用 • 将字幕嵌入视频需要 FFmpeg",
@@ -2272,7 +2110,6 @@ class I18nService(QObject):
             "about.restr_3": "相同方式共享：衍生作品必须同样采用 GNU GPL v3.0 协议分发",
             "about.btn_open_license": "打开本地 LICENSE 文件",
             "about.btn_web_deed": "查看 GNU GPL v3.0 官方条款",
-            # Burn In Dialog
             "burn.dialog_title": "压制字幕到视频 (硬字幕 / Hardsub)",
             "burn.lbl_video_source": "原始视频：",
             "burn.lbl_output_file": "导出视频：",
@@ -2305,7 +2142,6 @@ class I18nService(QObject):
             "worker.error_pipeline_internal": "内部错误",
             "burn.btn_folder": "打开文件夹",
             "burn.btn_close": "关闭",
-            # Alerts & Messages
             "alert.file_req_title": "缺少文件",
             "alert.file_req_desc": "请先拖放或选择一个字幕文件。",
             "alert.no_subs_title": "暂无字幕",
@@ -2317,7 +2153,6 @@ class I18nService(QObject):
             "alert.save_success_desc": "字幕已保存至：\n{path}",
             "alert.burn_success_title": "字幕压制完成",
             "alert.burn_success_desc": "已成功导出带有硬字幕的视频文件：\n{path}",
-            # Progress Modal
             "progress.window_title": "正在处理",
             "progress.title": "正在处理",
             "progress.step_reading": "正在读取文件...",
@@ -2329,24 +2164,19 @@ class I18nService(QObject):
             "progress.remaining": "预计剩余时间：{time}",
             "progress.translating_progress": "翻译中 ({done}/{total})...",
             "progress.cancel": "取消",
-            # Home extras
             "app.subtitle": "Subtitle Processor",
             "home.lang_auto": "自动检测",
             "home.engine_deepl": "DeepL (推荐)",
             "home.engine_google": "Google Translate",
             "home.engine_openai": "OpenAI / LLM",
-            # Preview extras
             "preview.overlay_hint": "点击此处或拖入视频 (.mp4, .mkv, .webm) 进行预览",
             "preview.video_loaded": "视频已加载 - 随时可播放",
             "preview.select_video_title": "选择要预览的视频",
             "preview.select_subtitle_title": "选择要预览的字幕",
             "preview.sub_filter": "字幕文件 (*.srt *.ass *.vtt *.txt);;所有文件 (*.*)",
             "preview.save_filter": "SRT 字幕 (*.srt);;VTT 字幕 (*.vtt);;ASS 字幕 (*.ass);;纯文本 (*.txt)",
-            # Completed extras
             "completed.saved_as": "已保存为：{name}",
-            # Settings extras
             "settings.save_success_title": "设置已保存",
-            # Burn-in extras
             "burn.sub_badge": "字幕就绪：{count} 行",
             "burn.lbl_quality": "画质 / 速度：",
             "burn.size_small": "小",
@@ -2372,7 +2202,6 @@ class I18nService(QObject):
             "burn.stopping": "正在停止 FFmpeg 进程...",
             "burn.chk_fix_overlaps": "避免相邻字幕的时间轴重叠",
             "burn.preview_hint": "字幕压制到视频后的预览效果",
-            # Alerts extras
             "alert.save_error_title": "保存出错",
             "alert.save_error_desc": "无法保存文件：\n{err}",
             "alert.process_error_title": "错误",

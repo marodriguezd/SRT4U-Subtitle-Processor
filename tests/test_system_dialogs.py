@@ -92,9 +92,8 @@ def test_file_dialog_palette_follows_theme(qapp, lang):
                 f"{lang} (dark={dark}): fondo del diálogo {palette.window().color().name()} "
                 f"!= {expected_window.name()}"
             )
-            # With an active application QSS (tooltips), Qt resolves the palette via
-            # QStyleSheetStyle, so the selection color must be declared in QSS;
-            # the Qt default blue (#308cc6) must not be used on any path.
+            # With an active QSS, QStyleSheetStyle ignores the palette: the
+            # selection color must be declared in QSS, never the default blue.
             sheet = dialog.styleSheet()
             assert sheet, "The dialog has no QSS applied"
             assert expected_highlight.name().lower() in sheet.lower(), (

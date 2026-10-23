@@ -1,34 +1,9 @@
-"""Canonical ASS rendering contract for SRT4U (no PyQt6, no domain deps).
+"""Canonical ASS rendering contract shared by the exporter and burn-in.
 
-Both ASS producers in the project — the ``.ass`` exporter
-(``SubtitleService._format_ass``) and the burn-in generator
-(``VideoBurnerService.generate_ass_script``) — render the very same
-``SubtitleItem`` model. They must therefore agree byte for byte on how
-``SubtitleItem.text`` becomes an ASS event body, otherwise the same subtitle
-renders differently depending on whether the user exported it or burned it.
-
-The canonical model is deliberately simple: ``SubtitleItem.text`` is *plain
-text* that may additionally contain
-
-* literal ``{`` and ``}`` characters, and
-* the SRT/SubStation markup subset SRT4U itself understands:
-  ``<i>``, ``</i>``, ``<b>``, ``</b>``, ``<u>``, ``</u>``.
-
-Rendering order (this order *is* the contract, do not reorder):
-
-1. Escape every ``{``/``}`` as ``\\{``/``\\}``. In ASS a brace opens an override
-   block, so user text must never be able to inject ``\\b1``, ``\\p1`` (drawing
-   mode), ``\\pos``, ``\\t`` or any other tag. Escaping first means our own
-   tags — added in step 2 — are still emitted as real overrides.
-2. Translate the supported ``<i>/<b>/<u>`` markup into real override tags.
-   These are the *only* tags SRT4U ever generates.
-3. Turn real newlines into ``\\N`` (ASS hard line break).
-
-Styles live in the same module: a document must define every style it
-references, otherwise a renderer silently falls back to its own defaults and
-the styling is lost (M2). ``parse_style_definitions`` recovers the real
-definitions from a source document so a round trip can preserve them.
-"""
+``SubtitleItem.text`` is plain text plus literal braces and ``<i>/<b>/<u>``.
+Order is the contract: escape braces first (they open override blocks, so
+user text could inject ``\\p1``), translate our own markup, then newlines to
+``\\N``. A document must declare every style it references (M2)."""
 
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -154,17 +129,10 @@ def build_ass_document(
 ) -> str:
     """Assemble a complete ASS document.
 
-    ``events`` is an ordered sequence of ``(start_ms, end_ms, event_body)``
-    tuples, where ``event_body`` already went through :func:`to_ass_text`.
-    ``style_definitions`` maps style name -> definition body. Every style that
-    appears in the events is guaranteed to be declared in the header, so a
-    renderer never has to fall back silently (M2).
-
-    ``event_styles`` optionally carries the per-event style assignment
-    (parallel to ``events``; deep-audit D2). When omitted, every event uses
-    ``Default`` — the historical behaviour. A name that is unsafe or absent
-    from ``style_definitions`` falls back to ``Default``, preserving the
-    never-emit-an-undefined-style guarantee.
+    ``events`` is an ordered sequence of ``(start_ms, end_ms, body)`` tuples
+    already passed through :func:`to_ass_text`. Every referenced style is
+    declared in the header (M2). ``event_styles`` optionally assigns styles per
+    event (D2); an unsafe or unknown name falls back to ``Default``.
     """
     definitions: Dict[str, str] = {}
     if style_definitions:

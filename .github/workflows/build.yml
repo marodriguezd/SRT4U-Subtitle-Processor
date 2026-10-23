@@ -4,10 +4,8 @@ on:
   push:
     branches:
       - main
-    # The glob is intentionally wide: Actions cannot filter by format.
-    # The real gate is the "Validate tag before publishing" step of the
-    # release job (tools/release_check.py), which requires vMAJOR.MINOR.PATCH
-    # and that the tag matches pyproject.toml before publishing.
+    # Actions cannot glob by format, so this stays wide; the release job's
+    # tools/release_check.py gate rejects anything but vMAJOR.MINOR.PATCH.
     tags:
       - 'v*'
   pull_request:
@@ -16,25 +14,14 @@ on:
 permissions:
   contents: read
 
-# Supply chain: third-party Actions are pinned to immutable commit SHAs (with
-# the human-readable tag kept as a trailing comment). Dependabot
-# (.github/dependabot.yml) proposes the SHA bumps weekly;
-# tests/test_hardening_portfolio.py guards the pinning so a floating tag
-# cannot slip back in.
+# Third-party Actions are pinned to immutable commit SHAs (tag kept as a
+# trailing comment); Dependabot bumps them weekly and a test guards the pinning.
 
 env:
-  # Version-pinned static FFmpeg: all three builds use the SAME tag from
-  # eugeneware/ffmpeg-static, so artifacts stay reproducible. Do not use
-  # the moving `latest` tag of yt-dlp/FFmpeg-Builds: their autobuilds are purged
-  # after ~14 days and a URL pinned to one of them would end in a 404.
-  # tests/test_coherence.py::test_ci_pins_static_ffmpeg_version guards this.
-  # NOTE: `b6.1.1` is the release identifier of the repository publishing
-  # the binary, not the semantic banner of FFmpeg itself; the docs describe
-  # it as a download pin, never as an FFmpeg semantic version.
-  # When publishing: bump pyproject.toml and application/version.py together
-  # (the CLI, the API, the seven `about.version_pill` and this comment derive
-  # from them); the release job compares the tag against pyproject.toml and
-  # cancels on mismatch.
+  # All three builds use the same pinned tag from eugeneware/ffmpeg-static so
+  # artifacts stay reproducible; never the yt-dlp `latest` tag (purged after
+  # ~14 days, the URL 404s). `b6.1.1` is the publisher's release id, not an
+  # FFmpeg banner. When publishing, bump pyproject.toml and application/version.py.
   FFMPEG_VERSION: "b6.1.1"
   # appimagetool also tracked the moving `continuous` tag, which left
   # the AppImage unreproducible. Same stable tag for every build.
@@ -62,11 +49,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          # `.[api]` is mandatory: tests/test_api.py, test_pipeline.py and
-          # test_transcription.py import fastapi.testclient at module level,
-          # so without the extra, collection fails and takes down the whole
-          # CI pipeline (builds included). Do not duplicate these dependencies here:
-          # pyproject.toml is the source and requirements.txt its base mirror.
+          # `.[api]` is mandatory: three test modules import fastapi at module
+          # level, so without it collection fails and no build or release runs.
           pip install -r requirements.txt ".[api]"
           pip install pytest pytest-cov ruff==0.16.9
 
@@ -84,16 +68,12 @@ jobs:
       - name: Run full deterministic test suite
         env:
           QT_QPA_PLATFORM: offscreen
-        # `-m "not network"`: the primary suite is deterministic and never touches
-        # external translation services; the `network` tests stay as
-        # opt-in integration (same as the README local-first policy).
-        # Coverage is enforced through the [tool.coverage.report] floor
-        # (pyproject.toml); it is not inflated with empty assertions.
+        # `-m "not network"` keeps the suite deterministic (network tests are
+        # opt-in); coverage is enforced by the pyproject floor, never padded.
         run: python -m pytest tests/ -q -m "not network" --cov=application --cov-report=term-missing --cov-fail-under=62
 
-  # Verify the minimum bound declared in requirements.txt still works.
-  # The minimum version and the Qt runtime resolve from requirements.txt,
-  # so only that file needs updating when raising the bound.
+  # The minimum bound and the Qt runtime both resolve from requirements.txt,
+  # so only that file changes when the bound is raised.
   compat-min-pyqt6:
     name: Compatibility (minimum PyQt6)
     runs-on: ubuntu-latest
@@ -133,9 +113,8 @@ jobs:
       - name: Install the declared minimum stack
         run: |
           python -m pip install --upgrade pip
-          # `.[api]` for the same reason as in the test job: the suite imports
-          # fastapi at module level. PyQt6 stays pinned to ==MIN via
-          # requirements-min.txt, which the next step verifies.
+          # `.[api]` for the same reason as the test job; PyQt6 stays pinned to
+          # ==MIN through requirements-min.txt, which the next step verifies.
           pip install -r /tmp/requirements-min.txt "PyQt6-Qt6>=${{ steps.min.outputs.minor }},<${{ steps.min.outputs.next_minor }}" pytest ".[api]"
 
       - name: Verify that the pinned minimum is really installed
@@ -159,10 +138,8 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest tests/ -q -m "not network"
 
-  # Validate the declared `requires-python = ">=3.10"` floor with the guards
-  # that read pyproject.toml. `tomllib` is stdlib only from 3.11, so on 3.10
-  # the [dev] extra installs `tomli` and tests/_toml_compat.py selects it
-  # (the analytics-packaging subprocess has the same fallback inline).
+  # Guards for the declared `>=3.10` floor: `tomllib` is 3.11+ stdlib, so 3.10
+  # installs `tomli` from [dev] and tests/_toml_compat.py selects it.
   compat-min-python:
     name: Compatibility (minimum Python)
     runs-on: ubuntu-latest
@@ -232,9 +209,8 @@ jobs:
           Move-Item -Path "dist/SRT4U.exe" -Destination "dist/SRT4U-Windows-x64.exe"
 
       - name: Smoke-test executable (launch, resources, bundled FFmpeg)
-        # Runs the built GUI binary in its hidden --smoke-test mode. The
-        # --noconsole build has no stderr, so the diagnostics come from the
-        # temporary log file, which is printed in both outcomes.
+        # Runs the binary in hidden --smoke-test mode; --noconsole has no stderr,
+        # so diagnostics come from the temp log, printed in both outcomes.
         timeout-minutes: 5
         shell: pwsh
         run: |
@@ -244,11 +220,8 @@ jobs:
           exit $code
 
       - name: Stamp release version (provenance marker)
-        # The stamp goes in a text file next to the binary: PyInstaller
-        # binaries compress all Python code (PYZ/zlib), so grepping
-        # the binary for the version literal can never pass.
-        # The release job compares this stamp against the tag; an artifact
-        # built from another ref carries the wrong stamp.
+        # PyInstaller compresses the Python code, so the version literal is not
+        # greppable; this stamp next to the binary is what a release verifies.
         run: |
           $v = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
           Set-Content -Path dist/RELEASE_VERSION -Value $v -NoNewline
@@ -319,7 +292,7 @@ jobs:
 
       - name: Package AppImage
         run: |
-          # 1. Prepare the AppDir structure
+          # Prepare the AppDir structure
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp dist/SRT4U AppDir/usr/bin/SRT4U
@@ -327,7 +300,7 @@ jobs:
           cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/srt4u.png
           cp assets/icon.png AppDir/srt4u.png
 
-          # 2. Desktop file
+          # Desktop file
           cat << 'EOF' > AppDir/srt4u.desktop
           [Desktop Entry]
           Name=SRT4U
@@ -342,7 +315,7 @@ jobs:
           Keywords=subtitle;srt;translate;video;audio;
           EOF
 
-          # 3. AppRun
+          # AppRun
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
           SELF=$(readlink -f "$0")
@@ -353,7 +326,7 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
 
-          # 4. Download appimagetool and package the AppImage
+          # Download appimagetool and package the AppImage
           curl -sL "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage" -o appimagetool
           chmod +x appimagetool
           ./appimagetool --version
@@ -365,9 +338,8 @@ jobs:
           cd ..
 
       - name: Smoke-test AppImage (launch, resources, bundled FFmpeg)
-        # Runs the packaged AppImage itself. APPIMAGE_EXTRACT_AND_RUN avoids
-        # needing FUSE on the runner; offscreen Qt needs no display server and
-        # the smoke path only covers startup, not interactive use.
+        # APPIMAGE_EXTRACT_AND_RUN avoids FUSE on the runner; offscreen Qt needs
+        # no display, and the smoke path covers startup only.
         timeout-minutes: 5
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
@@ -381,9 +353,8 @@ jobs:
           exit $status
 
       - name: Stamp release version (provenance marker)
-        # See the equivalent build-windows step: the stamp goes next to
-        # the binary because the PyInstaller code is compressed. sed
-        # (not grep -P) to stay portable across GNU and BSD grep.
+        # See the Windows equivalent: the stamp sits next to the binary because
+        # PyInstaller compresses the code; sed keeps it portable across greps.
         run: |
           sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml > dist/RELEASE_VERSION
           cat dist/RELEASE_VERSION
@@ -452,10 +423,8 @@ jobs:
           hdiutil create -volname "SRT4U" -srcfolder "dist/SRT4U.app" -ov -format UDZO "dist/SRT4U-macOS.dmg"
 
       - name: Stamp release version (provenance marker)
-        # See the equivalent build-windows step: the stamp goes next to
-        # the binary because the PyInstaller code is compressed (and a
-        # UDZO image admits no bytes appended past its koly trailer). sed (not
-        # grep -P) because BSD grep on macOS lacks -P support.
+        # As in the Windows step: the code is compressed and UDZO admits no
+        # bytes past the koly trailer, so the stamp sits beside the binary.
         run: |
           sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml > dist/RELEASE_VERSION
           cat dist/RELEASE_VERSION
@@ -492,27 +461,18 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          # 1. Stable format and tag == project.version (pyproject.toml).
-          #    Fails BEFORE publishing: v1.4.8/v1.5.0/v2.0.0 on mismatch,
-          #    v1.4.12-rc1 for not being vMAJOR.MINOR.PATCH. The `v*` trigger stays
-          #    wide (Actions globs do not filter by format);
-          #    this gate decides whether to publish.
+          # Gate before publishing: stable vMAJOR.MINOR.PATCH matching
+          # pyproject.toml, the tag pointing at this commit (local git, no
+          # API), and every artifact's RELEASE_VERSION stamp matching the tag.
+          # The stamp sits beside the binary because PyInstaller compresses code.
           python tools/release_check.py "$TAG"
 
-          # 2. The tag points at the commit being published (no GitHub API:
-          #    local git after checking out the tag ref).
           TAG_SHA=$(git rev-parse "refs/tags/${TAG}^{commit}")
           if [ "$TAG_SHA" != "$EXPECTED_SHA" ]; then
             echo "release cancelled: tag ${TAG} points at ${TAG_SHA}, not at the built commit ${EXPECTED_SHA}" >&2
             exit 1
           fi
 
-          # 3. Provenance: every artifact carries a plain-text version stamp
-          #    (dist/RELEASE_VERSION, written by the builds from the built
-          #    commit's pyproject.toml). PyInstaller binaries compress the Python
-          #    code, so the literal is not greppable inside the executable; the
-          #    stamp next to the binary is the verifiable provenance marker: an
-          #    artifact from another ref does not carry the tag version.
           VERSION="${TAG#v}"
           for artifact in \
             release-artifacts/SRT4U-Windows-x64/RELEASE_VERSION \

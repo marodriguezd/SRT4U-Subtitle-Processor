@@ -105,9 +105,6 @@ def api_client():
         yield test_client
 
 
-# Registry & abstraction
-
-
 def test_registry_has_whisper_and_rejects_unknown():
     assert "whisper" in TranscriptionRegistry.names()
     with pytest.raises(TranscriptionError):
@@ -138,9 +135,6 @@ def test_config_language_normalization():
     assert TranscriptionConfig(language="").normalized_language() is None
     assert TranscriptionConfig(language="ES").normalized_language() == "es"
     assert TranscriptionConfig(language=" es ").normalized_language() == "es"
-
-
-# Models & metrics
 
 
 def test_metrics_realtime_factor_only_when_known():
@@ -216,9 +210,6 @@ def test_segments_to_subtitle_items_validates():
     assert items[2].start_ms == 0
 
 
-# Service: validation, rendering
-
-
 def test_service_rejects_missing_and_unsupported(media_file):
     service = TranscriptionService()
     with pytest.raises(TranscriptionError) as exc_info:
@@ -275,9 +266,6 @@ def test_check_available_reports_missing_backend():
         service.check_available("whisper")
 
 
-# Analytics / QA reuse
-
-
 def test_transcription_feeds_analytics_and_qa(fake_registry, media_file):
     service = TranscriptionService()
     result = service.transcribe_file(media_file, language="es")
@@ -290,9 +278,6 @@ def test_transcription_feeds_analytics_and_qa(fake_registry, media_file):
     assert qa_report.error_count == 0
     report_only = service.subtitle_service.qa_subtitles(items, file_format="srt")
     assert report_only.passed
-
-
-# History
 
 
 def test_history_records_transcription_without_texts(
@@ -317,9 +302,6 @@ def test_history_records_transcription_without_texts(
     assert row["success"] == 1
     blob = json.dumps(rows)
     assert "hola mundo" not in blob
-
-
-# CLI
 
 
 def test_cli_transcribe_with_fake(
@@ -401,9 +383,6 @@ def test_cli_transcribe_bad_extension(tmp_path, fake_registry, capsys):
     assert code == 2
 
 
-# API
-
-
 def _wait_job(client, job_id, timeout=15.0):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -474,9 +453,6 @@ def test_api_transcribe_openapi_lists_route(api_client):
     assert "/api/v1/transcribe" in spec["paths"]
 
 
-# GUI
-
-
 def test_transcribe_page_wired(qapp):
     from application.ui.main_window import MainWindow
 
@@ -500,9 +476,6 @@ def test_transcribe_page_wired(qapp):
     assert media_filter.endswith(win.i18n.t("dialog.all_files"))
 
 
-# Jobs
-
-
 def test_job_cancel_marks_cancelled():
     manager = JobManager(max_workers=1)
     started = threading.Event()
@@ -522,9 +495,6 @@ def test_job_cancel_marks_cancelled():
     assert job["status"] == "completed"
     assert manager.get(second)["status"] == "cancelled"
     manager.shutdown()
-
-
-# Full fake integration
 
 
 def test_fake_transcription_end_to_end(fake_registry, media_file, tmp_path):

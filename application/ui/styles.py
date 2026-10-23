@@ -48,7 +48,6 @@ class Styles:
     BORDER = "#334155"
     BORDER_SUBTLE = "#1F2937"
 
-    # Text
     TEXT = "#F8FAFC"
     TEXT_SUBTLE = "#CBD5E1"
     TEXT_MUTED = "#94A3B8"

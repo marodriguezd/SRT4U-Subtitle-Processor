@@ -1,9 +1,7 @@
 name: Integration Tests (manual)
 
-# Manual-only integration checks. This workflow never triggers on push,
-# pull_request or tags, so it cannot slow down normal CI or interfere with
-# the tag-based release pipeline; it runs the `network`-marked tests on a
-# runner with FFmpeg. See docs/testing.md for the full integration matrix.
+# Manual-only (workflow_dispatch): never runs on push/PR/tags, so it cannot
+# slow CI or releases. Runs the `network` tests with FFmpeg; see docs/testing.md.
 on:
   workflow_dispatch:
 

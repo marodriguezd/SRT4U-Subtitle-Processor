@@ -83,9 +83,8 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
     ):
         app.include_router(module.router, prefix=API_PREFIX)
 
-    # Job payloads travel inside JobStatusResponse.result, so FastAPI cannot
-    # infer their shape while generating OpenAPI; extend the schema with the
-    # job-result models. Runtime responses stay plain dicts.
+    # Job payloads are plain dicts, so FastAPI cannot infer their shape; extend
+    # the schema with the job-result models. Runtime responses stay dicts.
     original_openapi = app.openapi
     job_result_models = (
         ProcessResultModel,

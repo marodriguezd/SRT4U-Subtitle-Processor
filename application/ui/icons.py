@@ -172,14 +172,12 @@ _SVG_ICONS = {
 class Icons:
     """Helper to render vector icons with dynamic color tinting and sizing."""
 
-    # Default Theme Colors
     DEFAULT_MUTED = "#94A3B8"
     DEFAULT_ACTIVE = "#818CF8"
     DEFAULT_SUCCESS = "#10B981"
 
-    #: Hard ceiling for the pixmap cache: today's palette is small, but the
-    #: cache keys include caller-supplied colors, so it must not grow without
-    #: bound for the lifetime of the process.
+    #: Pixmap cache ceiling: keys include caller colors, so it must not grow
+    #: without bound for the process lifetime.
     _CACHE_LIMIT = 256
     _PIXMAP_CACHE: Dict[Tuple[str, str, int, int], QPixmap] = {}
 

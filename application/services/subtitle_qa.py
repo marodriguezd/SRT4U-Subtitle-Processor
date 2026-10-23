@@ -386,8 +386,7 @@ class _FormattingRule(SubtitleQARule):
                     )
 
             # ASS override blocks start with '{\\'; natural braces are ignored.
-            # The patterns are class-level and compiled once (M-5): resolving
-            # them per cue made every rule pass re-run the regex cache lookup.
+            # Patterns are compiled once at class level (M-5).
             residual_text = SubtitleQA._ASS_BLOCK.sub("", item.text)
             unmatched_open = len(SubtitleQA._ASS_OPEN.findall(residual_text))
             unmatched_close = len(SubtitleQA._ASS_CLOSE.findall(residual_text))
@@ -415,11 +414,8 @@ class _FormattingRule(SubtitleQARule):
 class SubtitleQA:
     """Runs composable deterministic rules over parsed cues and source structure."""
 
-    # D4: the timestamp grammar is now shared with the parser via the
-    # ``timestamps`` module. The full-line regexes below only add the arrow,
-    # optional cue settings and line anchors around the SAME component grammar
-    # ``SubtitleService`` accepts, so a file the parser reads cannot be
-    # reported as structurally broken here (and vice versa).
+    # D4: these full-line regexes wrap the SAME component grammar the parser
+    # uses, so a file one side accepts cannot be reported broken by the other.
     _SRT_TIMESTAMP = re.compile(
         rf"^({ts.SRT_TIMESTAMP_PATTERN})\s*-->\s*"
         rf"({ts.SRT_TIMESTAMP_PATTERN})(?:\s+.*)?$"
@@ -555,9 +551,8 @@ class SubtitleQA:
         if not content.strip():
             return
 
-        # D4: WebVTT ends a cue at every blank line, so the plain split is
-        # exact. SRT keeps blank lines inside a cue, so a block starts only
-        # when the next line is a cue index (M7).
+        # D4: WebVTT ends a cue at every blank line; SRT keeps blank lines
+        # inside a cue, so a block starts only at the next cue index (M7).
         if file_format == "srt":
             blocks = re.split(r"\r?\n\s*\r?\n(?=\s*\d+\s*(?:\r?\n))", content.strip())
         else:
@@ -578,9 +573,7 @@ class SubtitleQA:
                 if lines[0].upper() == "WEBVTT" or lines[0].upper().startswith(
                     ("WEBVTT ", "WEBVTT\t")
                 ):
-                    # D4: the header may share a block with the first cue (the
-                    # block split only fires on cue-number boundaries); drop
-                    # the header line and keep validating the rest.
+                    # D4: the header may share a block with the first cue.
                     lines = lines[1:]
                     if not lines:
                         continue
@@ -669,9 +662,8 @@ class SubtitleQA:
             if not match or not self._timestamp_components_valid(match, file_format):
                 duplicate_parsed_interval = False
                 if match and file_format == "srt":
-                    # The regex now carries one capturing group per timestamp
-                    # (shared grammar); recompute the interval with the same
-                    # converter so the parser-dropped-cue dedup keeps working.
+                    # Recompute with the same converter so parser-dropped-cue
+                    # dedup keeps working.
                     start_ms = srt_timestamp_to_ms(match.group(1))
                     end_ms = srt_timestamp_to_ms(match.group(2))
                     if start_ms is not None and end_ms is not None:

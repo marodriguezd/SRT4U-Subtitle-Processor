@@ -69,9 +69,8 @@ def _origin(url: str) -> tuple:
     try:
         port = parsed.port
     except ValueError:
-        # A malformed port (e.g. from a hostile Location header) must not raise
-        # inside the redirect handler; a sentinel origin never matches a valid one,
-        # so the cross-origin check rejects the redirect cleanly.
+        # A malformed port (hostile Location header) must not raise inside the
+        # redirect handler; the sentinel origin never matches a valid one.
         return (scheme, (parsed.hostname or "").lower(), "invalid-port")
     if port is None:
         if scheme == "http":
@@ -418,9 +417,8 @@ class OpenAICompatibleProvider(TranslationProvider):
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
             raise ProviderConfigurationError("the endpoint base URL is not valid")
         self._local_endpoint = is_loopback_host(parsed_url.hostname)
-        # Deep-audit M5: cleartext HTTP is only acceptable when the request can
-        # never leave the machine. For anything else the API key would travel
-        # unencrypted, so the configuration is rejected instead of warned about.
+        # M5: cleartext HTTP is only acceptable when the request cannot leave
+        # the machine; otherwise the API key would travel unencrypted.
         if parsed_url.scheme == "http" and not self._local_endpoint:
             raise ProviderConfigurationError(
                 "remote endpoints require HTTPS; plain HTTP is only allowed "

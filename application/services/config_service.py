@@ -75,14 +75,10 @@ class ConfigService:
                 pass
 
     def save(self) -> bool:
-        """Write configuration and credentials atomically with restricted permissions.
+        """Write configuration atomically with 0600 permissions.
 
-        Deep-audit H4: this used to ``open(path, "w")`` and dump straight into
-        the destination, so any interruption left a truncated JSON file and the
-        next ``load()`` silently reverted the user to defaults, losing every
-        stored API key with nothing but a log line. The content is now written
-        to a sibling temporary file, fsynced, chmod'ed to 0600 *before* the
-        rename, and only then moved into place with ``os.replace()``.
+        H4: write a sibling temp, fsync, chmod, then ``os.replace``, so an
+        interruption cannot truncate the existing settings.
         """
         try:
             os.makedirs(self.config_dir, exist_ok=True)

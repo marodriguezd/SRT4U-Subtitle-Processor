@@ -36,12 +36,10 @@ def test_make_unique_burn_temp_properties(tmp_path):
     assert temp1.endswith(".mp4"), "Must preserve target format extension for FFmpeg"
     assert "srt4u-burn-tmp" in temp1, "Must contain substring for cleanup tracking"
 
-    # Test with different extension
     mkv_dest = str(tmp_path / "movie.mkv")
     temp_mkv = make_unique_burn_temp(mkv_dest)
     assert temp_mkv.endswith(".mkv")
 
-    # Generate 50 unique names and ensure no collisions
     generated = {make_unique_burn_temp(dest) for _ in range(50)}
     assert len(generated) == 50
 

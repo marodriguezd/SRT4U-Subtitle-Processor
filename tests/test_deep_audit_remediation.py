@@ -630,9 +630,8 @@ def test_job_manager_prunes_completed_jobs():
     try:
         for _ in range(500):
             manager.submit("t", lambda: {"payload": "x" * 512})
-        # The cap can be reached while the last submissions are still queued or
-        # running (live jobs are never pruned), so the condition requires both
-        # the cap and a fully drained burst before asserting the survivors.
+        # The cap is reached with live jobs still queued: wait for the burst
+        # to drain before asserting the survivors.
         terminal = {"completed", "failed", "cancelled"}
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:

@@ -258,10 +258,8 @@ class TranslationService:
                 if candidate_position == 0:
                     original_error = exc
                     fallback_error_type = exc.error_type
-                # Fallback failed too: keep the *requested* provider's error
-                # category in ``fallback_error_type`` so metrics always answer
-                # "why did the primary fail?" even when the fallback chain
-                # ends in failure.
+                # Keep the *requested* provider's error category in
+                # ``fallback_error_type`` so metrics explain the primary failure.
             except Exception as exc:
                 safe_error = (
                     exc

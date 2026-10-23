@@ -38,20 +38,17 @@ def test_srt_to_all_formats(service):
 
     items = service.parse_subtitles(content, "srt")
 
-    # 1. SRT -> VTT
     vtt = service.format_output(items, "vtt")
     assert vtt.startswith("WEBVTT")
     vtt_items = service.parse_subtitles(vtt, "vtt")
     assert len(vtt_items) == len(items)
 
-    # 2. SRT -> ASS
     ass = service.format_output(items, "ass")
     assert "[Script Info]" in ass
     assert "Dialogue:" in ass
     ass_items = service.parse_subtitles(ass, "ass")
     assert len(ass_items) == len(items)
 
-    # 3. SRT -> TXT
     txt = service.format_output(items, "txt")
     assert "Good morning, detective" in txt
     txt_items = service.parse_subtitles(txt, "txt")

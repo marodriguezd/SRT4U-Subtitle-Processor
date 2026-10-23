@@ -22,9 +22,8 @@ def reveal_path(path: str) -> None:
     if not path:
         return
     if sys.platform == "win32":
-        # ``explorer`` only accepts the ``/select,<file>`` form as one command
-        # line. Quotes are invalid in a Windows path anyway, so removing them
-        # keeps a hostile filename from breaking out of the quoted argument.
+        # ``explorer`` only accepts ``/select,<file>`` as one command line, and
+        # quotes are invalid anyway, so stripping them blocks argument escape.
         target = os.path.normpath(path).replace('"', "")
         subprocess.Popen(f'explorer /select,"{target}"')
     elif sys.platform == "darwin":

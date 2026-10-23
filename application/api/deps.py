@@ -21,9 +21,8 @@ logger = get_logger("api")
 SUPPORTED_EXTENSIONS = {".srt", ".vtt", ".ass", ".ssa", ".txt"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-#: Upload chunks are coalesced up to this size before touching the disk, which
-#: keeps the blocking write off the event loop without paying a thread hop per
-#: 64 KiB read (a full 5 MB upload drops from ~80 writes to 5).
+#: Coalesce upload chunks up to this size: one blocking write per chunk instead
+#: of a thread hop per 64 KiB read.
 _UPLOAD_WRITE_BATCH = 1024 * 1024
 
 
@@ -52,12 +51,9 @@ def validate_extension(filename: Optional[str]) -> str:
 def validate_provider(provider: str) -> str:
     """Reject an unknown translation provider as a configuration error.
 
-    Deep-audit L7: an unvalidated provider was accepted, the job ran, every cue
-    "failed" with the opaque ``unknown`` error type, and the caller still got a
-    completed job. The registry is the single source of truth shared with the
-    CLI and the GUI, so this check cannot drift from what would actually run.
-    Resolving the provider also surfaces a broken endpoint configuration
-    (e.g. a non-HTTPS remote URL) as a 422 instead of a late per-cue failure.
+    L7: the registry shared with the CLI and GUI is the single source of truth,
+    and resolving here also surfaces a broken endpoint as 422, not a late
+    per-cue failure.
     """
     name = (provider or "").strip()
     if not name:
@@ -175,10 +171,8 @@ def safe_detail(exc: Exception, fallback: str = "internal error") -> str:
     )
 
     if isinstance(exc, PipelineConfigError):
-        # D5: these messages are generated locally by ``PipelineConfig.validate``
-        # from the caller's own request parameters — they never contain
-        # tracebacks, server paths, credentials or content, so flattening them
-        # to a generic message only hid which 422 cause the client must fix.
+        # D5: these messages come from ``PipelineConfig.validate`` with the
+        # caller's own parameters, so they never leak server internals.
         message = str(exc).strip()
         return message or fallback
     if isinstance(exc, TranscriptionError):

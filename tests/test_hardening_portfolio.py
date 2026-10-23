@@ -15,9 +15,6 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 
 
-# JobManager concurrency
-
-
 def test_job_manager_concurrent_submit_get_cancel_list_is_safe():
     """Concurrent submit/get/cancel/list must not deadlock or corrupt state."""
     from application.api.jobs import JobManager
@@ -181,9 +178,6 @@ def test_job_manager_submit_after_shutdown_calls_on_drop():
     assert dropped == ["shut"]
 
 
-# History migrations
-
-
 def _legacy_v1_db(path: Path) -> None:
     """Create a v1 database (no media_duration_ms, no parse_issues)."""
     conn = sqlite3.connect(str(path))
@@ -308,9 +302,6 @@ def test_history_unknown_field_rejected_not_silently_stored(tmp_path):
         assert store.recent_runs(limit=10) == []
 
 
-# Config persistence
-
-
 def test_config_corrupt_json_falls_back_to_defaults(tmp_path, monkeypatch):
     from application.services.config_service import ConfigService
 
@@ -332,9 +323,6 @@ def test_config_corrupt_json_falls_back_to_defaults(tmp_path, monkeypatch):
     )
 
 
-# Upload caps
-
-
 def test_upload_caps_are_centralized_and_distinct():
     from application.api import deps as api_deps
     from application.api.routes import transcribe as transcribe_route
@@ -342,9 +330,6 @@ def test_upload_caps_are_centralized_and_distinct():
     assert api_deps.MAX_UPLOAD_BYTES == 5 * 1024 * 1024
     assert transcribe_route.TRANSCRIBE_MAX_BYTES == 500 * 1024 * 1024
     assert transcribe_route.TRANSCRIBE_MAX_BYTES > api_deps.MAX_UPLOAD_BYTES
-
-
-# About single source
 
 
 def test_about_identity_has_single_source():
@@ -365,9 +350,6 @@ def test_about_identity_has_single_source():
     assert "APP_GITHUB_PROFILE_URL" in source
     assert "APP_GITHUB_REPO_URL" in source
     assert "APP_AUTHOR_NAME" in source
-
-
-# Supply chain
 
 
 def test_ci_actions_are_pinned_to_shas():

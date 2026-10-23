@@ -163,9 +163,8 @@ class PipelineConfig:
                 "unsupported transcription model: "
                 f"{self.transcription_model} (supported: {', '.join(WHISPER_MODELS)})"
             )
-        # Deep-audit L8: strict QA with QA disabled *looks* like a gate is
-        # applied while the stage is silently skipped. Reject the incoherent
-        # combination instead of pretending, consistently across CLI/API/GUI.
+        # L8: strict QA with QA disabled looks like a gate but is skipped;
+        # reject the combination consistently across CLI/API/GUI.
         if self.qa_strict and not self.qa_enabled:
             raise PipelineConfigError(
                 "qa_strict requires qa_enabled: strict QA cannot be enforced "
@@ -195,9 +194,8 @@ class PipelineConfig:
         if self.output_video and _same_file_path(subtitle_output, self.output_video):
             raise PipelineConfigError("video and subtitle outputs must be different")
 
-        # Validation is side-effect free (S-6): directories are created by the
-        # export/burn stages when the run actually writes something, so a
-        # rejected configuration or a cancelled run leaves no artifacts behind.
+        # Validation is side-effect free (S-6): directories are only created by
+        # the stages that write, so a rejected run leaves no artifacts.
         return self
 
     def is_media_input(self) -> bool:
@@ -239,9 +237,8 @@ class PipelineResult:
     output_video: Optional[str] = None
     total_duration_ms: int = 0
     media_duration_ms: Optional[int] = None
-    # P1: structural problems the parser could not use (skipped/repaired
-    # blocks). Advisory only — they never flip ``success`` — but they must
-    # survive to the API/CLI/GUI/history instead of dying at the parse stage.
+    # P1: advisory parser findings; they never flip ``success`` but must reach
+    # the API/CLI/GUI/history.
     parse_issues: List[Dict[str, Any]] = field(default_factory=list)
     errors: List[Dict[str, str]] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -413,8 +410,6 @@ class MediaPipeline:
             )
         )
 
-    # Stages
-
     def _run_stage(
         self,
         stage: str,
@@ -495,10 +490,8 @@ class MediaPipeline:
         self, config: PipelineConfig, result: PipelineResult
     ) -> List[SubtitleItem]:
         try:
-            # One decoding policy for every entry point: BOM/UTF-16/CP1252
-            # detection lives in ``read_subtitle_file``, so the pipeline can
-            # never re-introduce mojibake on a legacy subtitle the GUI/CLI read
-            # correctly.
+            # BOM/UTF-16/CP1252 detection lives in ``read_subtitle_file``, so the
+            # pipeline cannot re-introduce mojibake the GUI/CLI read correctly.
             content = read_subtitle_file(config.input_media)
             file_format = self.subtitle_service.detect_format(
                 content, config.input_media
@@ -645,9 +638,8 @@ class MediaPipeline:
             ) from exc
         destination = config.output_subtitle or self._default_output(config)
         try:
-            # Deep-audit L9: writing straight into the destination destroyed the
-            # previous good file if the write failed part-way. The content is
-            # staged in a sibling temp file and renamed into place instead.
+            # L9: stage in a sibling temp and rename, so a failed write cannot
+            # destroy the previous good file.
             atomic_write_text(destination, content, encoding="utf-8")
         except OSError as exc:
             raise PipelineStageError(
