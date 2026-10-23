@@ -1,7 +1,24 @@
 # Deuda técnica y veredictos (hardening final)
 
 Aceptado conscientemente para la release candidate. Nada de aquí bloquea;
-cada punto indica por qué no se toca.
+cada punto indica por qué no se toca. Revisado el 2026-10-23 contra la suite
+determinista (`-m "not network"`: 765 passed, 26 skipped, 3 deselected).
+
+## Deuda cerrada (verificada por la suite)
+
+- **Overlap QA como warning** (antes punto 10): `passed` tolera los
+  solapamientos y `strict` los frena; no es un bug. Cubierto por
+  `test_detects_overlap_without_treating_touching_edges_as_overlap`,
+  `test_detects_one_millisecond_overlap_but_not_consecutive_cues`,
+  `test_many_cues_produce_stable_bounded_overlap_findings` y
+  `test_cli_qa_strict_fails_on_warnings_and_default_still_passes`.
+- **Pruebas de seguridad** (antes pendientes de reejecución): los errores y
+  logs no exponen claves, cabeceras ni rutas internas. Cubierto por
+  `test_no_tracebacks_or_keys_in_errors`, `test_failed_job_sanitizes_error`,
+  `test_translation_logs_never_contain_api_keys_or_input_text`,
+  `test_secrets_in_backend_message_are_not_exposed`,
+  `test_history_schema_has_no_secret_columns` y
+  `test_cross_origin_redirect_must_not_receive_the_api_key`.
 
 ## Deuda aceptada
 
@@ -27,11 +44,9 @@ cada punto indica por qué no se toca.
 8. **Cancelación cooperativa**: la etapa de traducción termina su trabajo
    actual; transcripción y burn-in sí abortan a mitad. Documentado.
 9. **Sin purga de historial**: filas agregadas diminutas; no hace falta gestión.
-10. **Overlap QA es warning**: `passed` lo tolera, `strict` lo frena.
-    Semántica verificada en tests, no un bug.
-11. **`build_exe.bat` cubre la variante BASE**: FULL documentado con flags en
+10. **`build_exe.bat` cubre la variante BASE**: FULL documentado con flags en
     el propio `.bat` (modelos nunca empaquetados).
-12. **Hex restantes sin constante**: tras la normalización selectiva quedan
+11. **Hex restantes sin constante**: tras la normalización selectiva quedan
     literales con semántica propia (blancos puros de pintura, colores de
     previsualización elegibles, superficies permanentes oscuras, hover
     `#059669`). Sin equivalencia exacta en `Styles`; no se inventan
@@ -75,8 +90,8 @@ cada punto indica por qué no se toca.
 - Sin imports circulares conocidos; el dominio no importa FastAPI/Pydantic.
   `i18n_service` y `video_burner_service` requieren PyQt6.
 - Errores normalizados de proveedores protegen credenciales; los errores
-  de subprocess y de escritura no se interpolan en mensajes UI. Pendiente de
-  reejecutar pruebas de seguridad en este entorno.
+  de subprocess y de escritura no se interpolan en mensajes UI (seguridad
+  reejecutada en este entorno el 2026-10-23; ver "Deuda cerrada").
 - Fallback sin ciclos (cadena acotada a 8, error ante repetición);
   `max_retries` acotado en API (0–10) y no negativo en servicios/CLI.
 - Temporales API siempre eliminados (incluido cancel en cola vía `on_drop`;
