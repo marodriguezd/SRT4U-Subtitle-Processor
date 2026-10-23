@@ -17,8 +17,6 @@ Aktuelles stabiles Release: **[v1.0.0](https://github.com/marodriguezd/SRT4U-Sub
 
 ![SRT4U-Vorschau](assets/preview_en.png)
 
----
-
 ## Funktionen
 
 - **Mehrsprachige Oberfläche (i18n)**:
@@ -52,8 +50,6 @@ Aktuelles stabiles Release: **[v1.0.0](https://github.com/marodriguezd/SRT4U-Sub
 - **Headless-CLI**: Batches verarbeiten, Untertitelmetriken analysieren und deterministisches QA mit JSON/CSV-Exporten ohne PyQt6-Start.
 - **Parallele Ausführung**: Multithread-Blockübersetzung zur Beschleunigung großer Untertiteldateien.
 - **Dunkles / helles Glass-Design**: Moderne Glassmorphism-UI mit sofortigem Designwechsel.
-
----
 
 ## Installation & Ausführung
 
@@ -133,8 +129,6 @@ Die CI-Builds bündeln ein versionsgepinntes statisches FFmpeg-Executable, sodas
 out of the box funktioniert; Plattform-Laufzeitbibliotheksanforderungen gelten weiterhin.
 Source-Installationen (voriger Abschnitt) benötigen ein nutzbares FFmpeg auf `PATH` für Burn-in.
 
----
-
 ## Headless-CLI
 
 Die CLI nutzt `SubtitleService` wieder, um ohne Erzeugung einer Qt-Anwendung zu bereinigen, zu übersetzen, Formate zu konvertieren und Verzeichnisse in Batches zu verarbeiten. Nach Paketinstallation `srt4u process` ausführen; aus einem Checkout `python -m application.cli process` nutzen. JSON-Presets und Optionen wie `--translate --source auto --target es --engine ollama` werden unterstützt. Siehe [docs/cli.md](docs/cli.md) für Beispiele, Preset-Schlüssel und Ausgabeverhalten.
@@ -162,8 +156,6 @@ pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # di
 
 Die Standard-Suite ist deterministisch: kein Netzwerk, keine API-Schlüssel, Whisper-Modelle oder Medien-Fixtures. Opt-in-Integrationssuiten (kostenlose Google-Übersetzung, echtes Whisper, E2E mit echten Medien) und ihre exakten Umgebungsvariablen sind in [docs/testing.md](docs/testing.md) dokumentiert.
 
----
-
 ## Entwicklerwerkzeuge
 
 ### Screenshot-Galerie-Generator
@@ -179,8 +171,6 @@ QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--
 - Die resultierende Größe und deklarierte Mindestgröße jedes Dialogs werden als schneller Geometrie-Sanity-Check gedruckt (`size == min` erwartet).
 - Das Tool ist via `tests/test_screenshot_tool.py`-Smoke-Test gegen Bit-Rot geschützt, der es in einem Subprozess bei jedem CI-Testjob ausführt.
 
----
-
 ## Logs & Fehlerbehebung
 
 Fehler werden in eine rotierende Logdatei geschrieben (512 KB × 3), statt verschluckt zu werden:
@@ -192,8 +182,6 @@ Fehler werden in eine rotierende Logdatei geschrieben (512 KB × 3), statt versc
 | Linux | `~/.config/SRT4U/srt4u.log` (oder `$XDG_CONFIG_HOME/SRT4U/srt4u.log`) |
 
 Sie zeichnet Konfigurations-Lese-/Schreibfehler, Übersetzungsengine-Fehler pro Block, FFmpeg-Erkennungs-/Dauer-/Dimensionsprobleme, unerwartete Ausnahmen (mit Traceback) und den finalen Exit-Code auf. Qts eigene Meldungen werden dorthin geroutet (`qWarning`/`qCritical`/`qFatal`, und `qDebug`/`qInfo` auf Debug-Level), sodass Multimedia-/Codec-Warnungen und Plattform-Plugin-Diagnostik neben den app-eigenen Einträgen auftauchen. Wenn ein Fehler anwendersichtbar ist — Einstellungen nicht gespeichert, unvollständige Übersetzung, unlesbare Einstellungsdatei, unbehandelter Fehler — zeigt die App einen Dialog mit Verweis auf diese Datei.
-
----
 
 ## Unterstützte Formate
 

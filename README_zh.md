@@ -17,8 +17,6 @@
 
 ![SRT4U 预览](assets/preview_en.png)
 
----
-
 ## 功能
 
 - **多语言界面（i18n）**：
@@ -52,8 +50,6 @@
 - **Headless CLI**：不启动 PyQt6 即可批量处理、分析字幕指标、运行确定性 QA 并导出 JSON/CSV。
 - **并行执行**：多线程分块翻译，加速大字幕文件。
 - **深色 / 浅色 Glass 主题**：现代 Glassmorphism UI，主题即时切换。
-
----
 
 ## 安装与运行
 
@@ -130,8 +126,6 @@ python -m application.cli serve  # 文档见 http://127.0.0.1:8000/docs
 CI 构建捆绑版本锁定的静态 FFmpeg 可执行文件，开箱即用支持烧录；平台运行时库要求仍然适用。
 源码安装（上一节）需要在 `PATH` 有可用的 FFmpeg 方可烧录。
 
----
-
 ## Headless CLI
 
 CLI 复用 `SubtitleService`，无需创建 Qt 应用即可清理、翻译、转换格式与批量处理目录。
@@ -175,8 +169,6 @@ pytest tests/ -m "not network" --cov=application --cov-report=term-missing  # �
 
 默认测试套件是确定性的：不需要网络、API 密钥、Whisper 模型或媒体素材。可选集成套件（Google 免费翻译、真实 Whisper、真实媒体端到端）及其确切环境变量见 [docs/testing.md](docs/testing.md)。
 
----
-
 ## 开发者工具
 
 ### 截图画廊生成器
@@ -194,8 +186,6 @@ QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--
 - 打印每对话框的结果尺寸与声明最小尺寸作快速几何 sanity 检查（期望 `size == min`）。
 - 该工具由 `tests/test_screenshot_tool.py` 烟雾测试防 bit-rot，每个 CI 测试任务都在子进程中运行它。
 
----
-
 ## 日志与排障
 
 失败写入轮转日志文件（512 KB × 3）而非被吞掉：
@@ -211,8 +201,6 @@ QT_QPA_PLATFORM=offscreen python tools/regenerate_screenshots.py [--out DIR] [--
 （`qWarning`/`qCritical`/`qFatal`，debug 级还有 `qDebug`/`qInfo`），因此多媒体/codec
 告警与平台插件诊断与应用自身条目并列。当失败用户可见——设置未保存、翻译不完整、
 设置文件不可读、未处理错误——应用显示指向该文件的对话框。
-
----
 
 ## 支持的格式
 
