@@ -555,14 +555,9 @@ class SubtitleQA:
         if not content.strip():
             return
 
-        # D4: split source structure the way each format models cues.
-        # WebVTT terminates a cue at every blank line, so the plain split is
-        # exact there. SRT does not: ``_parse_srt`` (M7) keeps a cue that
-        # contains internal blank lines, so a blank line only starts a new
-        # block when the next line looks like a cue index (digit), the same
-        # cue-shape heuristic the parser uses to stop collecting a cue's
-        # text. Anything else stays inside the cue instead of becoming a
-        # phantom block reported as a structural error.
+        # D4: WebVTT ends a cue at every blank line, so the plain split is
+        # exact. SRT keeps blank lines inside a cue, so a block starts only
+        # when the next line is a cue index (M7).
         if file_format == "srt":
             blocks = re.split(r"\r?\n\s*\r?\n(?=\s*\d+\s*(?:\r?\n))", content.strip())
         else:

@@ -127,7 +127,7 @@ def server():
         attacker.server_close()
 
 
-# ------------------------------------------------------------------ M4 redirect
+# M4: redirect
 
 
 def test_cross_origin_redirect_must_not_receive_the_api_key(server):
@@ -174,7 +174,7 @@ def test_google_and_deepl_also_use_the_safe_opener():
     assert body.count("with _open(") >= 3
 
 
-# ------------------------------------------------------------- M5/M6 endpoints
+# M5/M6: endpoints
 
 
 @pytest.mark.parametrize(
@@ -255,7 +255,7 @@ def test_loopback_detection_policy(host, expected):
     assert is_loopback_host(host) is expected
 
 
-# ------------------------------------------------------------------ L7 provider
+# L7: provider
 
 
 def test_api_rejects_unknown_provider_with_422(client=None):
@@ -308,7 +308,7 @@ def test_cli_provider_choices_come_from_the_registry():
     assert set(TRANSLATION_PROVIDERS) == set(ProviderRegistry.names())
 
 
-# ------------------------------------------------------------------ M10 i18n
+# M10: i18n
 
 
 def _catalogs():
@@ -379,7 +379,7 @@ def test_worker_error_strings_resolve_through_i18n():
         assert rendered.strip()
 
 
-# -------------------------------------------------------------- M11 lifecycle
+# M11: lifecycle
 
 
 def test_process_worker_uses_cooperative_cancellation_not_terminate():
@@ -542,7 +542,7 @@ def test_process_worker_completes_normally_without_cancellation(tmp_path):
     assert seen == ["completed"]
 
 
-# ----------------------------------------------------------------- L10 extra
+# L10: extra
 
 
 def test_vtt_cue_settings_are_preserved_and_documented():

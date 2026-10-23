@@ -161,13 +161,8 @@ class HistoryStore:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or default_db_path()
-        # Only the application-managed location (``~/.config/SRT4U`` and its
-        # platform equivalents) is ours to harden. An explicit path — the
-        # constructor argument or its ``SRT4U_HISTORY_DB`` equivalent — can
-        # point anywhere (CWD, a repository, a shared folder), and chmod-ing
-        # that parent would silently rewrite the permissions of a directory
-        # SRT4U does not own. The database file itself is not chmod-ed either:
-        # a custom path inherits the umask the user chose for that location.
+        # Harden only the application-managed location; a custom path
+        # (constructor or ``SRT4U_HISTORY_DB``) keeps the umask the user chose.
         self._owns_directory = not path and not os.environ.get("SRT4U_HISTORY_DB")
         if self.path != ":memory:":
             parent = os.path.dirname(os.path.abspath(self.path))
@@ -241,7 +236,7 @@ class HistoryStore:
     def __exit__(self, *args: Any) -> None:
         self.close()
 
-    # -- writes (single transaction each) -----------------------------------
+    # Writes (single transaction each)
 
     def record_run(self, operation: str, **fields: Any) -> int:
         """Insert one execution row; returns its id. All values parameterized."""
@@ -487,7 +482,7 @@ class HistoryStore:
             raise HistoryError(f"cannot record benchmark: {exc}") from exc
         return ids
 
-    # -- reads -----------------------------------------------------------------
+    # Reads
 
     def recent_runs(
         self,

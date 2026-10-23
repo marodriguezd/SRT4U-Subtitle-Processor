@@ -64,7 +64,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# Utilities
 def _ffprobe(path: str) -> dict:
     """File metadata via ffprobe (streams + format)."""
     out = subprocess.run(
@@ -141,7 +140,7 @@ def _frame(video: str, second: float, dest: str) -> QImage:
     return QImage(dest)
 
 
-# 1. Reading the real SRT
+# Reading the real SRT
 def test_01_reads_every_cue_of_the_real_srt():
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
@@ -179,7 +178,7 @@ def test_02_every_output_format_round_trips(fmt):
         assert [it.end_ms for it in reparsed] == [it.end_ms for it in items]
 
 
-# 2. Cleaning
+# Cleaning
 def test_03_cleaning_keeps_the_real_content_intact():
     service = SubtitleService()
     with open(SRT_PATH, encoding="utf-8") as handle:
@@ -196,7 +195,7 @@ def test_03_cleaning_keeps_the_real_content_intact():
     assert [it.start_ms for it in cleaned] == [it.start_ms for it in items]
 
 
-# 3. Translation with the free engine
+# Translation with the free engine
 @pytest.mark.network
 def test_04_free_translation_engine_on_real_subtitles():
     """
@@ -230,7 +229,7 @@ def test_04_free_translation_engine_on_real_subtitles():
         assert all(it.text.strip() for it in translated)
 
 
-# 4. Full processing pipeline
+# Full processing pipeline
 def test_05_processing_pipeline_end_to_end(tmp_path, caplog):
     service = SubtitleService()
     source = str(tmp_path / SRT_NAME)
@@ -277,7 +276,7 @@ def test_05_processing_pipeline_end_to_end(tmp_path, caplog):
     assert not errors, [r.getMessage() for r in errors]
 
 
-# 5. Real video metadata
+# Real video metadata
 def test_06_ffmpeg_detects_real_video_metadata():
     ffmpeg = VideoBurnerService.get_ffmpeg_path()
     assert ffmpeg, "FFmpeg not found"
@@ -293,7 +292,7 @@ def test_06_ffmpeg_detects_real_video_metadata():
     assert float(probe["format"]["duration"]) == pytest.approx(60.0, abs=0.5)
 
 
-# 6. ASS generation for hardsub
+# ASS generation for hardsub
 @pytest.mark.parametrize(
     "options",
     [
@@ -327,7 +326,7 @@ def test_07_ass_script_matches_the_real_video(options):
     assert not any("0:00:30." in start for start in starts), starts
 
 
-# 7. Burn-in (hardsub) of the full minute -- done once and reused
+# Burn-in (hardsub) of the full minute -- done once and reused
 @pytest.fixture(scope="module")
 def burned_video(tmp_path_factory, qapp):
     """Burn the subtitles onto the full real video and return the path."""
@@ -446,7 +445,7 @@ def test_11_burn_in_fails_cleanly_on_a_broken_video(tmp_path, caplog, qapp):
     assert not os.path.exists(out) or os.path.getsize(out) == 0
 
 
-# 8. Preview player
+# Preview player
 def test_12_preview_player_opens_the_real_video(qapp):
     player = VideoPreviewPlayer()
     player.show()
@@ -522,7 +521,7 @@ def test_13_preview_player_shows_the_real_subtitles(qapp):
     assert "upgrade" not in player.sub_overlay.text()
 
 
-# 9. Full UI flows
+# Full UI flows
 def test_14_main_window_processes_the_real_file(qapp, tmp_path):
     """Home -> process with translation -> preview -> result page."""
     win = MainWindow()
@@ -749,7 +748,7 @@ def test_18_burn_in_dialog_with_real_subtitles(qapp, tmp_path):
         dialog.close()
 
 
-# 10. Settings, languages and state
+# Settings, languages and state
 def test_19_home_options_are_persisted(qapp, tmp_path):
     win = MainWindow()
     source = str(tmp_path / SRT_NAME)

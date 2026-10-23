@@ -310,7 +310,7 @@ def test_ci_release_is_the_only_job_with_write_permission():
     assert "contents: write" in release_block
 
 
-# ------------------------------------------------------- release hardening --
+# Release hardening
 
 
 def _release_check_module():
@@ -415,17 +415,14 @@ def test_release_notes_are_release_facing_not_preparation():
     current publishing state is whatever GitHub reports (draft / published /
     not-yet-tagged)."""
     notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
-    # RELEASE_NOTES.md may truthfully say a release is prepared/not yet
-    # published when that matches GitHub state; it must not invent a
-    # published/stable release that does not exist, and it must not claim a
-    # *latest published release* version that differs from GitHub.
+    # May truthfully say "prepared / not yet published"; must not invent a
+    # published release or a latest version that differs from GitHub.
     assert f"SRT4U {EXPECTED_VERSION}" in notes
     # macOS stays documented as arm64-only, never universal.
     assert "Apple Silicon (arm64)" in notes
     assert "x86_64 build is produced" not in notes
-    # The notes must explicitly state that Intel x86_64 Macs are unsupported;
-    # accepted phrasings of that guarantee (the official 1.0.0 wording uses
-    # "Intel x86_64 Macs are not supported").
+    # Must state that Intel x86_64 Macs are unsupported; the official 1.0.0
+    # wording is one accepted phrasing.
     intel_exclusion = (
         "x86_64 build is NOT produced" in notes
         or "no x86_64 build" in notes.lower()

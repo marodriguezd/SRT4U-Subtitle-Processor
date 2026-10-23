@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 
 
-# ------------------------------------------------- JobManager concurrency ---
+# JobManager concurrency
 
 
 def test_job_manager_concurrent_submit_get_cancel_list_is_safe():
@@ -181,7 +181,7 @@ def test_job_manager_submit_after_shutdown_calls_on_drop():
     assert dropped == ["shut"]
 
 
-# ------------------------------------------------- History migrations -------
+# History migrations
 
 
 def _legacy_v1_db(path: Path) -> None:
@@ -308,7 +308,7 @@ def test_history_unknown_field_rejected_not_silently_stored(tmp_path):
         assert store.recent_runs(limit=10) == []
 
 
-# ------------------------------------------------- Config persistence ------
+# Config persistence
 
 
 def test_config_corrupt_json_falls_back_to_defaults(tmp_path, monkeypatch):
@@ -332,7 +332,7 @@ def test_config_corrupt_json_falls_back_to_defaults(tmp_path, monkeypatch):
     )
 
 
-# ------------------------------------------------- Upload caps -------------
+# Upload caps
 
 
 def test_upload_caps_are_centralized_and_distinct():
@@ -344,7 +344,7 @@ def test_upload_caps_are_centralized_and_distinct():
     assert transcribe_route.TRANSCRIBE_MAX_BYTES > api_deps.MAX_UPLOAD_BYTES
 
 
-# ------------------------------------------------- About single source ----
+# About single source
 
 
 def test_about_identity_has_single_source():
@@ -367,7 +367,7 @@ def test_about_identity_has_single_source():
     assert "APP_AUTHOR_NAME" in source
 
 
-# ------------------------------------------------- Supply chain ------------
+# Supply chain
 
 
 def test_ci_actions_are_pinned_to_shas():

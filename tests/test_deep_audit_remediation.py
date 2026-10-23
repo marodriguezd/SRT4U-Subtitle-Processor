@@ -36,7 +36,7 @@ def service():
     return SubtitleService()
 
 
-# ---------------------------------------------------------------- H1 cleaner
+# H1: cleaner
 
 
 def _line(service, text):
@@ -126,7 +126,7 @@ def test_cleaner_keeps_whole_cue_when_one_line_is_spam(service):
     assert cleaned[0].start_ms == 0 and cleaned[0].end_ms == 2000
 
 
-# ------------------------------------------------------------------ H2 race
+# H2: race
 
 
 class _SelectivelyFailingService(TranslationService):
@@ -231,7 +231,7 @@ def test_translation_preserves_input_order_regardless_of_completion_order():
     assert out[-1].start_ms == 39000
 
 
-# ------------------------------------------------------- H3 cancel contract
+# H3: cancel contract
 
 
 def test_cancel_before_translation_starts():
@@ -308,7 +308,7 @@ def test_process_subtitles_forwards_cancellation(tmp_path):
         )
 
 
-# ------------------------------------------------------------------- H4 save
+# H4: save
 
 
 def test_config_save_is_valid_json_and_0600(tmp_path, monkeypatch):
@@ -383,7 +383,7 @@ def test_corrupt_config_recovers_to_defaults_and_reports(tmp_path, monkeypatch):
     assert fresh.get("deepl_api_key") == ""
 
 
-# ---------------------------------------------------------- M1/M2 ASS output
+# M1/M2: ASS output
 
 
 def _ass_dialogues(document):
@@ -477,7 +477,7 @@ def test_ass_round_trip_preserves_real_style_definitions():
     assert ",8,20,20,20,1" in exported  # the real alignment/margins survived
 
 
-# ------------------------------------------------------- M3/M7 parse issues
+# M3/M7: parse issues
 
 
 def test_invalid_timestamp_raises_instead_of_returning_zero():
@@ -585,7 +585,7 @@ def test_process_subtitles_surfaces_parse_issues(tmp_path):
     assert result.parse_issues
 
 
-# ------------------------------------------------------------------- M8 time
+# M8: time
 
 
 @pytest.mark.parametrize(
@@ -618,7 +618,7 @@ def test_ass_time_never_goes_backwards_in_the_wrong_direction():
         assert a <= b
 
 
-# -------------------------------------------------------------- M9 retention
+# M9: retention
 
 
 def test_job_manager_prunes_completed_jobs():
@@ -712,7 +712,7 @@ def test_job_manager_final_prune_enforces_cap_without_live_jobs():
         manager.shutdown()
 
 
-# ---------------------------------------------------------------- L1 history
+# L1: history
 
 
 def test_run_and_findings_are_written_in_one_transaction(tmp_path):
@@ -768,7 +768,7 @@ class _ProcessingDouble:
     success = True
 
 
-# ----------------------------------------------------------------- L2 success
+# L2: success
 
 
 @pytest.mark.parametrize(
@@ -831,7 +831,7 @@ class _PipelineConfigDouble:
     translation_enabled = False
 
 
-# ----------------------------------------------------------------- L11 migrate
+# L11: migrate
 
 
 def test_migration_from_v1_to_v2(tmp_path):
@@ -886,7 +886,7 @@ def test_failed_migration_leaves_version_and_schema_consistent(tmp_path, monkeyp
         conn.close()
 
 
-# ---------------------------------------------------------------- L6 whisper
+# L6: whisper
 
 
 def test_whisper_models_have_a_single_source_of_truth(tmp_path):
@@ -944,7 +944,7 @@ def test_strict_qa_requires_qa_enabled(tmp_path):
         ).validate()
 
 
-# -------------------------------------------------------------------- L9 i/o
+# L9: i/o
 
 
 def test_pipeline_export_does_not_destroy_existing_output(tmp_path, monkeypatch):

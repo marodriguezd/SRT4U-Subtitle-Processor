@@ -33,9 +33,7 @@ def service():
     return SubtitleService()
 
 
-# ==============================================================================
 # 1. Format Round-Tripping & SSA Specifics
-# ==============================================================================
 
 
 def test_ssa_format_parsing_and_formatting(service):
@@ -91,9 +89,7 @@ def test_txt_format_roundtrip_with_crlf(service):
     assert "Line 2 of subtitles" in out_txt
 
 
-# ==============================================================================
 # 2. Multi-Hour (>99h) Timestamps
-# ==============================================================================
 
 
 def test_multi_hour_timestamps_across_formats(service):
@@ -130,9 +126,7 @@ def test_multi_hour_timestamps_across_formats(service):
     assert vtt_items[0].start_ms == ms
 
 
-# ==============================================================================
 # 3. Malformed Timestamps & Empty Cues (ParseIssue tracking)
-# ==============================================================================
 
 
 def test_malformed_timestamp_minutes_seconds_out_of_range(service):
@@ -194,9 +188,7 @@ Dialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,,Valid ASS
     assert any(i.kind == "empty_cue" for i in service.last_parse_issues)
 
 
-# ==============================================================================
 # 4. Batch Queue Resilience & Error Isolation
-# ==============================================================================
 
 
 def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
@@ -216,7 +208,6 @@ def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
     empty_file = tmp_path / "empty.srt"
     empty_file.write_text("", encoding="utf-8")
 
-    # Add to batch table
     win._clear_batch_table()
     for f in [str(valid_srt), str(missing_file), str(empty_file)]:
         row = win.batch_table.rowCount()
@@ -226,7 +217,6 @@ def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
         win.batch_table.setItem(row, 2, QTableWidgetItem("srt"))
         win.batch_table.setItem(row, 3, QTableWidgetItem("Queued"))
 
-    # Turn off translation to test local processing
     win.toggle_translate.setChecked(False)
     win.toggle_clean.setChecked(True)
 
@@ -235,7 +225,6 @@ def test_batch_processing_isolates_failures_and_missing_files(qapp, tmp_path):
 
     from application.services.i18n_service import t
 
-    # Row 0 must be completed
     assert win.batch_table.item(0, 3).text() == t("batch.status_completed")
     out_path = str(tmp_path / "valid_processed.srt")
     assert os.path.exists(out_path)
@@ -281,7 +270,6 @@ def test_batch_processing_cooperative_cancellation(qapp, tmp_path):
         win.batch_table.setItem(row, 0, QTableWidgetItem(f))
         win.batch_table.setItem(row, 3, QTableWidgetItem("Queued"))
 
-    # Cancel immediately
     win._batch_cancelled = True
     win._run_batch_processing()
 
@@ -289,9 +277,7 @@ def test_batch_processing_cooperative_cancellation(qapp, tmp_path):
     assert win.batch_table.item(0, 3).text() == "Queued"
 
 
-# ==============================================================================
 # 5. Worker Thread State Isolation & Cancellation
-# ==============================================================================
 
 
 def test_process_worker_cancellation_during_clean_or_parse(tmp_path, qapp):
@@ -314,7 +300,6 @@ def test_process_worker_cancellation_during_clean_or_parse(tmp_path, qapp):
     worker.cancelled.connect(lambda: signals_emitted.append("cancelled"))
     worker.completed.connect(lambda res: signals_emitted.append("completed"))
 
-    # Pre-cancel worker before starting
     worker.cancel()
     worker.run()
 
@@ -340,9 +325,7 @@ def test_process_subtitles_cancel_event_without_translation(tmp_path):
         )
 
 
-# ==============================================================================
 # 6. Atomic File Write Protection
-# ==============================================================================
 
 
 def test_atomic_write_preserves_destination_on_failure(tmp_path, monkeypatch):
@@ -367,20 +350,16 @@ def test_atomic_write_preserves_destination_on_failure(tmp_path, monkeypatch):
     assert len(remaining_tmps) == 0
 
 
-# ==============================================================================
 # 7. Reviewer Hardening & Adversarial Edge Cases
-# ==============================================================================
 
 
 def test_batch_processing_resets_cancellation_for_subsequent_runs(qapp, tmp_path):
     """Cancelling a batch must not prevent subsequent batch runs from executing."""
     win = MainWindow()
 
-    # Pre-cancel first batch
     win.cancel_batch()
     win._run_batch_processing()
 
-    # Now add a valid file and run a second batch
     valid_file = tmp_path / "subsequent.srt"
     valid_file.write_text(
         "1\n00:00:01,000 --> 00:00:02,000\nSubsequent\n", encoding="utf-8"
@@ -435,7 +414,6 @@ def test_run_burn_in_sync_failure_before_temp_output_cleans_up_safely(
     video = tmp_path / "dummy.mp4"
     video.write_bytes(b"dummy")
 
-    # Mock ffmpeg binary and duration
     monkeypatch.setattr(VideoBurnerService, "get_ffmpeg_path", lambda: "ffmpeg")
     monkeypatch.setattr(VideoBurnerService, "get_video_duration_ms", lambda *a: 5000)
     monkeypatch.setattr(

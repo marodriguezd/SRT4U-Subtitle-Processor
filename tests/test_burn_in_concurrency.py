@@ -48,21 +48,17 @@ def test_make_unique_burn_temp_properties(tmp_path):
 
 def test_destination_lock_lifecycle(tmp_path):
     dest = str(tmp_path / "target.mp4")
-    # Initial acquire succeeds
     assert acquire_burn_destination(dest) is True
-    # Duplicate acquire on same destination fails
     assert acquire_burn_destination(dest) is False
 
     # Relative path pointing to same canonical file also fails
     rel_dest = os.path.relpath(dest)
     assert acquire_burn_destination(rel_dest) is False
 
-    # Release allows subsequent acquisition
     release_burn_destination(dest)
     assert acquire_burn_destination(dest) is True
     release_burn_destination(dest)
 
-    # Safe to release unacquired path
     release_burn_destination(dest)
 
 
@@ -180,10 +176,8 @@ def test_run_burn_in_sync_failure_cleans_temp_and_releases_lock(tmp_path, monkey
 
     # Pre-existing file survives intact
     assert Path(out).read_bytes() == b"original-valid-content"
-    # No temporary files left behind
     leftovers = [n for n in os.listdir(tmp_path) if "srt4u-burn-tmp" in n]
     assert leftovers == []
-    # Lock was released so subsequent acquire succeeds
     assert acquire_burn_destination(out) is True
     release_burn_destination(out)
 
@@ -221,6 +215,5 @@ def test_burn_in_worker_cancel_cleans_temp_and_releases_lock(
     assert Path(out).read_bytes() == b"previous-good-content"
     leftovers = [n for n in os.listdir(tmp_path) if "srt4u-burn-tmp" in n]
     assert leftovers == []
-    # Destination lock was cleanly released
     assert acquire_burn_destination(out) is True
     release_burn_destination(out)

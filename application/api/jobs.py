@@ -215,18 +215,9 @@ class JobManager:
     def _prune_locked(self) -> None:
         """Drop finished jobs that are too old or beyond the retention cap.
 
-        Only terminal jobs are ever evicted, and the oldest go first, so a
-        client that polls normally always finds its own job. Callers must hold
-        ``self._lock``.
-
-        The cap compares the *total* dict size (live + finished minus already
-        dropped) against ``max_jobs``: dropping the oldest finished rows while
-        the total still exceeds the cap. The previous condition compared
-        ``survivors + len(to_drop) >= max_jobs`` (survivors = live jobs), which
-        only pruned while live jobs alone filled the cap — under fast workers
-        the final prune of a burst saw few live jobs and stranded finished
-        rows above the cap (race flake in
-        ``test_job_manager_prunes_completed_jobs``).
+        Only terminal jobs are evicted, oldest first, so a client that polls
+        normally always finds its own job. Callers must hold ``self._lock``.
+        The cap compares the total dict size, not live jobs alone.
         """
         if not self._jobs:
             return

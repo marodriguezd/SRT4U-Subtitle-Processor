@@ -83,17 +83,9 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
     ):
         app.include_router(module.router, prefix=API_PREFIX)
 
-    # Slow operations (translate/process/transcribe/pipeline) run as
-    # JobManager jobs and their payload travels inside
-    # JobStatusResponse.result, so FastAPI cannot infer the result shape
-    # while generating OpenAPI. Extend the generated schema so `result` is
-    # documented as the union of the job-result models (the routes already
-    # build those payloads with these very models — no business logic is
-    # duplicated), and ProcessResultModel keeps declaring parse_issues.
-    # Runtime responses stay plain dicts (the field is Dict[str, Any]); this
-    # only documents the served contract.
-    # (Standard "extending OpenAPI" pattern: wrap the generator, keep its
-    # cache, and only add what is missing.)
+    # Job payloads travel inside JobStatusResponse.result, so FastAPI cannot
+    # infer their shape while generating OpenAPI; extend the schema with the
+    # job-result models. Runtime responses stay plain dicts.
     original_openapi = app.openapi
     job_result_models = (
         ProcessResultModel,

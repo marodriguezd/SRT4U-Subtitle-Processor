@@ -425,11 +425,9 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        # 1. Sidebar navigation
         self.sidebar = self._build_sidebar()
         root_layout.addWidget(self.sidebar)
 
-        # 2. Main content stack
         self.stack = QStackedWidget()
         self.page_home = self._build_home_page()
         self.page_preview = self._build_preview_page()
@@ -467,7 +465,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 24, 16, 24)
         layout.setSpacing(8)
 
-        # Brand Header
         logo_layout = QHBoxLayout()
         logo_layout.setSpacing(12)
         logo_badge = LogoBadge()
@@ -493,7 +490,6 @@ class MainWindow(QMainWindow):
         layout.addLayout(logo_layout)
         layout.addSpacing(20)
 
-        # Nav Buttons
         self.nav_buttons: List[QPushButton] = []
         nav_items = [
             ("home", "nav.home", 0),
@@ -666,7 +662,6 @@ class MainWindow(QMainWindow):
             app.setStyleSheet(Styles.tooltip_qss(self.dark_mode))
         self._switch_page(self.stack.currentIndex())
 
-    # Home Page
     def _build_home_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -693,7 +688,6 @@ class MainWindow(QMainWindow):
         header_text.addWidget(self.lbl_home_title)
         header_text.addWidget(self.lbl_home_sub)
 
-        # Global language selector
         self.cb_top_lang = QComboBox()
         self.cb_top_lang.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
@@ -765,7 +759,6 @@ class MainWindow(QMainWindow):
         header_row.addWidget(self.btn_theme)
         layout.addLayout(header_row)
 
-        # Drop Zone
         self.drop_zone = DropZone()
         self.drop_zone.file_dropped.connect(self._on_file_selected)
         layout.addWidget(self.drop_zone)
@@ -777,7 +770,6 @@ class MainWindow(QMainWindow):
         sel_layout.setContentsMargins(18, 14, 18, 14)
         sel_layout.setSpacing(18)
 
-        # 1. Source language
         src_box = QVBoxLayout()
         src_box.setSpacing(6)
         self.lbl_src_lang = QLabel(t("home.source_lang"))
@@ -791,7 +783,6 @@ class MainWindow(QMainWindow):
         src_box.addWidget(self.lbl_src_lang)
         src_box.addWidget(self.cb_source_lang)
 
-        # 2. Target language
         tgt_box = QVBoxLayout()
         tgt_box.setSpacing(6)
         self.lbl_tgt_lang = QLabel(t("home.target_lang"))
@@ -804,7 +795,6 @@ class MainWindow(QMainWindow):
         tgt_box.addWidget(self.lbl_tgt_lang)
         tgt_box.addWidget(self.cb_target_lang)
 
-        # 3. Translation engine
         engine_box = QVBoxLayout()
         engine_box.setSpacing(6)
         self.lbl_engine = QLabel(t("home.engine"))
@@ -851,7 +841,6 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(self.card_parallel, 1, 1)
         layout.addLayout(grid_layout)
 
-        # Primary action button
         self.btn_process = QPushButton(t("home.btn_process"))
         self.btn_process.setObjectName("PrimaryBtn")
         self.btn_process.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -864,14 +853,12 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # Translation Studio Page
     def _build_preview_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
         page_layout.setContentsMargins(24, 18, 24, 18)
         page_layout.setSpacing(10)
 
-        # 1. Top Header & Action Buttons
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
         top_bar.setSpacing(12)
@@ -944,7 +931,6 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.btn_burn_in)
         page_layout.addLayout(top_bar)
 
-        # 2. Control & Search Toolbar
         toolbar = QFrame()
         toolbar.setStyleSheet(f"""
             QFrame {{
@@ -957,7 +943,6 @@ class MainWindow(QMainWindow):
         tb_layout.setContentsMargins(10, 6, 10, 6)
         tb_layout.setSpacing(14)
 
-        # Search bar
         self.preview_search_input = QLineEdit()
         self.preview_search_input.setPlaceholderText(t("preview.search_placeholder"))
         self.preview_search_input.setClearButtonEnabled(True)
@@ -986,7 +971,6 @@ class MainWindow(QMainWindow):
         self._pending_search = ""
         tb_layout.addWidget(self.preview_search_input, stretch=2)
 
-        # Counter badge
         self.lbl_preview_sub_counter = QLabel(t("preview.sub_count_zero"))
         self.lbl_preview_sub_counter.setStyleSheet(f"""
             QLabel {{
@@ -1001,7 +985,6 @@ class MainWindow(QMainWindow):
         """)
         tb_layout.addWidget(self.lbl_preview_sub_counter)
 
-        # Auto-scroll toggle
         self.chk_autoscroll = QCheckBox(t("preview.autoscroll"))
         self.chk_autoscroll.setChecked(True)
         self.chk_autoscroll.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1046,7 +1029,6 @@ class MainWindow(QMainWindow):
         self.video_player = VideoPreviewPlayer()
         self.diff_viewer = SubtitleDiffViewer()
 
-        # Connect signals
         self.diff_viewer.subtitles_edited.connect(self._on_subtitles_edited)
         self.diff_viewer.cue_selected.connect(self.video_player.seek_to_ms)
         self.diff_viewer.count_changed.connect(self._on_preview_count_changed)
@@ -1065,7 +1047,6 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(splitter, stretch=1)
         return page
 
-    # Clean Page
     def _build_clean_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1107,7 +1088,6 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # Convert Page
     def _build_convert_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1166,7 +1146,6 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # Transcribe Page
     def _build_transcribe_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1468,7 +1447,6 @@ class MainWindow(QMainWindow):
             t("transcribe.error_generic"),
         )
 
-    # Pipeline Page
     def _build_pipeline_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1870,7 +1848,6 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # Settings Page
     def _build_settings_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -1886,7 +1863,6 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(self.lbl_settings_title)
 
-        # 1. Interface Language Card
         lang_card = QFrame()
         lang_card.setObjectName("CardContainer")
         l_layout = QVBoxLayout(lang_card)
@@ -1927,7 +1903,6 @@ class MainWindow(QMainWindow):
         l_layout.addWidget(self.lbl_lang_effective)
         layout.addWidget(lang_card)
 
-        # 2. DeepL Card
         deepl_card = QFrame()
         deepl_card.setObjectName("CardContainer")
         d_layout = QVBoxLayout(deepl_card)
@@ -1966,7 +1941,6 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(deepl_card)
 
-        # 3. OpenAI / LLM Card
         openai_card = QFrame()
         openai_card.setObjectName("CardContainer")
         o_layout = QVBoxLayout(openai_card)
@@ -2008,7 +1982,6 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # Completed Page
     def _build_completed_page(self) -> QWidget:
         page = QWidget()
         page_layout = QVBoxLayout(page)
@@ -2043,7 +2016,6 @@ class MainWindow(QMainWindow):
         header_layout.addStretch()
         layout.addLayout(header_layout)
 
-        # Metric cards
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(14)
         self.card_lines = MetricCard("file", "0", t("completed.card_lines"))
@@ -2054,7 +2026,6 @@ class MainWindow(QMainWindow):
         cards_layout.addWidget(self.card_time)
         layout.addLayout(cards_layout)
 
-        # Action buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
         self.btn_open_file = QPushButton(t("completed.btn_open_file"))
@@ -2096,7 +2067,6 @@ class MainWindow(QMainWindow):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-        # Summary card
         summary_card = QFrame()
         summary_card.setObjectName("CardContainer")
         s_layout = QVBoxLayout(summary_card)
@@ -2123,7 +2093,6 @@ class MainWindow(QMainWindow):
         page_layout.addWidget(container, alignment=Qt.AlignmentFlag.AlignHCenter)
         return page
 
-    # Actions and Workflow
     def _on_file_selected(self, subtitle_path: str, video_path: str):
         # DropZone tracks its own video path; MainWindow only needs the subtitle.
         self.current_subtitle_path = subtitle_path
@@ -2528,7 +2497,6 @@ class MainWindow(QMainWindow):
         if self.saved_output_path and os.path.exists(self.saved_output_path):
             reveal_path(self.saved_output_path)
 
-    # Batch Processing
     def _add_batch_files(self):
         files = ask_open_files(self, t("batch.title"), t("preview.sub_filter"))
         for f in files:
@@ -2639,7 +2607,6 @@ class MainWindow(QMainWindow):
                 self, t("alert.batch_done_title"), t("alert.batch_done_desc")
             )
 
-    # Settings Management
     def _load_config_values(self):
         self.txt_deepl_key.setText(self.config_service.get("deepl_api_key", ""))
         is_pro = self.config_service.get("deepl_type", "free") == "pro"
@@ -2728,7 +2695,6 @@ class MainWindow(QMainWindow):
             self, t("settings.save_success_title"), t("settings.save_success")
         )
 
-    # About Page
     def _btn_link_style(self) -> str:
         return """
             QPushButton {
@@ -2899,7 +2865,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(36, 28, 36, 28)
         layout.setSpacing(20)
 
-        # 1. Header with identity
         header_card = QFrame()
         header_card.setObjectName("CardContainer")
         h_layout = QHBoxLayout(header_card)
@@ -2952,7 +2917,6 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(header_card)
 
-        # 2. Developer card
         dev_card = QFrame()
         dev_card.setObjectName("CardContainer")
         d_layout = QVBoxLayout(dev_card)
@@ -3027,7 +2991,6 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(dev_card)
 
-        # 3. License and legal terms card
         lic_card = QFrame()
         lic_card.setObjectName("CardContainer")
         l_layout = QVBoxLayout(lic_card)
@@ -3191,7 +3154,7 @@ class MainWindow(QMainWindow):
                 self.cb_top_lang.setToolTip(t("topbar.lang_tooltip"))
 
     def retranslate_ui(self):
-        # 0. Global chrome
+        # Global chrome
         self.setWindowTitle(t("about.title"))
         if hasattr(self, "lbl_app_sub"):
             self.lbl_app_sub.setText(t("app.subtitle"))
@@ -3210,13 +3173,13 @@ class MainWindow(QMainWindow):
             self.cb_settings_lang.setItemText(0, t("settings.lang_auto"))
         self._refresh_effective_language()
 
-        # 1. Sidebar Nav
+        # Sidebar Nav
         for btn in self.nav_buttons:
             key = btn.property("i18n_key")
             if key:
                 btn.setText(_nav_label(key))
 
-        # 2. Home Page
+        # Home Page
         if hasattr(self, "lbl_home_title"):
             self.lbl_home_title.setText(t("home.title"))
             self.lbl_home_sub.setText(t("home.subtitle"))
@@ -3232,7 +3195,7 @@ class MainWindow(QMainWindow):
             self.btn_process.setText(t("home.btn_process"))
             self.drop_zone.retranslate()
 
-        # 3. Preview / Studio Page
+        # Preview / Studio Page
         if hasattr(self, "lbl_preview_title"):
             self.lbl_preview_title.setText(t("preview.title"))
             self.lbl_preview_sub.setText(t("preview.subtitle"))
@@ -3246,14 +3209,14 @@ class MainWindow(QMainWindow):
             self.diff_viewer.retranslate()
             self.video_player.retranslate()
 
-        # 4. Clean Page
+        # Clean Page
         if hasattr(self, "lbl_clean_title"):
             self.lbl_clean_title.setText(t("clean.title"))
             self.lbl_clean_sub.setText(t("clean.subtitle"))
             self.btn_fast_clean.setText(t("clean.btn_clean"))
             self.clean_drop_zone.retranslate()
 
-        # 5. Convert Page
+        # Convert Page
         if hasattr(self, "lbl_convert_title"):
             self.lbl_convert_title.setText(t("convert.title"))
             self.lbl_convert_sub.setText(t("convert.subtitle"))
@@ -3261,7 +3224,7 @@ class MainWindow(QMainWindow):
             self.btn_run_convert.setText(t("convert.btn_convert"))
             self.convert_drop_zone.retranslate()
 
-        # 5b. Transcribe Page
+        # Transcribe Page
         if hasattr(self, "lbl_transcribe_title"):
             self.lbl_transcribe_title.setText(t("transcribe.title"))
             self.lbl_transcribe_sub.setText(t("transcribe.subtitle"))
@@ -3275,7 +3238,7 @@ class MainWindow(QMainWindow):
             self.btn_start_transcribe.setText(t("transcribe.btn_start"))
             self._refresh_transcribe_availability()
 
-        # 5c. Pipeline Page
+        # Pipeline Page
         if hasattr(self, "lbl_pipeline_title"):
             self.lbl_pipeline_title.setText(t("pipeline.title"))
             self.lbl_pipeline_sub.setText(t("pipeline.subtitle"))
@@ -3295,7 +3258,7 @@ class MainWindow(QMainWindow):
             self.btn_choose_video_out.setText(t("pipeline.btn_video_out"))
             self.btn_start_pipeline.setText(t("pipeline.btn_start"))
 
-        # 6. Batch Page
+        # Batch Page
         if hasattr(self, "lbl_batch_title"):
             self.lbl_batch_title.setText(t("batch.title"))
             self.lbl_batch_sub.setText(t("batch.subtitle"))
@@ -3311,7 +3274,7 @@ class MainWindow(QMainWindow):
             )
             self.btn_start_batch.setText(t("batch.btn_start"))
 
-        # 7. Settings Page
+        # Settings Page
         if hasattr(self, "lbl_settings_title"):
             self.lbl_settings_title.setText(t("settings.title"))
             self.lbl_lang_card_title.setText(t("settings.lang_card_title"))
@@ -3329,7 +3292,7 @@ class MainWindow(QMainWindow):
             )
             self.btn_save_settings.setText(t("settings.btn_save"))
 
-        # 8. Completed Page
+        # Completed Page
         if hasattr(self, "lbl_completed_title"):
             self.lbl_completed_title.setText(t("completed.title"))
             self.lbl_completed_sub.setText(t("completed.subtitle"))
@@ -3344,7 +3307,7 @@ class MainWindow(QMainWindow):
             self.lbl_sum2.setText(t("completed.sum2"))
             self.lbl_sum3.setText(t("completed.sum3"))
 
-        # 9. About Page
+        # About Page
         if hasattr(self, "lbl_about_status"):
             self.lbl_about_title.setText(t("about.title"))
             self.lbl_version_badge.setText(t("about.version_pill"))
@@ -3364,7 +3327,7 @@ class MainWindow(QMainWindow):
             self.btn_open_license.setText(t("about.btn_open_license"))
             self.btn_web_deed.setText(t("about.btn_web_deed"))
 
-        # 10. History Page
+        # History Page
         if hasattr(self, "lbl_history_title"):
             self.lbl_history_title.setText(t("history.title"))
             self.lbl_history_sub.setText(t("history.subtitle"))

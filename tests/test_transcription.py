@@ -105,7 +105,7 @@ def api_client():
         yield test_client
 
 
-# -- registry & abstraction -------------------------------------------------
+# Registry & abstraction
 
 
 def test_registry_has_whisper_and_rejects_unknown():
@@ -140,7 +140,7 @@ def test_config_language_normalization():
     assert TranscriptionConfig(language=" es ").normalized_language() == "es"
 
 
-# -- models & metrics --------------------------------------------------------
+# Models & metrics
 
 
 def test_metrics_realtime_factor_only_when_known():
@@ -216,7 +216,7 @@ def test_segments_to_subtitle_items_validates():
     assert items[2].start_ms == 0
 
 
-# -- service: validation, rendering ------------------------------------------
+# Service: validation, rendering
 
 
 def test_service_rejects_missing_and_unsupported(media_file):
@@ -275,7 +275,7 @@ def test_check_available_reports_missing_backend():
         service.check_available("whisper")
 
 
-# -- analytics / QA reuse ------------------------------------------------------
+# Analytics / QA reuse
 
 
 def test_transcription_feeds_analytics_and_qa(fake_registry, media_file):
@@ -292,7 +292,7 @@ def test_transcription_feeds_analytics_and_qa(fake_registry, media_file):
     assert report_only.passed
 
 
-# -- history -------------------------------------------------------------------
+# History
 
 
 def test_history_records_transcription_without_texts(
@@ -319,7 +319,7 @@ def test_history_records_transcription_without_texts(
     assert "hola mundo" not in blob
 
 
-# -- CLI -------------------------------------------------------------------------
+# CLI
 
 
 def test_cli_transcribe_with_fake(
@@ -401,7 +401,7 @@ def test_cli_transcribe_bad_extension(tmp_path, fake_registry, capsys):
     assert code == 2
 
 
-# -- API ---------------------------------------------------------------------------
+# API
 
 
 def _wait_job(client, job_id, timeout=15.0):
@@ -474,7 +474,7 @@ def test_api_transcribe_openapi_lists_route(api_client):
     assert "/api/v1/transcribe" in spec["paths"]
 
 
-# -- GUI -----------------------------------------------------------------------------
+# GUI
 
 
 def test_transcribe_page_wired(qapp):
@@ -500,7 +500,7 @@ def test_transcribe_page_wired(qapp):
     assert media_filter.endswith(win.i18n.t("dialog.all_files"))
 
 
-# -- jobs ----------------------------------------------------------------------------
+# Jobs
 
 
 def test_job_cancel_marks_cancelled():
@@ -524,7 +524,7 @@ def test_job_cancel_marks_cancelled():
     manager.shutdown()
 
 
-# -- full fake integration ---------------------------------------------------------------
+# Full fake integration
 
 
 def test_fake_transcription_end_to_end(fake_registry, media_file, tmp_path):

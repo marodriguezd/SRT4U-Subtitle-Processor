@@ -200,7 +200,7 @@ def _ok_stages(result):
     return {stage.name: stage.status for stage in result.stages}
 
 
-# 1. minimal pipeline: fake transcription -> SRT ---------------------------------
+# 1. Minimal pipeline: fake transcription -> SRT
 
 
 def test_minimal_transcription_to_srt(fakes, media_file, tmp_path):
@@ -227,7 +227,7 @@ def test_minimal_transcription_to_srt(fakes, media_file, tmp_path):
     assert result.total_duration_ms >= 0
 
 
-# 2. transcription -> analytics -> QA ----------------------------------------------
+# 2. Transcription -> analytics -> QA
 
 
 def test_transcription_analytics_qa(fakes, media_file, tmp_path):
@@ -245,7 +245,7 @@ def test_transcription_analytics_qa(fakes, media_file, tmp_path):
     assert set(result.qa_before) == set(result.qa_after)
 
 
-# 3. transcription -> cleaning -> export ----------------------------------------------
+# 3. Transcription -> cleaning -> export
 
 
 def test_cleaning_stage_removes_spam(fakes, tmp_path):
@@ -265,7 +265,7 @@ def test_cleaning_stage_removes_spam(fakes, tmp_path):
     assert "Hello world" in content
 
 
-# 4. transcription -> translation with fake ----------------------------------------------
+# 4. Transcription -> translation with fake
 
 
 def test_translation_stage_keeps_metrics(fakes, media_file, tmp_path):
@@ -288,7 +288,7 @@ def test_translation_stage_keeps_metrics(fakes, media_file, tmp_path):
     assert "[en]" in result.output_content
 
 
-# 5. pipeline with fallback ----------------------------------------------
+# 5. Pipeline with fallback
 
 
 def test_translation_fallback_used(fakes, media_file, tmp_path):
@@ -322,7 +322,7 @@ def test_translation_fallback_used(fakes, media_file, tmp_path):
     assert result.translation_metrics.requested_provider == "openai"
 
 
-# 6. transcription failure ----------------------------------------------
+# 6. Transcription failure
 
 
 def test_transcription_failure_binds_stage(fakes, media_file, tmp_path):
@@ -338,7 +338,7 @@ def test_transcription_failure_binds_stage(fakes, media_file, tmp_path):
     assert _ok_stages(result).get("export") != "ok"
 
 
-# 7. translation failure ----------------------------------------------
+# 7. Translation failure
 
 
 def test_translation_failure_binds_stage(fakes, media_file, tmp_path):
@@ -384,7 +384,7 @@ def test_partial_translation_failure_keeps_original_cue_and_exports(
     assert "[en]" in result.output_content
 
 
-# 8. strict QA ----------------------------------------------
+# 8. Strict QA
 
 
 def test_strict_qa_stops_pipeline(tmp_path):
@@ -412,7 +412,7 @@ def test_strict_qa_stops_pipeline(tmp_path):
     assert ok_result.qa_before["passed"] is True
 
 
-# 9. burn-in with mock ----------------------------------------------
+# 9. Burn-in with mock
 
 
 def test_burn_in_uses_runner(fakes, media_file, tmp_path):
@@ -538,7 +538,7 @@ def test_burn_in_config_errors(tmp_path, srt_file):
         PipelineConfig(input_media=srt_file, burn_in_enabled=True).validate()
 
 
-# 10. cancellation ----------------------------------------------
+# 10. Cancellation
 
 
 def test_cancel_before_stages(media_file, tmp_path):
@@ -586,7 +586,7 @@ def test_cancel_mid_transcription(fakes, media_file, tmp_path):
     assert exported == []
 
 
-# 11. history ----------------------------------------------
+# 11. History
 
 
 def test_history_main_record(fakes, media_file, tmp_path):
@@ -649,7 +649,7 @@ def test_history_partial_translation_failure_count(fakes, media_file, tmp_path):
     assert rows[0]["translation_failures"] == 1
 
 
-# 12. JSON serialization ----------------------------------------------
+# 12. JSON serialization
 
 
 def test_result_json_roundtrip(fakes, media_file, tmp_path):
@@ -673,7 +673,7 @@ def test_result_json_roundtrip(fakes, media_file, tmp_path):
     assert payload["failed_stage"] == "transcription"
 
 
-# 13. CLI ----------------------------------------------
+# 13. CLI
 
 
 def test_cli_pipeline_subtitle(fakes, tmp_path, capsys):
@@ -722,7 +722,7 @@ def test_cli_pipeline_stats_json_and_failure(fakes, tmp_path, capsys):
     assert exc_info.value.code == 2
 
 
-# 14. API ----------------------------------------------
+# 14. API
 
 
 def _wait_job(client, job_id, timeout=15.0):
@@ -803,7 +803,7 @@ def test_api_pipeline_validation(api_client):
     assert "/api/v1/pipeline" in spec["paths"]
 
 
-# -- GUI -----------------------------------------------------------------------------
+# GUI
 
 
 def test_pipeline_page_wired(qapp):
@@ -822,7 +822,7 @@ def test_pipeline_page_wired(qapp):
     assert "nav.pipeline" in [b.property("i18n_key") for b in win.nav_buttons]
 
 
-# 15. full fake end-to-end ----------------------------------------------
+# 15. Full fake end-to-end
 
 
 def test_full_end_to_end(fakes, media_file, tmp_path):
@@ -871,7 +871,7 @@ def test_full_end_to_end(fakes, media_file, tmp_path):
     json.dumps(result.to_dict())
 
 
-# -- hardening: job drop cleanup + no server paths ---------------------------------
+# Hardening: job drop cleanup + no server paths
 
 
 def test_queued_cancel_runs_on_drop():

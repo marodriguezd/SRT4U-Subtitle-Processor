@@ -495,12 +495,9 @@ class SubtitleService:
             if not line:
                 i += 1
                 continue
-            # D3: WEBVTT metadata blocks (NOTE/STYLE/REGION) run from their
-            # header until the next blank line. Skipping only the header line
-            # re-scanned the body, so a timecode inside a NOTE became a phantom
-            # cue. Consume the whole block instead. STYLE blocks may contain
-            # VTT selectors with '-->' is impossible, but a NOTE body can cite
-            # timestamps, so the block skip is what matters — not the text.
+            # D3: NOTE/STYLE/REGION blocks run until the next blank line.
+            # Skipping only the header re-scanned the body and turned a
+            # timecode inside a NOTE into a phantom cue.
             if (
                 line == "NOTE"
                 or line.startswith(("NOTE ", "NOTE\t"))
@@ -1166,7 +1163,6 @@ class SubtitleService:
         check_cancelled()
         start_time = time.time()
 
-        # Step 1: Reading
         if progress_callback:
             progress_callback("step_reading", True)
 
@@ -1176,7 +1172,6 @@ class SubtitleService:
         source_format = self.detect_format(content, file_path)
         out_format = target_format or source_format
 
-        # Step 2: Analysis
         if progress_callback:
             progress_callback("step_analyzing", True)
 
@@ -1193,7 +1188,6 @@ class SubtitleService:
         deleted_lines_count = 0
         check_cancelled()
 
-        # Step 3: Cleaning
         if do_clean:
             if progress_callback:
                 progress_callback("step_cleaning", True)
@@ -1202,7 +1196,6 @@ class SubtitleService:
             )
             check_cancelled()
 
-        # Step 4: Translation
         translation_failures = 0
         if do_translate and target_language:
             if progress_callback:
@@ -1219,14 +1212,12 @@ class SubtitleService:
             translation_failures = self.last_translation_failures
             check_cancelled()
 
-        # Step 5: Apply original formatting
         if progress_callback:
             progress_callback("step_formatting", True)
 
         output_content = self.format_output(current_items, out_format)
         check_cancelled()
 
-        # Step 6: Saving
         if progress_callback:
             progress_callback("step_saving", True)
 

@@ -107,10 +107,8 @@ def test_i18n_fallback():
 def test_main_window_i18n_switching(qapp):
     win = MainWindow()
 
-    # Default UI language test
     assert win.i18n is not None
 
-    # Switch to English
     win.cb_top_lang.setCurrentIndex(win.cb_top_lang.findData("en"))
     assert win.i18n.current_language == "en"
     assert win.nav_buttons[0].text().strip() == "Home"
@@ -118,10 +116,8 @@ def test_main_window_i18n_switching(qapp):
     assert win.btn_fast_clean.text().strip() == "Clean File Now"
     assert not win.btn_fast_clean.icon().isNull()
 
-    # Verify settings combo is synchronized
     assert win.cb_settings_lang.currentData() == "en"
 
-    # Switch to Spanish via settings combo
     win.cb_settings_lang.setCurrentIndex(win.cb_settings_lang.findData("es"))
     assert win.i18n.current_language == "es"
     assert win.nav_buttons[0].text().strip() == "Inicio"
@@ -130,7 +126,6 @@ def test_main_window_i18n_switching(qapp):
     assert not win.btn_fast_clean.icon().isNull()
     assert win.cb_top_lang.currentData() == "es"
 
-    # Switch to German
     win.cb_top_lang.setCurrentIndex(win.cb_top_lang.findData("de"))
     assert win.i18n.current_language == "de"
     assert win.nav_buttons[0].text().strip() == "Startseite"
@@ -138,7 +133,6 @@ def test_main_window_i18n_switching(qapp):
     assert win.btn_fast_clean.text().strip() == "Datei jetzt bereinigen"
     assert not win.btn_fast_clean.icon().isNull()
 
-    # Switch to Chinese
     win.cb_top_lang.setCurrentIndex(win.cb_top_lang.findData("zh-CN"))
     assert win.i18n.current_language == "zh-CN"
     assert win.nav_buttons[0].text().strip() == "首页"

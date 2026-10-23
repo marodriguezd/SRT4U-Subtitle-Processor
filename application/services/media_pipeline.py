@@ -413,7 +413,7 @@ class MediaPipeline:
             )
         )
 
-    # -- stages -----------------------------------------------------------
+    # Stages
 
     def _run_stage(
         self,
@@ -858,10 +858,8 @@ def run_burn_in_sync(
                     "burn_in_error",
                     "Video encoding failed; see the application log",
                 )
-            # D1: promote only on success. If the process dies between FFmpeg
-            # finishing and this rename, the final file is untouched and a
-            # ``*.srt4u-burn-tmp.*`` sibling is left behind instead of a
-            # destroyed destination.
+            # D1: promote only on success; a crash before this rename leaves
+            # the destination intact and a ``*.srt4u-burn-tmp.*`` sibling.
             os.replace(temp_output, final_path)
         finally:
             if process is not None and process.poll() is None:

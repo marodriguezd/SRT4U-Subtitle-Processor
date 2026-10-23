@@ -107,7 +107,7 @@ class VideoBurnerService:
         """
         candidates = []
 
-        # 1. PyInstaller bundled path
+        # PyInstaller bundled path
         if hasattr(sys, "_MEIPASS"):
             exe_name = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
             candidates.append(os.path.join(sys._MEIPASS, exe_name))
@@ -121,19 +121,19 @@ class VideoBurnerService:
             candidates.append(os.path.join(exe_dir, "bin", "ffmpeg.exe"))
             candidates.append(os.path.join(exe_dir, "..", "Resources", "ffmpeg"))
 
-        # 2. Local app directory bin/
+        # Local app directory bin/
         app_root = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
         local_exe = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
         candidates.append(os.path.join(app_root, "bin", local_exe))
 
-        # 3. System PATH
+        # System PATH
         system_ffmpeg = shutil.which("ffmpeg")
         if system_ffmpeg:
             candidates.append(system_ffmpeg)
 
-        # 4. Common Linux/Unix fallbacks
+        # Common Linux/Unix fallbacks
         for fallback in [
             "/usr/bin/ffmpeg",
             "/usr/local/bin/ffmpeg",
@@ -236,7 +236,7 @@ class VideoBurnerService:
         Scales font metrics and margins to the video frame resolution while
         optionally fixing temporal overlaps.
         """
-        # 1. Sanitize timestamps and resolve temporal overlaps if enabled
+        # Sanitize timestamps and resolve temporal overlaps if enabled
         processed_items: List[SubtitleItem] = []
         if items:
             sorted_items = sorted(items, key=lambda x: (x.start_ms, x.end_ms))
@@ -265,7 +265,7 @@ class VideoBurnerService:
                                 curr_item.start_ms + 200, next_item.start_ms - 40
                             )
 
-        # 2. Reference resolution (PlayResX / PlayResY)
+        # Reference resolution (PlayResX / PlayResY)
         vw = max(320, video_width)
         vh = max(240, video_height)
 
@@ -423,17 +423,14 @@ class BurnInWorker(QThread):
             )
             temp_dir = tempfile.mkdtemp(prefix="srt4u_burn_")
 
-            # 2. Generate ASS file in temporary directory
+            # Generate ASS file in temporary directory
             ass_filename = "subtitles.ass"
             ass_path = os.path.join(temp_dir, ass_filename)
             stderr_log_path = os.path.join(temp_dir, "ffmpeg_stderr.log")
 
-            # D1: FFmpeg never opens the final destination. It used to receive
-            # ``output_path`` with ``-y``, so any file already at that path was
-            # truncated the moment encoding started and the cancel/failure
-            # branches then deleted it. Encode into a sibling temp file and
-            # promote it with ``os.replace`` only after a clean exit; every other
-            # path removes just the temp.
+            # D1: FFmpeg never opens the final destination. Encode into a
+            # sibling temp and promote it with ``os.replace`` only after a clean
+            # exit; every other path removes just the temp.
             final_path = os.path.abspath(self.output_path)
             temp_output = make_unique_burn_temp(self.output_path)
 
@@ -443,7 +440,7 @@ class BurnInWorker(QThread):
             with open(ass_path, "w", encoding="utf-8") as f:
                 f.write(ass_content)
 
-            # 3. Configure encoding parameters
+            # Configure encoding parameters
             if self.options.quality_preset == "fast":
                 v_preset = "ultrafast"
                 v_crf = "23"

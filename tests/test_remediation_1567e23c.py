@@ -125,7 +125,7 @@ def _make_video(ffmpeg, path, seconds):
     )
 
 
-# ================================================================== D1 =====
+# D1
 
 
 @pytest.fixture(scope="module")
@@ -364,7 +364,7 @@ def test_d1_burnin_worker_ffmpeg_failure_preserves_preexisting_output(
     worker.deleteLater()
 
 
-# ================================================================== D2 =====
+# D2
 
 
 def _dialogue_style_fields(document):
@@ -469,7 +469,7 @@ def test_d2_build_ass_document_event_styles_parameter():
     assert "Style: bad" not in unsafe
 
 
-# ================================================================== D3 =====
+# D3
 
 
 def test_d3_note_block_with_timestamp_is_not_a_cue():
@@ -525,7 +525,7 @@ def test_d3_unterminated_metadata_block_consumes_rest_of_file():
     assert service.last_parse_issues == []
 
 
-# ================================================================== D4 =====
+# D4
 
 
 def test_d4_srt_above_99_hours_parser_and_qa_agree():
@@ -626,7 +626,7 @@ def test_d4_cross_layer_contract_canonical_inputs_produce_no_structural_errors()
         assert not structural, (source, fmt, structural)
 
 
-# ================================================================== D5 =====
+# D5
 
 
 def test_d5_safe_detail_keeps_pipeline_config_message():
@@ -659,7 +659,7 @@ def test_d5_pipeline_route_returns_useful_422_detail(client):
     assert "Traceback" not in response.text
 
 
-# ================================================================== D6 =====
+# D6
 
 
 def _slow_process_patch(monkeypatch, release):
@@ -772,7 +772,7 @@ def test_d6_transcription_second_start_rejected(qapp, tmp_path, monkeypatch):
         window.deleteLater()
 
 
-# ================================================================== P1 =====
+# P1
 
 
 def test_p1_pipeline_result_preserves_parse_issues(tmp_path):
@@ -962,7 +962,7 @@ def test_p1_gui_history_exposes_parse_issue_column(qapp):
         window.deleteLater()
 
 
-# ================================================ test-quality upgrades ====
+# Test-quality upgrades
 
 
 def test_ass_style_test_verifies_real_dialogue_assignment_not_declarations():
