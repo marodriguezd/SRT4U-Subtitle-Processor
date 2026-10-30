@@ -21,7 +21,7 @@ dependencies = [
 desktop = ["PyQt6>=6.6.1,<6.12", "deep-translator>=1.11.4"]
 # fastapi 0.147 stopped applying Form defaults to omitted booleans, which
 # silently disables pipeline transcription/cleaning/QA; stay below it.
-api = ["fastapi>=0.115,<0.147", "uvicorn>=0.30", "python-multipart>=0.0.18", "httpx>=0.27"]
+api = ["fastapi>=0.115,<0.163", "uvicorn>=0.30", "python-multipart>=0.0.18", "httpx>=0.27"]
 transcription = ["faster-whisper>=1.0"]
 # ``tomli`` backports ``tomllib`` for the 3.10 floor read by the coherence and
 # packaging guards (the fallback lives in tests/_toml_compat.py).
