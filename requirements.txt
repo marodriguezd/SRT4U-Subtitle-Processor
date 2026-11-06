@@ -1,5 +1,5 @@
 # Exact mirror of [project].dependencies in pyproject.toml (a drift fails CI).
 # 6.6.1 is the verified minimum, <6.12 skips unverified minors; the
 # compat-min-pyqt6 job greps the bound here and revalidates it alone.
-PyQt6>=6.6.1,<6.12
+PyQt6>=6.6.1,<6.13
 deep-translator>=1.11.4
